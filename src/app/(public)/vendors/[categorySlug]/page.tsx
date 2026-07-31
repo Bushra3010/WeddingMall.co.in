@@ -1,23 +1,46 @@
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 
+import { AttributeFilters } from '@/components/public/attribute-filters'
 import { SearchResults } from '@/components/public/search-results'
 import { CardSkeleton } from '@/components/ui/states'
 import { parseSearchParams } from '@/features/search/filters'
 import { breadcrumbSchema, buildMetadata } from '@/lib/seo'
-import { getCategoryBySlug, listCities } from '@/server/dal/taxonomy'
+import {
+  getCategoryBySlug,
+  listCities,
+  resolveSlugRedirect,
+  listFilterableAttributes,
+} from '@/server/dal/taxonomy'
 
 type Params = Promise<{ categorySlug: string }>
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 export const revalidate = 900
 
+/**
+ * Renamed slugs must redirect BEFORE the response starts streaming.
+ *
+ * generateMetadata resolves before the shell is flushed, so a redirect raised
+ * there produces a real 308. Raising it inside the page component happens after
+ * the first bytes are out, and Next degrades to an HTTP 200 carrying a
+ * meta-refresh — which a crawler reads as a 200 "not found" page, exactly the
+ * outcome PRD 11.2 is trying to avoid.
+ */
+async function redirectRenamedSlug(slug: string) {
+  const current = await resolveSlugRedirect('category', slug)
+  if (current && current !== slug) permanentRedirect(`/vendors/${current}`)
+}
+
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { categorySlug } = await params
   const category = await getCategoryBySlug(categorySlug)
-  if (!category) return buildMetadata({ title: 'Category not found', noindex: true })
+  if (!category) {
+    await redirectRenamedSlug(categorySlug)
+    return buildMetadata({ title: 'Category not found', noindex: true })
+  }
 
   return buildMetadata({
     title: category.seo_title ?? `${category.name} for weddings`,
@@ -36,8 +59,15 @@ export default async function CategoryPage({
   searchParams: SearchParams
 }) {
   const { categorySlug } = await params
-  const [category, cities] = await Promise.all([getCategoryBySlug(categorySlug), listCities(12)])
-  if (!category) notFound()
+  const [category, cities, attributeFilters] = await Promise.all([
+    getCategoryBySlug(categorySlug),
+    listCities(12),
+    listFilterableAttributes(categorySlug),
+  ])
+  if (!category) {
+    await redirectRenamedSlug(categorySlug)
+    notFound()
+  }
 
   const filters = { ...parseSearchParams(await searchParams), category: category.slug }
   const basePath = `/vendors/${category.slug}`
@@ -105,6 +135,12 @@ export default async function CategoryPage({
             ))}
           </ul>
         </nav>
+      ) : null}
+
+      {attributeFilters.length > 0 ? (
+        <div className="border-sand-200 mt-6 rounded-[var(--radius-card)] border bg-white p-4">
+          <AttributeFilters attributes={attributeFilters} filters={filters} basePath={basePath} />
+        </div>
       ) : null}
 
       <div className="mt-8">

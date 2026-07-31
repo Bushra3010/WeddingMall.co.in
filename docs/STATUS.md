@@ -1,62 +1,59 @@
 # Status
 
-Updated: 2026-07-31
+Updated: 2026-08-01
 
 ## Completed
 
 - **Prompt 0 — repository blueprint.** Next.js 16 / React 19 / TS strict / Tailwind v4, structure per PRD 8.2, pinned dependencies, env schema, CI.
 - **Milestone 1 — foundation.** App shell, three Supabase clients, SSR session refresh, profile trigger, permission catalogue (TS + SQL), route protection, env validation, error boundaries, design tokens.
-- **Milestone 2 — vendor onboarding.** Taxonomy admin, vendor organisations and memberships, onboarding draft with completion score, private verification uploads, submission, and admin approve / request-changes / reject / suspend with audit events.
-- **Public discovery** (ahead of plan): homepage, search, category and category × city SEO routes, vendor profile, sitemap, robots, structured data.
-- **Schema:** migrations `0001`–`0010` applied to the live project. 57 tables, 2 views, 13 enums, 88 FKs, 4 storage buckets, generated types.
+- **Milestone 2 — vendor onboarding.** Taxonomy admin, vendor organisations and memberships, onboarding draft with completion score, private verification uploads, submission, admin approve / request-changes / reject / suspend with audit events.
+- **Milestone 3 — listings and discovery.** Versioned listing editor, packages, portfolio with media moderation, availability, admin listing moderation with before/after comparison, slug redirects, and attribute-driven category filters.
+- **Schema:** migrations `0001`–`0013` applied to the live project.
 
 ## Verified
 
-| Check                | Result                                                                                          |
-| -------------------- | ----------------------------------------------------------------------------------------------- |
-| `npm run lint`       | pass, 0 warnings                                                                                |
-| `npm run typecheck`  | pass                                                                                            |
-| `npm run test`       | **69 passed** (permissions, enquiry transitions, money/dates, search filters, completion score) |
-| `npm run build`      | pass                                                                                            |
-| `npm run db:rls`     | **90 passed** (28 anon + 24 cross-tenant + 38 onboarding)                                       |
-| Migrations           | 10/10 applied clean                                                                             |
-| Journey 2 (PRD 17.4) | **walked end to end in a browser** — see below                                                  |
+| Check               | Result                                                                  |
+| ------------------- | ----------------------------------------------------------------------- |
+| `npm run lint`      | pass, 0 warnings                                                        |
+| `npm run typecheck` | pass                                                                    |
+| `npm run test`      | **90 passed** across 6 files                                            |
+| `npm run build`     | pass                                                                    |
+| `npm run db:rls`    | **116 passed** (28 anon + 24 cross-tenant + 38 onboarding + 26 listing) |
+| Migrations          | 13/13 applied clean                                                     |
+| Route smoke test    | public 200, dashboards 307, genuine 404 → **404**                       |
 
-### Journey 2, driven through the real UI
+### What the Milestone 3 probes prove
 
-Sign up → create business → onboarding (completion moved 34% → 49% as fields were saved) → submit for review → sign out → sign in as admin → verification queue → vendor detail → approve. Result: the listing became public, carried the verified badge, and was searchable by keyword and by category × city, all confirmed as an anonymous visitor.
+The central guarantee is that an edit to an approved listing does not reach the public until a moderator approves it. Every one of these failed before migration 0011:
 
-The Playwright spec for this is still skipped (see outstanding #5) — the walkthrough was manual.
+- Editing the draft does not change the public page, and the unreviewed text is not searchable.
+- Submitting an edit leaves the published version live; a second submission is refused while one is pending.
+- Anon cannot read a pending version, a draft listing row, or an unmoderated image.
+- A vendor cannot approve their own edit; an admin without `listing.moderate` cannot either.
+- `request_changes` is refused without a reason, and rejecting an edit leaves the published version untouched.
+- Approving publishes the new text, archives the version it replaces (rather than deleting it), and makes the new text searchable.
+- Availability rows are unreadable by anon; the public view exposes the status signal and no private note.
+- Renaming records a redirect, a second rename does not create a chain, and a live slug never redirects to itself.
 
-### What the Milestone 2 probes prove
+## Fixed during Milestone 3
 
-- An owner can create a business, bootstrap their own membership, and submit — but an outsider cannot use the bootstrap policy to join someone else's business.
-- A draft is invisible to anon _and_ to other signed-in users; submitting does not publish anything.
-- An editor can edit the listing but cannot invite members, submit for review, or read verification documents.
-- A manager cannot mint an owner.
-- Verification documents are readable only by vendor managers and admins holding `vendor.verify`; the private bucket is not publicly fetchable.
-- An admin without `vendor.verify` cannot approve; a vendor cannot approve itself; `vendor.verify` alone cannot suspend.
-- Every decision except approval is refused without a reason, and each writes an audit row that neither the vendor nor a non-`admin.manage` admin can read.
-
-## Fixed during Milestone 2
-
-1. **Onboarding was impossible** — three compounding RLS gaps in `0004` (ADR-012). Fixed in `0008`.
-2. **Admins could not see what they were approving** — five child tables had no admin read policy, so the verification queue showed "Category: —" (ADR-013). Fixed in `0010`. Found by driving the UI, not by probes.
-3. **Validation message crashed on the error path.** `missing || 'text'` in `submit_vendor_for_review` is ambiguous and raised `22P02`; the happy path passed while the "what's still needed" message failed. Fixed in `0009` with `array_append`.
-4. **Two type-generator defects** — partial unique indexes mistyped as one-to-one, and `text[]` degrading to `unknown[]` (ADR-014).
-5. **No way to sign out.** The `signOut` action existed but was wired to nothing. Added to the public header and both dashboard layouts.
+1. **Unreviewed edits went live instantly.** `public_vendors` read `vendor_listings` directly and `vendor_listing_versions` was never written to (ADR-015). Fixed in `0011`.
+2. **Draft content was publicly readable.** `vendor_listings` keeps `status = 'approved'` on the draft row after publication, so its public-read policy exposed the vendor's unreviewed working copy to anon — the exact content 0011 was written to protect. Fixed in `0013`.
+3. **Every 404 on the site returned HTTP 200.** A root `loading.tsx` wrapped all routes in Suspense, so streaming began before `notFound()` ran and the status could no longer be set. Soft 404s get indexed. Same cause made `permanentRedirect()` degrade to a meta-refresh (ADR-016).
+4. **The public availability signal never worked.** `public_vendor_availability` was `security_invoker` over a table anon cannot read, so it always returned zero rows (ADR-013 pattern again). Fixed in `0013`.
+5. **A render-phase `setState`** in the package editor would have thrown in React.
 
 ## Blocked / outstanding
 
-1. **Listing editor, packages, portfolio, availability are still stubs** — Milestone 3. The onboarding page collects the basics; the richer editors do not exist.
-2. **Team invitations require the invitee to already have an account.** `invite_vendor_member()` raises a clear error if not. Email invitations need the notification work in Milestone 4.
-3. **Slug changes are refused** in taxonomy admin — renaming would break published URLs without a `slug_redirects` entry. Milestone 3.
-4. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google. Needs a client ID/secret in the Supabase dashboard.
-5. **Playwright E2E has never been run.** Journey 2 is verified manually but its spec is still `test.skip`.
-6. **No check that the TS and SQL permission matrices agree** (ADR-004).
-7. **Public pages render dynamically** because `SiteHeader` reads the session. Milestone 7.
-8. **CSP not set.** Milestone 7.
-9. **Category attributes have no admin UI.** The table and seed data exist; `/admin/attributes` is still a stub.
+1. **Numeric attribute filters are exact-match only.** Range filtering needs an `attributeRanges` parameter in `search_vendors` — the seeded `capacity` and `price_per_plate` attributes are only usable as exact values today (ADR-018).
+2. **Media has no bulk reordering UI.** `reorderMedia` exists in the service layer but nothing calls it; ordering is by upload order plus cover selection.
+3. **Media is approved wholesale with the listing.** An admin cannot reject one image while approving the rest.
+4. **Enquiries, reviews, billing, and CMS remain stubs** — Milestones 4–6.
+5. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google.
+6. **Playwright E2E has never been run.** Journey 2 was verified manually in Milestone 2; the specs are still `test.skip`.
+7. **No check that the TS and SQL permission matrices agree** (ADR-004).
+8. **Public pages render dynamically** because `SiteHeader` reads the session. Milestone 7.
+9. **CSP not set.** Milestone 7.
 
 ## Credentials note
 
@@ -64,18 +61,22 @@ The Playwright spec for this is still skipped (see outstanding #5) — the walkt
 
 ## Next task
 
-Milestone 3 (PRD 19.6) — listing and public discovery:
+Milestone 4 (PRD 19.7) — customer and enquiry:
 
-1. Versioned listing editor (`vendor_listing_versions`) so an approved listing stays published while an edit is in review.
-2. Packages, portfolio upload with moderation, availability.
-3. Slug redirects, then enable renaming in taxonomy admin.
-4. Category attributes admin + attribute-driven search filters.
-5. Re-verify that a published listing never shows unapproved edits.
+1. Wedding profile and shortlist.
+2. Enquiry submission with idempotency and explicit contact consent.
+3. Lifecycle events on every transition (`enquiry_events` is append-only by design).
+4. Participant-authorised conversation thread and messages.
+5. In-app and email notifications.
+6. E2E journey 1.
 
-Extend `npm run db:rls` with each new boundary. Add both directions: that the unauthorised are denied **and** that the authorised can actually see what they need — that asymmetry is what hid ADR-013.
+The transition map already exists and is unit-tested in `src/features/enquiries/status.ts` — wire the service layer to it rather than re-deriving the rules.
+
+Keep extending `npm run db:rls` with each boundary, in **both** directions: that the unauthorised are denied and that the authorised can see what they need. That asymmetry hid two separate bugs across Milestones 2 and 3.
 
 ## Notes
 
 - All seed and demo data is fictional (PRD 2.3, Epic G). `node --env-file=.env.local scripts/seed-demo-vendors.mjs --clean` removes the demo vendors.
-- Grant yourself admin with `npm run grant-admin -- you@example.com` after signing up. There is no public admin sign-up (PRD 6.4).
+- Grant yourself admin with `npm run grant-admin -- you@example.com`. There is no public admin sign-up (PRD 6.4).
+- Do not add a `loading.tsx` above any route that calls `notFound()` or `redirect()` — see ADR-016.
 - Legal text in `supabase/seed.sql` is placeholder and must go to counsel before launch (PRD 14.3).

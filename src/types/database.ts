@@ -2102,6 +2102,8 @@ export interface Database {
           reason: string | null
           created_at: string
           decided_at: string | null
+          vendor_id: string
+          published_at: string | null
         }
         Insert: {
           id?: string
@@ -2113,6 +2115,8 @@ export interface Database {
           reason?: string | null
           created_at?: string
           decided_at?: string | null
+          vendor_id: string
+          published_at?: string | null
         }
         Update: {
           id?: string
@@ -2124,6 +2128,8 @@ export interface Database {
           reason?: string | null
           created_at?: string
           decided_at?: string | null
+          vendor_id?: string
+          published_at?: string | null
         }
         Relationships: [
           {
@@ -2138,6 +2144,13 @@ export interface Database {
             columns: ['reviewer_id']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_listing_versions_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
             referencedColumns: ['id']
           },
         ]
@@ -2808,12 +2821,17 @@ export interface Database {
           languages: string[] | null
           policies_json: Json | null
           faqs_json: Json | null
+          published_version_no: number | null
         }
         Relationships: []
       }
     }
     Functions: {
       admin_decide_vendor: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      build_listing_snapshot: {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
@@ -2845,11 +2863,23 @@ export interface Database {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
+      moderate_listing_version: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      record_slug_redirect: {
+        Args: Record<string, never>
+        Returns: unknown
+      }
       refresh_vendor_rating: {
         Args: Record<string, never>
         Returns: unknown
       }
       refresh_vendor_search_text: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      resolve_slug_redirect: {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
@@ -2862,6 +2892,10 @@ export interface Database {
         Returns: unknown
       }
       slugify: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      submit_listing_for_review: {
         Args: { [key: string]: unknown }
         Returns: unknown
       }

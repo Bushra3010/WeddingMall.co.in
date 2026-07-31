@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { BadgeCheck, MapPin, Star } from 'lucide-react'
 
@@ -12,15 +12,33 @@ import { breadcrumbSchema, buildMetadata, vendorSchema } from '@/lib/seo'
 import { storagePublicUrl } from '@/lib/supabase/storage'
 import { cn } from '@/lib/utils'
 import { getPublicVendor, getRatingDistribution, getVendorReviews } from '@/server/dal/vendors'
+import { resolveSlugRedirect } from '@/server/dal/taxonomy'
 
 type Params = Promise<{ vendorSlug: string }>
+
+/**
+ * Renamed slugs must redirect BEFORE the response starts streaming.
+ *
+ * generateMetadata resolves before the shell is flushed, so a redirect raised
+ * there produces a real 308. Raising it inside the page component happens after
+ * the first bytes are out, and Next degrades to an HTTP 200 carrying a
+ * meta-refresh — which a crawler reads as a 200 "not found" page, exactly the
+ * outcome PRD 11.2 is trying to avoid.
+ */
+async function redirectRenamedSlug(slug: string) {
+  const current = await resolveSlugRedirect('vendor', slug)
+  if (current && current !== slug) permanentRedirect(`/vendor/${current}`)
+}
 
 export const revalidate = 600
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { vendorSlug } = await params
   const vendor = await getPublicVendor(vendorSlug)
-  if (!vendor) return buildMetadata({ title: 'Vendor not found', noindex: true })
+  if (!vendor) {
+    await redirectRenamedSlug(vendorSlug)
+    return buildMetadata({ title: 'Vendor not found', noindex: true })
+  }
 
   const cover = vendor.media.find((item) => item.is_cover) ?? vendor.media[0]
 
@@ -38,7 +56,11 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function VendorProfilePage({ params }: { params: Params }) {
   const { vendorSlug } = await params
   const vendor = await getPublicVendor(vendorSlug)
-  if (!vendor) notFound()
+  if (!vendor) {
+    // Belt and braces — generateMetadata redirects first in practice.
+    await redirectRenamedSlug(vendorSlug)
+    notFound()
+  }
 
   const [reviews, distribution] = await Promise.all([
     getVendorReviews(vendor.id),

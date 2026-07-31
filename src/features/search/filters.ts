@@ -37,6 +37,12 @@ export const searchFiltersSchema = z.object({
     .default('recommended')
     .catch('recommended'),
   page: z.coerce.number().int().min(1).max(100).default(1).catch(1),
+  /**
+   * Category-specific attribute filters (PRD 6.2). Carried in the URL as
+   * `attr_<code>=value` and repeated for multiple accepted values, so a search
+   * stays shareable and back-navigable like every other filter.
+   */
+  attributes: z.record(z.string(), z.array(z.string())).default({}).catch({}),
   limit: z.coerce.number().int().min(1).max(60).default(24).catch(24),
 })
 
@@ -46,12 +52,26 @@ export type SearchFilters = z.infer<typeof searchFiltersSchema>
  * Parses `searchParams` leniently: an unknown or malformed parameter falls back
  * to its default rather than erroring the page (`.catch()` above).
  */
+export const ATTRIBUTE_PREFIX = 'attr_'
+
 export function parseSearchParams(
   params: Record<string, string | string[] | undefined>,
 ): SearchFilters {
-  const flat = Object.fromEntries(
-    Object.entries(params).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value]),
-  )
+  const flat: Record<string, unknown> = {}
+  const attributes: Record<string, string[]> = {}
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) continue
+    if (key.startsWith(ATTRIBUTE_PREFIX)) {
+      const code = key.slice(ATTRIBUTE_PREFIX.length)
+      const values = (Array.isArray(value) ? value : [value]).filter(Boolean)
+      if (code && values.length > 0) attributes[code] = values
+      continue
+    }
+    flat[key] = Array.isArray(value) ? value[0] : value
+  }
+
+  flat.attributes = attributes
   return searchFiltersSchema.parse(flat)
 }
 
@@ -67,8 +87,13 @@ export function buildSearchUrl(filters: Partial<SearchFilters>, base = '/vendors
 
   for (const [key, value] of Object.entries(filters)) {
     if (value === undefined || value === null || value === '') continue
+    if (key === 'attributes') continue
     if (defaults[key] !== undefined && defaults[key] === value) continue
     params.set(key, String(value))
+  }
+
+  for (const [code, values] of Object.entries(filters.attributes ?? {})) {
+    for (const value of values) params.append(`${ATTRIBUTE_PREFIX}${code}`, value)
   }
 
   // Category and city are path segments on the canonical SEO route.
@@ -97,5 +122,6 @@ export function activeFilterCount(filters: SearchFilters): number {
   if (filters.verifiedOnly) count++
   if (filters.budgetMinMinor || filters.budgetMaxMinor) count++
   if (filters.eventDate) count++
+  count += Object.keys(filters.attributes ?? {}).length
   return count
 }

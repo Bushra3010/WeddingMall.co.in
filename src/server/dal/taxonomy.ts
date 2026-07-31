@@ -84,3 +84,113 @@ export const getCityBySlug = cache(async (slug: string) => {
     .maybeSingle()
   return data
 })
+
+/**
+ * Resolves an outdated slug to its current value (PRD 11.2).
+ *
+ * Returns null when there is no redirect, which the caller treats as a genuine
+ * 404. Called only on the miss path, so it costs nothing on a normal request.
+ */
+export async function resolveSlugRedirect(
+  kind: 'vendor' | 'category' | 'city' | 'post' | 'page',
+  candidate: string,
+): Promise<string | null> {
+  try {
+    const supabase = createPublicClient()
+    const { data, error } = await supabase.rpc('resolve_slug_redirect', {
+      kind,
+      candidate,
+    })
+    if (error) throw error
+    return (data as string | null) ?? null
+  } catch (error) {
+    logError('dal.resolveSlugRedirect', error, { kind, candidate })
+    return null
+  }
+}
+
+export interface AttributeDefinition {
+  id: string
+  categoryId: string
+  code: string
+  label: string
+  helpText: string | null
+  inputType: string
+  dataType: string
+  unit: string | null
+  filterable: boolean
+  required: boolean
+  options: string[]
+  sortOrder: number
+}
+
+function mapAttribute(row: {
+  id: string
+  category_id: string
+  code: string
+  label: string
+  help_text: string | null
+  input_type: string
+  data_type: string
+  unit: string | null
+  filterable: boolean
+  required: boolean
+  options_json: unknown
+  sort_order: number
+}): AttributeDefinition {
+  return {
+    id: row.id,
+    categoryId: row.category_id,
+    code: row.code,
+    label: row.label,
+    helpText: row.help_text,
+    inputType: row.input_type,
+    dataType: row.data_type,
+    unit: row.unit,
+    filterable: row.filterable,
+    required: row.required,
+    options: Array.isArray(row.options_json) ? (row.options_json as string[]) : [],
+    sortOrder: row.sort_order,
+  }
+}
+
+const ATTRIBUTE_COLUMNS =
+  'id, category_id, code, label, help_text, input_type, data_type, unit, filterable, required, options_json, sort_order'
+
+export const listAttributes = cache(async (): Promise<AttributeDefinition[]> => {
+  try {
+    const supabase = createPublicClient()
+    const { data, error } = await supabase
+      .from('category_attributes')
+      .select(ATTRIBUTE_COLUMNS)
+      .order('sort_order')
+    if (error) throw error
+    return (data ?? []).map(mapAttribute)
+  } catch (error) {
+    logError('dal.listAttributes', error)
+    return []
+  }
+})
+
+/** Filterable attributes for one category — drives the search sidebar. */
+export const listFilterableAttributes = cache(
+  async (categorySlug: string): Promise<AttributeDefinition[]> => {
+    try {
+      const supabase = createPublicClient()
+      const category = await getCategoryBySlug(categorySlug)
+      if (!category) return []
+
+      const { data, error } = await supabase
+        .from('category_attributes')
+        .select(ATTRIBUTE_COLUMNS)
+        .eq('category_id', category.id)
+        .eq('filterable', true)
+        .order('sort_order')
+      if (error) throw error
+      return (data ?? []).map(mapAttribute)
+    } catch (error) {
+      logError('dal.listFilterableAttributes', error, { categorySlug })
+      return []
+    }
+  },
+)

@@ -85,9 +85,30 @@ const live = (
   })
 ).body?.[0]
 
-await rest('vendor_listings', SVC, {
+const liveListing = (
+  await rest('vendor_listings', SVC, {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      vendor_id: live.id,
+      status: 'approved',
+      about: 'Probe fixture listing.',
+    }),
+  })
+).body?.[0]
+
+// Since migration 0011 a vendor is public and searchable only once it has an
+// APPROVED VERSION — an approved draft row is no longer sufficient.
+await rest('vendor_listing_versions', SVC, {
   method: 'POST',
-  body: JSON.stringify({ vendor_id: live.id, status: 'approved', about: 'Probe fixture listing.' }),
+  body: JSON.stringify({
+    listing_id: liveListing.id,
+    vendor_id: live.id,
+    version_no: 1,
+    snapshot_json: { about: 'Probe fixture listing.' },
+    status: 'approved',
+    published_at: new Date().toISOString(),
+  }),
 })
 await rest('vendor_listings', SVC, {
   method: 'POST',

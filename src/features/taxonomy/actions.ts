@@ -12,9 +12,9 @@ import { categoryFormSchema, cityFormSchema } from '@/features/vendors/schema'
  * Taxonomy management (PRD 6.11).
  *
  * Writes are gated on `admin.manage` or `cms.publish` — the same pair the
- * `can_manage_taxonomy()` policy uses. Changing a slug is deliberately not
- * supported here: published URLs depend on it, and a rename needs a
- * `slug_redirects` entry. That belongs with the SEO work in Milestone 3.
+ * `can_manage_taxonomy()` policy uses. Renaming is allowed: a trigger added in
+ * migration 0012 records the old → new mapping, and the public routes redirect
+ * on the miss path, so an indexed URL never breaks.
  */
 
 function str(form: FormData, key: string): string {
@@ -58,19 +58,6 @@ export async function saveCategoryAction(
     }
 
     if (input.id) {
-      const { data: existing } = await supabase
-        .from('categories')
-        .select('slug')
-        .eq('id', input.id)
-        .maybeSingle()
-
-      if (existing && existing.slug !== input.slug) {
-        throw new ServiceError(
-          'slug_change_unsupported',
-          'Changing a slug would break published URLs. Slug redirects arrive in Milestone 3.',
-        )
-      }
-
       const { error } = await supabase.from('categories').update(row).eq('id', input.id)
       if (error) {
         throw new ServiceError(
@@ -129,19 +116,6 @@ export async function saveCityAction(
     }
 
     if (input.id) {
-      const { data: existing } = await supabase
-        .from('cities')
-        .select('slug')
-        .eq('id', input.id)
-        .maybeSingle()
-
-      if (existing && existing.slug !== input.slug) {
-        throw new ServiceError(
-          'slug_change_unsupported',
-          'Changing a slug would break published URLs. Slug redirects arrive in Milestone 3.',
-        )
-      }
-
       const { error } = await supabase.from('cities').update(row).eq('id', input.id)
       if (error) {
         throw new ServiceError(

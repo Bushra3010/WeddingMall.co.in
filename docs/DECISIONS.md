@@ -201,3 +201,63 @@ Migration 0008 exposed two bugs in `scripts/gen-types.mjs` (ADR-009):
 - **Array columns degraded to `unknown[]`.** Postgres reports `text[]` with `udt_name = '_text'`. The leading underscore is now stripped to resolve the element type, so `languages` types as `string[]`.
 
 Both were caught by typecheck rather than at runtime, which is the argument for generating real types rather than keeping a loose placeholder.
+
+---
+
+## ADR-015 — `vendor_listings` is the draft; versions are what the public sees
+
+**Date:** 2026-08-01 · **Status:** accepted
+
+Before migration 0011, `public_vendors` joined `vendor_listings` directly, so any edit a vendor made to an approved listing went live instantly with no re-moderation. `vendor_listing_versions` existed in the schema from 0004 but was never written to. PRD 6.9 requires the opposite: "preserve currently published version until update approval."
+
+**Decision:**
+
+- `vendor_listings` is the working **draft**. Its `status` tracks the review state of the latest submission.
+- `vendor_listing_versions` holds immutable snapshots. The newest `approved` row is the public surface.
+- `submit_listing_for_review()` snapshots the draft into a new version; `moderate_listing_version()` approves it and archives the one it replaces.
+
+Two details worth remembering:
+
+- **`vendor_id` is denormalised onto versions.** The public view must not join `vendor_listings` to reach a version — that table's policy requires `status = 'approved'`, so a vendor with a pending edit would make their own published page vanish.
+- **Search indexes the published snapshot,** not the draft. Otherwise unreviewed text stays findable even though the page does not show it.
+
+The backfill in 0011 creates version 1 for every already-published listing; without it, switching the view over would have unpublished every live vendor at once.
+
+---
+
+## ADR-016 — A root `loading.tsx` turned every 404 into a soft 200
+
+**Date:** 2026-08-01 · **Status:** accepted, security/SEO-relevant
+
+`src/app/loading.tsx` wrapped **every** route in an implicit Suspense boundary. Next therefore began streaming the shell immediately, and once the first bytes are flushed the HTTP status can no longer be set. Consequences:
+
+- `notFound()` returned **HTTP 200** carrying the not-found page — a soft 404, which search engines index. Directly contrary to PRD 11.1.
+- `permanentRedirect()` degraded to an HTTP 200 with a meta-refresh, so slug redirects never produced a 308.
+
+**Decision:** delete the root `loading.tsx`. Streaming skeletons belong at the segment that actually needs them — the search pages already wrap `SearchResults` in an explicit `<Suspense>`, which is the right granularity. The root file was also wrong on its own terms: it rendered vendor-card skeletons over the sign-in page.
+
+**Rule going forward:** a `loading.tsx` at a segment makes every `notFound()` and `redirect()` below it lose its status code. Do not add one above a route that needs either.
+
+---
+
+## ADR-017 — Slug redirects are raised in `generateMetadata`
+
+**Date:** 2026-08-01 · **Status:** accepted
+
+Even after ADR-016, raising the redirect inside the page component is fragile: it runs after the shell has begun rendering. `generateMetadata` resolves _before_ the response starts, so a redirect raised there reliably produces a real 308.
+
+**Decision:** each public route resolves a renamed slug in `generateMetadata` and keeps the same check in the component as a fallback. Redirects are recorded by a trigger (0012) that also repoints existing entries, so renaming A→B then B→C leaves A→C rather than a chain.
+
+Next emits **308**, not the 301 the PRD names. Both are permanent and search engines treat them identically; 308 additionally preserves the request method. Recorded rather than worked around.
+
+---
+
+## ADR-018 — Category attributes: input type drives data type
+
+**Date:** 2026-08-01 · **Status:** accepted
+
+`search_vendors` matches attribute filters against the **shape** of the stored `value_json` — a `multiselect` stores an array, a `select` stores a string. If an admin could pick input type and data type independently, a mismatch would silently produce a filter that never matches.
+
+**Decision:** the admin form exposes one "Answer type" control and derives `data_type` from it. Filter semantics are OR within an attribute code and AND across codes, which is what a shopper expects from faceted search.
+
+**Known gap:** numeric attributes are stored and matched as exact values. Range filtering ("capacity ≥ 400") needs a `attributeRanges` parameter in `search_vendors`; the seeded numeric attributes are currently only usable as exact matches.

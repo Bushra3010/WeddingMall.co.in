@@ -51,7 +51,7 @@ interface SearchRow {
   total_count: number | string
 }
 
-export async function searchVendors(input: SearchFilters): Promise<SearchPage> {
+export async function searchVendors(input: Partial<SearchFilters>): Promise<SearchPage> {
   const filters = searchFiltersSchema.parse(input)
 
   try {
@@ -65,6 +65,7 @@ export async function searchVendors(input: SearchFilters): Promise<SearchPage> {
         verifiedOnly: filters.verifiedOnly,
         budgetMinMinor: filters.budgetMinMinor ?? null,
         budgetMaxMinor: filters.budgetMaxMinor ?? null,
+        attributes: filters.attributes,
         sort: filters.sort,
         limit: filters.limit,
         offset: (filters.page - 1) * filters.limit,

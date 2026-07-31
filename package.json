@@ -19,7 +19,7 @@
     "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
     "db:apply": "node scripts/apply-migrations.mjs",
     "db:seed": "node scripts/apply-migrations.mjs --seed-only",
-    "db:rls": "node --env-file=.env.local scripts/rls-probe.mjs && node --env-file=.env.local scripts/rls-tenant-probe.mjs && node --env-file=.env.local scripts/rls-onboarding-probe.mjs",
+    "db:rls": "node --env-file=.env.local scripts/rls-probe.mjs && node --env-file=.env.local scripts/rls-tenant-probe.mjs && node --env-file=.env.local scripts/rls-onboarding-probe.mjs && node --env-file=.env.local scripts/rls-listing-probe.mjs",
     "grant-admin": "node --env-file=.env.local scripts/grant-admin.mjs"
   },
   "dependencies": {
