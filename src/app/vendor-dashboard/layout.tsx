@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { SignOutButton } from '@/components/shared/sign-out-button'
 import { requireUser } from '@/server/policies/require'
 import { site } from '@/lib/site'
 import { NOINDEX } from '@/lib/seo'
@@ -41,6 +42,9 @@ export default async function VendorDashboardLayout({ children }: { children: Re
           <span className="bg-brand-50 text-brand-700 rounded-full px-2 py-0.5 text-xs font-medium">
             Vendor
           </span>
+          <div className="ml-auto">
+            <SignOutButton />
+          </div>
         </div>
       </header>
 

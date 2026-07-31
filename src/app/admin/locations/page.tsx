@@ -1,15 +1,81 @@
-import { MilestonePlaceholder } from '@/components/shared/milestone-placeholder'
+import { NewCityForm } from '@/components/admin/taxonomy-forms'
+import { EmptyState } from '@/components/ui/states'
 import { NOINDEX } from '@/lib/seo'
+import { createClient } from '@/lib/supabase/server'
+import { requireAdmin } from '@/server/policies/require'
 
 export const metadata = { title: 'Locations', ...NOINDEX }
+export const dynamic = 'force-dynamic'
 
-export default function AdminLocationsPage() {
+export default async function AdminLocationsPage() {
+  await requireAdmin()
+  const supabase = await createClient()
+
+  const [{ data: cities }, { data: states }] = await Promise.all([
+    supabase
+      .from('cities')
+      .select('id, name, slug, active, sort_order, states(name)')
+      .order('sort_order')
+      .order('name'),
+    supabase.from('states').select('id, name').order('name'),
+  ])
+
   return (
-    <MilestonePlaceholder
-      title={'Locations'}
-      milestone={'Milestone 2'}
-      prdSection={'6.11'}
-      description={'Countries, states, cities, areas, coordinates, and aliases.'}
-    />
+    <div className="space-y-6">
+      <header>
+        <h1 className="font-display text-sand-900 text-2xl">Locations</h1>
+        <p className="text-sand-600 mt-1 text-sm">
+          Cities appear in search filters and in every category × city landing page.
+        </p>
+      </header>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
+        <div>
+          {(cities ?? []).length === 0 ? (
+            <EmptyState title="No cities yet" description="Add the first one to get started." />
+          ) : (
+            <div className="border-sand-200 overflow-x-auto rounded-[var(--radius-card)] border">
+              <table className="w-full min-w-[34rem] text-sm">
+                <caption className="sr-only">All cities</caption>
+                <thead className="bg-sand-50 text-sand-600 text-left text-xs tracking-wide uppercase">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      City
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      State
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Slug
+                    </th>
+                    <th scope="col" className="px-4 py-3 font-medium">
+                      Visible
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-sand-200 divide-y bg-white">
+                  {(cities ?? []).map((city) => (
+                    <tr key={city.id}>
+                      <td className="text-sand-900 px-4 py-3 font-medium">{city.name}</td>
+                      <td className="text-sand-700 px-4 py-3">{city.states?.name ?? '—'}</td>
+                      <td className="text-sand-600 px-4 py-3 font-mono text-xs">{city.slug}</td>
+                      <td className="px-4 py-3">
+                        {city.active ? (
+                          <span className="text-[var(--color-success)]">yes</span>
+                        ) : (
+                          <span className="text-sand-500">hidden</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <NewCityForm states={states ?? []} />
+      </div>
+    </div>
   )
 }

@@ -393,7 +393,7 @@ export interface Database {
           latitude: number | null
           longitude: number | null
           timezone: string
-          aliases: unknown[]
+          aliases: string[]
           seo_title: string | null
           seo_description: string | null
           intro_html: string | null
@@ -410,7 +410,7 @@ export interface Database {
           latitude?: number | null
           longitude?: number | null
           timezone?: string
-          aliases?: unknown[]
+          aliases?: string[]
           seo_title?: string | null
           seo_description?: string | null
           intro_html?: string | null
@@ -427,7 +427,7 @@ export interface Database {
           latitude?: number | null
           longitude?: number | null
           timezone?: string
-          aliases?: unknown[]
+          aliases?: string[]
           seo_title?: string | null
           seo_description?: string | null
           intro_html?: string | null
@@ -2047,7 +2047,7 @@ export interface Database {
           {
             foreignKeyName: 'vendor_categories_vendor_id_fkey'
             columns: ['vendor_id']
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: 'vendors'
             referencedColumns: ['id']
           },
@@ -2149,7 +2149,7 @@ export interface Database {
           status: Database['public']['Enums']['moderation_status']
           about: string | null
           experience_years: number | null
-          languages: unknown[]
+          languages: string[]
           policies_json: Json
           faqs_json: Json
           completion_score: number
@@ -2164,7 +2164,7 @@ export interface Database {
           status?: Database['public']['Enums']['moderation_status']
           about?: string | null
           experience_years?: number | null
-          languages?: unknown[]
+          languages?: string[]
           policies_json?: Json
           faqs_json?: Json
           completion_score?: number
@@ -2179,7 +2179,7 @@ export interface Database {
           status?: Database['public']['Enums']['moderation_status']
           about?: string | null
           experience_years?: number | null
-          languages?: unknown[]
+          languages?: string[]
           policies_json?: Json
           faqs_json?: Json
           completion_score?: number
@@ -2258,7 +2258,7 @@ export interface Database {
           {
             foreignKeyName: 'vendor_media_vendor_id_fkey'
             columns: ['vendor_id']
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: 'vendors'
             referencedColumns: ['id']
           },
@@ -2559,6 +2559,8 @@ export interface Database {
           published_at: string | null
           search_text: string | null
           search_tsv: unknown | null
+          submitted_at: string | null
+          rejection_reason: string | null
         }
         Insert: {
           id?: string
@@ -2586,6 +2588,8 @@ export interface Database {
           published_at?: string | null
           search_text?: string | null
           search_tsv?: unknown | null
+          submitted_at?: string | null
+          rejection_reason?: string | null
         }
         Update: {
           id?: string
@@ -2613,6 +2617,8 @@ export interface Database {
           published_at?: string | null
           search_text?: string | null
           search_tsv?: unknown | null
+          submitted_at?: string | null
+          rejection_reason?: string | null
         }
         Relationships: [
           {
@@ -2799,7 +2805,7 @@ export interface Database {
           published_at: string | null
           about: string | null
           experience_years: number | null
-          languages: unknown[] | null
+          languages: string[] | null
           policies_json: Json | null
           faqs_json: Json | null
         }
@@ -2807,8 +2813,16 @@ export interface Database {
       }
     }
     Functions: {
+      admin_decide_vendor: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
       can_access_enquiry: {
         Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      can_manage_taxonomy: {
+        Args: Record<string, never>
         Returns: unknown
       }
       handle_new_user: {
@@ -2816,6 +2830,10 @@ export interface Database {
         Returns: unknown
       }
       has_admin_permission: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      invite_vendor_member: {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
@@ -2844,6 +2862,10 @@ export interface Database {
         Returns: unknown
       }
       slugify: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      submit_vendor_for_review: {
         Args: { [key: string]: unknown }
         Returns: unknown
       }

@@ -178,7 +178,8 @@ const DEMO = [
     city: 'mumbai',
     category: 'music-and-dj',
     years: 11,
-    about: 'DJs, dhol players, and live bands. Sound and lighting equipment included in every package.',
+    about:
+      'DJs, dhol players, and live bands. Sound and lighting equipment included in every package.',
     rating: 4.2,
     reviews: 33,
     packages: [{ name: 'DJ + dhol, one function', min: 5500000, type: 'starting_at' }],

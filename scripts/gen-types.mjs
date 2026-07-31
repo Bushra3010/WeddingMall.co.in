@@ -67,9 +67,10 @@ const { rows: enums } = await client.query(`
 const enumNames = new Set(enums.map((e) => e.name))
 
 function tsType(udtName, isArray) {
-  const base = enumNames.has(udtName)
-    ? `Database["public"]["Enums"]["${udtName}"]`
-    : (SCALARS[udtName] ?? 'unknown')
+  const element = isArray && udtName.startsWith('_') ? udtName.slice(1) : udtName
+  const base = enumNames.has(element)
+    ? `Database["public"]["Enums"]["${element}"]`
+    : (SCALARS[element] ?? 'unknown')
   return isArray ? `${base}[]` : base
 }
 
@@ -94,6 +95,7 @@ const { rows: fks } = await client.query(`
     (select count(*) from pg_index i
       where i.indrelid = con.conrelid
         and i.indisunique
+        and i.indpred is null
         and i.indnkeyatts = array_length(con.conkey, 1)
         and i.indkey::int2[] @> con.conkey) > 0 as is_one_to_one
   from pg_constraint con

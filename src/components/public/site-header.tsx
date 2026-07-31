@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Heart, Search, UserRound } from 'lucide-react'
 
 import { buttonVariants } from '@/components/ui/button'
+import { SignOutButton } from '@/components/shared/sign-out-button'
 import { site } from '@/lib/site'
 import { cn } from '@/lib/utils'
 import { getActor } from '@/server/dal/actor'
@@ -63,6 +64,7 @@ export async function SiteHeader() {
                 <UserRound aria-hidden="true" />
                 <span className="hidden sm:inline">Account</span>
               </Link>
+              <SignOutButton className="hidden sm:inline-flex" label="" />
             </>
           ) : (
             <Link

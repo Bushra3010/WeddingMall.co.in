@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { SignOutButton } from '@/components/shared/sign-out-button'
 import { requireAdmin } from '@/server/policies/require'
 import { site } from '@/lib/site'
 import { NOINDEX } from '@/lib/seo'
@@ -46,6 +47,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <span className="bg-sand-800 text-accent-300 rounded-full px-2 py-0.5 text-xs font-medium">
             Admin
           </span>
+          <div className="ml-auto">
+            <SignOutButton className="text-sand-300 hover:bg-sand-900 hover:text-white" />
+          </div>
         </div>
       </header>
 

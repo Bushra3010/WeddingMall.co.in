@@ -158,3 +158,46 @@ Vendors need `owner_user_id` referencing `auth.users`, and only the Auth admin A
 Demo rows are tagged with `suspended_reason = 'demo-seed'` and owner emails end in `@demo.weddingmall.test`, so `--clean` removes exactly the demo set and nothing else. **That tag is a deliberate misuse of a product column for fixture bookkeeping** — before launch, either add a proper `is_demo` column or drop the demo data entirely.
 
 The script also calls `refresh_vendor_search_text()` explicitly: the search triggers fire on listing/category/package writes, which happen before all of a vendor's child rows exist, so the trigger-maintained text would otherwise be incomplete on first insert. **Real onboarding must call the same refresh after publishing** — this is a live foot-gun for Milestone 3, not just a seeding detail.
+
+---
+
+## ADR-012 — Onboarding deadlock: three policy gaps in migration 0004
+
+**Date:** 2026-07-31 · **Status:** accepted, fixed in 0008
+
+Vendor onboarding was impossible as originally written. Three separate gaps compounded:
+
+1. **The owner could not read back the vendor they had just created.** `vendors` had SELECT policies for "active vendors" and "is a member" only. A freshly created vendor is `draft` and has no members, so the INSERT succeeded but PostgREST returned 403 on the `Prefer: return=representation` read-back.
+2. **Membership bootstrap recursion.** `vendor_memberships` was writable only by someone holding `team.manage`, which is resolved _from_ `vendor_memberships`. The first owner membership could never exist.
+3. **No admin write path.** `vendors` and `vendor_listings` had UPDATE policies for members only, so approve/reject/suspend were impossible for anyone.
+
+**Lesson worth keeping:** deny-by-default RLS makes bootstrap steps invisible until you execute the flow. Reading the policies did not reveal this; running the sequence did. Every new flow should get a probe that walks it from a cold start, not just per-table permission checks.
+
+The bootstrap policy is deliberately narrow — the caller must already be `vendors.owner_user_id`, the role must be `vendor_owner`, and the unique `(vendor_id, user_id)` constraint stops replay. `scripts/rls-onboarding-probe.mjs` asserts an outsider cannot use it to join someone else's business.
+
+---
+
+## ADR-013 — Admins could not see what they were approving
+
+**Date:** 2026-07-31 · **Status:** accepted, fixed in 0010
+
+Found by driving the real admin UI, not by any API probe: the verification queue rendered "Category: —" for a pending submission.
+
+`vendor_categories`, `vendor_service_areas`, `vendor_packages`, `vendor_media`, and `vendor_attribute_values` each had exactly two policies — public read (requires `status = 'active'`) and member write. A pending vendor is not active, and an admin is not a member, so **an admin was being asked to approve a listing whose contents were invisible to them.**
+
+Fixed by adding admin SELECT policies gated on `vendor.read`. This is business content, not PII: contact details stay behind `user.support` and verification documents behind `vendor.verify`.
+
+**Why the probes missed it:** they seeded fixtures with the service-role client and then asserted _denial_ for unauthorised readers. Nothing asserted that an authorised reader could actually see the data. The probe suite now checks both directions, and this case has a named regression guard.
+
+---
+
+## ADR-014 — Two more generator defects, found by real schema
+
+**Date:** 2026-07-31 · **Status:** accepted
+
+Migration 0008 exposed two bugs in `scripts/gen-types.mjs` (ADR-009):
+
+- **Partial unique indexes were treated as one-to-one.** `vendor_categories` has `unique (vendor_id) where is_primary`. The one-to-one check saw a single-column unique index covering the FK and typed the embed as an object, so `.find()` on the array failed to compile. A partial index constrains only the rows matching its predicate, so `i.indpred is null` is now required.
+- **Array columns degraded to `unknown[]`.** Postgres reports `text[]` with `udt_name = '_text'`. The leading underscore is now stripped to resolve the element type, so `languages` types as `string[]`.
+
+Both were caught by typecheck rather than at runtime, which is the argument for generating real types rather than keeping a loose placeholder.
