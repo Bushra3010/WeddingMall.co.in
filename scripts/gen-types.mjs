@@ -16,12 +16,23 @@ import { writeFileSync } from 'node:fs'
 import pg from 'pg'
 
 const args = process.argv.slice(2)
+
+/** Project ref comes from NEXT_PUBLIC_SUPABASE_URL, not a hardcoded constant. */
+function projectRef() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set (run with --env-file=.env.local)')
+  return new URL(url).hostname.split('.')[0]
+}
 const opt = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback)
 
 const client = new pg.Client({
-  host: opt('--host', 'aws-0-ap-northeast-1.pooler.supabase.com'),
+  host: opt(
+    '--host',
+    process.env.SUPABASE_POOLER_HOST ?? 'aws-0-ap-northeast-1.pooler.supabase.com',
+  ),
   port: Number(opt('--port', '5432')),
-  user: opt('--user', 'postgres.ijuhvltvenfqqpsefoky'),
+  // The pooler requires the tenant in the username: postgres.<project-ref>
+  user: opt('--user', `postgres.${projectRef()}`),
   password: process.env.PGPASSWORD,
   database: 'postgres',
   ssl: { rejectUnauthorized: false },

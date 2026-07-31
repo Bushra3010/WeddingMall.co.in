@@ -8,7 +8,16 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import pg from 'pg'
 
-const REF = 'ijuhvltvenfqqpsefoky'
+/** Project ref comes from NEXT_PUBLIC_SUPABASE_URL so this repo is not tied to one project. */
+function projectRef() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!url) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set (run with --env-file=.env.local)')
+  const ref = new URL(url).hostname.split('.')[0]
+  if (!ref) throw new Error(`Could not derive a project ref from ${url}`)
+  return ref
+}
+
+const REF = projectRef()
 const ROOT = '/Users/bushrakhan/Downloads/Wedding Mall/supabase'
 const password = process.env.PGPASSWORD
 if (!password) throw new Error('PGPASSWORD not set')
