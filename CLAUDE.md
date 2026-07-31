@@ -64,6 +64,7 @@ supabase/migrations   schema truth, applied in filename order
 
 ## Gotchas
 
+- Route-level session refresh lives in `src/proxy.ts` (Next 16 renamed the `middleware` file convention to `proxy`). The Supabase helper it calls is still `lib/supabase/middleware.ts`.
 - Node 20.18 cannot `require()` ESM. `jsdom` is pinned to v26 and `vitest` to v3 for this reason. On Node ≥ 20.19 both can be raised — see `docs/DECISIONS.md`.
 - `src/types/database.ts` is GENERATED — never hand-edit it. Regenerate with `PGPASSWORD=... npm run db:types` (talks to Postgres directly; no Docker needed).
 - Embedded selects need an FK hint when a table has two FKs to the same target, e.g. `profiles!reviews_customer_id_fkey(full_name)`. Without it PostgREST returns HTTP 300 at runtime, which typecheck alone will not catch.

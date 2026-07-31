@@ -4,7 +4,7 @@ import { updateSession } from '@/lib/supabase/middleware'
 
 const PROTECTED_PREFIXES = ['/account', '/vendor-dashboard', '/admin']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request)
   const { pathname, search } = request.nextUrl
 
