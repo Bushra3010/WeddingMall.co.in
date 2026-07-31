@@ -47,15 +47,7 @@ export default async function VendorProfilePage({ params }: { params: Params }) 
 
   const cover = vendor.media.find((item) => item.is_cover) ?? vendor.media[0]
   const gallery = vendor.media.filter((item) => item.id !== cover?.id).slice(0, 8)
-  // Casts via `unknown`: embedded-relation types are unresolved until
-  // `npm run db:types` runs against a real project.
-  const primaryCategory =
-    (
-      vendor.categories as unknown as {
-        is_primary: boolean
-        categories: { name: string; slug: string }
-      }[]
-    ).find((row) => row.is_primary)?.categories ?? null
+  const primaryCategory = vendor.categories.find((row) => row.is_primary)?.categories ?? null
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -347,7 +339,7 @@ export default async function VendorProfilePage({ params }: { params: Params }) 
               <div className="border-sand-200 mt-5 border-t pt-4">
                 <h2 className="text-sand-900 text-sm font-medium">Serves</h2>
                 <p className="text-sand-600 mt-1 text-xs">
-                  {(vendor.serviceAreas as unknown as { cities: { name: string } | null }[])
+                  {vendor.serviceAreas
                     .map((row) => row.cities?.name)
                     .filter(Boolean)
                     .join(', ')}

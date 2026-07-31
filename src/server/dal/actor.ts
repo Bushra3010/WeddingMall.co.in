@@ -36,9 +36,7 @@ export const getActor = cache(async (): Promise<Actor> => {
 
   const adminRoles = (adminResult.data ?? [])
     .map((row) => {
-      // Cast via `unknown`: embedded-relation types are unresolved until
-      // `npm run db:types` runs against a real project.
-      const roles = row.admin_roles as unknown as { code: string } | { code: string }[] | null
+      const roles = row.admin_roles
       const record = Array.isArray(roles) ? roles[0] : roles
       return record?.code as AdminRole | undefined
     })

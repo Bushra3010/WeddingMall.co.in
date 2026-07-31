@@ -12,40 +12,55 @@ cp .env.example .env.local   # fill in Supabase values
 npm run dev
 ```
 
-The app runs without a database — public pages render their empty states rather than erroring. To get real data you need Supabase running locally:
+`.env.local` already points at a live Supabase project with the schema applied and demo data seeded, so the app works immediately.
+
+To point at a different project, set the values in `.env.local`, then:
 
 ```bash
-supabase start
-npm run db:reset             # applies migrations + fictional seed data
-npm run db:types             # regenerates src/types/database.ts
+PGPASSWORD=<db-password> npm run db:apply
+PGPASSWORD=<db-password> npm run db:seed
+PGPASSWORD=<db-password> npm run db:types
+npm run db:rls
+node --env-file=.env.local scripts/seed-demo-vendors.mjs
 ```
 
-Install the CLI with `brew install supabase/tap/supabase` (Docker required).
+These talk to Postgres directly, so **Docker is not required** (see ADR-009).
 
 ## Commands
 
-| Command | Purpose |
-|---|---|
-| `npm run dev` | development server |
-| `npm run verify` | lint + typecheck + test + build |
-| `npm run test` | unit tests (Vitest) |
-| `npm run test:e2e` | end-to-end tests (Playwright) |
-| `npm run db:reset` | re-apply migrations and seed |
-| `npm run db:types` | regenerate database types |
+| Command            | Purpose                                 |
+| ------------------ | --------------------------------------- |
+| `npm run dev`      | development server                      |
+| `npm run verify`   | lint + typecheck + test + build         |
+| `npm run test`     | unit tests (Vitest)                     |
+| `npm run test:e2e` | end-to-end tests (Playwright)           |
+| `npm run db:apply` | apply migrations to the remote project  |
+| `npm run db:rls`   | 52 RLS probes against the live database |
+| `npm run db:types` | regenerate database types               |
 
 ## Where to start reading
 
-| File | What it tells you |
-|---|---|
-| `docs/STATUS.md` | what is done, what is blocked, the exact next task |
-| `CLAUDE.md` | architecture invariants and coding rules |
-| `docs/DECISIONS.md` | why things are the way they are |
-| `docs/DB.md` | schema, RLS posture, storage layout |
-| `docs/PRD.md` | the full specification |
+| File                | What it tells you                                  |
+| ------------------- | -------------------------------------------------- |
+| `docs/STATUS.md`    | what is done, what is blocked, the exact next task |
+| `CLAUDE.md`         | architecture invariants and coding rules           |
+| `docs/DECISIONS.md` | why things are the way they are                    |
+| `docs/DB.md`        | schema, RLS posture, storage layout                |
+| `docs/PRD.md`       | the full specification                             |
 
 ## Current state
 
-Foundation and public discovery are built and verified: lint, typecheck, 55 unit tests, and build all pass. The full database schema is written but **has not yet been executed against a real Postgres** — that is the next task, and `docs/STATUS.md` explains why.
+Foundation and public discovery are built and **verified against a live Supabase project**:
+
+|                          |                                                |
+| ------------------------ | ---------------------------------------------- |
+| Migrations               | 7/7 applied clean                              |
+| Schema                   | 57 tables, 105 RLS policies, 4 storage buckets |
+| RLS probes               | 52 passed (`npm run db:rls`)                   |
+| Unit tests               | 55 passed                                      |
+| Lint / typecheck / build | pass                                           |
+
+Eight fictional demo vendors are seeded, so search, filtering, and vendor profiles work end to end.
 
 Routes that render a "scheduled for Milestone N" placeholder are intentional. They exist so the information architecture is navigable; each names the milestone that replaces it.
 

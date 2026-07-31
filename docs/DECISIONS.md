@@ -10,19 +10,19 @@ Short entries, newest last. One decision per heading.
 
 PRD 22 requires pinning mutually compatible current stable versions at implementation start.
 
-| Package | Version | Note |
-|---|---|---|
-| next | 16.2.12 | App Router, React Server Components |
-| react / react-dom | 19.2.4 | |
-| typescript | ^5 | `strict: true` |
-| tailwindcss | ^4 | CSS-first config via `@theme` |
-| @supabase/supabase-js | ^2.111 | |
-| @supabase/ssr | ^0.12 | cookie-based SSR sessions |
-| zod | ^4.4 | note: v4 API (`z.email()`, `z.flattenError()`) |
-| react-hook-form | ^7.83 | |
-| vitest | **^3** | see ADR-002 |
-| jsdom | **^26** | see ADR-002 |
-| @playwright/test | ^1.62 | |
+| Package               | Version | Note                                           |
+| --------------------- | ------- | ---------------------------------------------- |
+| next                  | 16.2.12 | App Router, React Server Components            |
+| react / react-dom     | 19.2.4  |                                                |
+| typescript            | ^5      | `strict: true`                                 |
+| tailwindcss           | ^4      | CSS-first config via `@theme`                  |
+| @supabase/supabase-js | ^2.111  |                                                |
+| @supabase/ssr         | ^0.12   | cookie-based SSR sessions                      |
+| zod                   | ^4.4    | note: v4 API (`z.email()`, `z.flattenError()`) |
+| react-hook-form       | ^7.83   |                                                |
+| vitest                | **^3**  | see ADR-002                                    |
+| jsdom                 | **^26** | see ADR-002                                    |
+| @playwright/test      | ^1.62   |                                                |
 
 ---
 
@@ -50,7 +50,7 @@ PRD 8.3 wants public discovery pages cached, and PRD 10.1 forbids service creden
 - `lib/supabase/public.ts` — **cookie-free** `anon` client for public data.
 - `lib/supabase/admin.ts` — service role, bypasses RLS, server-jobs only.
 
-The public client exists because *touching cookies opts a Next.js route out of static rendering*. The first build had every public page rendering dynamically purely because the footer read taxonomy through the session client. Splitting the client fixed the cause rather than the symptom. It grants nothing a logged-out visitor lacks — RLS still applies as `anon`.
+The public client exists because _touching cookies opts a Next.js route out of static rendering_. The first build had every public page rendering dynamically purely because the footer read taxonomy through the session client. Splitting the client fixed the cause rather than the symptom. It grants nothing a logged-out visitor lacks — RLS still applies as `anon`.
 
 ---
 
@@ -98,9 +98,9 @@ Anonymous visitors must be able to search, and the ranking query joins several t
 
 PRD 18 sequences features by milestone. The data model in PRD 9, however, is fully specified up front, and writing it in fragments would mean repeatedly altering tables that later migrations depend on.
 
-**Decision:** write all of PRD 9 as migrations `0001`–`0007` now; keep *features* strictly milestone-gated. Tables exist ahead of the UI that fills them.
+**Decision:** write all of PRD 9 as migrations `0001`–`0007` now; keep _features_ strictly milestone-gated. Tables exist ahead of the UI that fills them.
 
-**Caveat recorded honestly:** these migrations have not been executed against a real Postgres (no Docker on the build machine). They are unverified. See `docs/STATUS.md`.
+**Outcome:** all seven applied cleanly against the live project on the first run (2026-07-31). Verified by 52 RLS probes — see `docs/STATUS.md`.
 
 ---
 
@@ -113,3 +113,48 @@ Every route in PRD 5 exists, but unimplemented ones render `MilestonePlaceholder
 **Rationale:** the information architecture is navigable and link-checkable from day one, and a stub is honest where a half-built screen would imply working functionality.
 
 **Exit criterion:** zero `MilestonePlaceholder` imports before production launch. Grep for it in the launch checklist.
+
+---
+
+## ADR-009 — Custom type generator instead of `supabase gen types`
+
+**Date:** 2026-07-31 · **Status:** accepted
+
+`supabase gen types typescript` runs its introspection inside a container, so it needs Docker even when given `--db-url`. Docker is not available on this machine, which made `npm run db:types` permanently unusable.
+
+**Decision:** `scripts/gen-types.mjs` introspects Postgres directly over the same pooler connection the app uses, emitting Row/Insert/Update, Relationships, views, enums, and function stubs.
+
+Relationships matter: they are what lets supabase-js type an embedded `select('a, other(b)')`. Two subtleties cost a debugging cycle each and are worth remembering:
+
+- `array_agg` over `name`-typed catalog columns returns an unparsed string to node-pg. Cast to `::text[]`.
+- `isOneToOne` must compare the unique index key columns to the FK columns for **equality**, not containment. Containment marks any FK covered by a wider unique index as one-to-one, which mistypes embedded arrays as single objects.
+
+**Known gap:** function `Args`/`Returns` are emitted loosely (`{ [key: string]: unknown }` / `unknown`). `search_vendors` is therefore still typed by hand in `server/dal/search.ts`, which is acceptable because that file is the deliberate adapter boundary (ADR-006, PRD 11.3).
+
+**Revisit when:** Docker is available, or Supabase ships a container-free generator. Compare output before switching.
+
+---
+
+## ADR-010 — View columns are typed nullable; narrow at the DAL
+
+**Date:** 2026-07-31 · **Status:** accepted
+
+Postgres does not report reliable nullability for view columns, so the generator widens every `public_vendors` column to `| null`. Propagating that through the UI would mean null checks on `display_name` in a dozen places.
+
+**Decision:** narrow once in `getPublicVendor` with a runtime guard. `id`, `slug`, and `display_name` are NOT NULL on `vendors` and are not outer-joined by the view, so a null there means the view definition changed — the DAL logs and returns null, and the page 404s rather than rendering a half-built profile.
+
+**Rejected alternative:** asserting with `!`. That would hide a genuine schema regression instead of surfacing it.
+
+---
+
+## ADR-011 — Demo vendors seeded by script, not seed.sql
+
+**Date:** 2026-07-31 · **Status:** accepted
+
+Vendors need `owner_user_id` referencing `auth.users`, and only the Auth admin API can create those rows — plain SQL cannot.
+
+**Decision:** `supabase/seed.sql` covers taxonomy, plans, CMS, and templates. `scripts/seed-demo-vendors.mjs` creates eight fictional vendors with owners, memberships, approved listings, service areas, and packages.
+
+Demo rows are tagged with `suspended_reason = 'demo-seed'` and owner emails end in `@demo.weddingmall.test`, so `--clean` removes exactly the demo set and nothing else. **That tag is a deliberate misuse of a product column for fixture bookkeeping** — before launch, either add a proper `is_demo` column or drop the demo data entirely.
+
+The script also calls `refresh_vendor_search_text()` explicitly: the search triggers fire on listing/category/package writes, which happen before all of a vendor's child rows exist, so the trigger-maintained text would otherwise be incomplete on first insert. **Real onboarding must call the same refresh after publishing** — this is a live foot-gun for Milestone 3, not just a seeding detail.

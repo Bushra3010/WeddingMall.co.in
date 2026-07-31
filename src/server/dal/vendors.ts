@@ -59,6 +59,21 @@ export const getPublicVendor = cache(async (slug: string) => {
     if (error) throw error
     if (!vendor) return null
 
+    /*
+     * Postgres reports every view column as nullable, so the generated types
+     * widen them. Narrow once here, at the boundary, rather than making each
+     * consumer cope: these three are NOT NULL on `vendors` and the view does
+     * not outer-join them, so a null means the view definition changed and the
+     * page should 404 rather than render half a profile.
+     */
+    const { id, slug: vendorSlug, display_name } = vendor
+    if (!id || !vendorSlug || !display_name) {
+      logError('dal.getPublicVendor', new Error('public_vendors returned null identity columns'), {
+        slug,
+      })
+      return null
+    }
+
     const [city, categories, media, packages, serviceAreas] = await Promise.all([
       vendor.primary_city_id
         ? supabase
@@ -71,12 +86,12 @@ export const getPublicVendor = cache(async (slug: string) => {
       supabase
         .from('vendor_categories')
         .select('is_primary, categories(id, name, slug)')
-        .eq('vendor_id', vendor.id)
+        .eq('vendor_id', id)
         .then((result) => result.data ?? []),
       supabase
         .from('vendor_media')
         .select('id, storage_path, alt_text, is_cover, width, height')
-        .eq('vendor_id', vendor.id)
+        .eq('vendor_id', id)
         .eq('moderation_status', 'approved')
         .order('is_cover', { ascending: false })
         .order('sort_order')
@@ -86,18 +101,30 @@ export const getPublicVendor = cache(async (slug: string) => {
         .select(
           'id, name, description, price_type, min_amount_minor, max_amount_minor, currency, unit, inclusions_json, exclusions_json',
         )
-        .eq('vendor_id', vendor.id)
+        .eq('vendor_id', id)
         .eq('active', true)
         .order('sort_order')
-        .then((result) => (result.data ?? []) as PublicVendorPackage[]),
+        .then((result) => (result.data ?? []) as unknown as PublicVendorPackage[]),
       supabase
         .from('vendor_service_areas')
         .select('travel_available, cities(id, name, slug)')
-        .eq('vendor_id', vendor.id)
+        .eq('vendor_id', id)
         .then((result) => result.data ?? []),
     ])
 
-    return { ...vendor, city, categories, media, packages, serviceAreas }
+    return {
+      ...vendor,
+      id,
+      slug: vendorSlug,
+      display_name,
+      ratingAverage: Number(vendor.rating_average ?? 0),
+      ratingCount: Number(vendor.rating_count ?? 0),
+      city,
+      categories,
+      media,
+      packages,
+      serviceAreas,
+    }
   } catch (error) {
     logError('dal.getPublicVendor', error, { slug })
     return null
@@ -111,8 +138,17 @@ export const getVendorReviews = cache(
       const supabase = createPublicClient()
       const { data, error } = await supabase
         .from('reviews')
+        /*
+         * `profiles` must be hinted with the constraint name: `reviews` has two
+         * FKs to it (customer_id and reviewer_id), and an unhinted embed is
+         * ambiguous. It must resolve to the customer — reviewer_id is the
+         * moderating admin and must never surface publicly.
+         *
+         * `review_responses` is one-to-one (unique review_id), so it comes back
+         * as a single object rather than an array.
+         */
         .select(
-          'id, overall_rating, title, body, event_date, created_at, profiles(full_name), review_responses(body, created_at, status)',
+          'id, overall_rating, title, body, event_date, created_at, profiles!reviews_customer_id_fkey(full_name), review_responses(body, created_at, status)',
         )
         .eq('vendor_id', vendorId)
         .eq('status', 'approved')
@@ -122,24 +158,17 @@ export const getVendorReviews = cache(
       if (error) throw error
 
       return (data ?? []).map((row) => {
-        // Cast via `unknown`: embedded-relation types are unresolved until
-        // `npm run db:types` runs against a real project.
-        const profile = row.profiles as unknown as { full_name: string | null } | null
-        const responses = (row.review_responses ?? []) as unknown as {
-          body: string
-          created_at: string
-          status: string
-        }[]
-        const approved = responses.find((response) => response.status === 'approved')
+        const response = row.review_responses
+        const approved = response && response.status === 'approved' ? response : null
 
         return {
-          id: row.id as string,
-          overall_rating: row.overall_rating as number,
-          title: row.title as string | null,
-          body: row.body as string | null,
-          event_date: row.event_date as string | null,
-          created_at: row.created_at as string,
-          customer_name: profile?.full_name ?? null,
+          id: row.id,
+          overall_rating: row.overall_rating,
+          title: row.title,
+          body: row.body,
+          event_date: row.event_date,
+          created_at: row.created_at,
+          customer_name: row.profiles?.full_name ?? null,
           response: approved ? { body: approved.body, created_at: approved.created_at } : null,
         }
       })

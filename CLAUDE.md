@@ -20,8 +20,9 @@ npm run dev          # local dev server
 npm run verify       # lint + typecheck + test + build (run before every handoff)
 npm run test         # vitest unit tests
 npm run test:e2e     # playwright
-npm run db:reset     # re-apply migrations + seed to the local database
-npm run db:types     # regenerate src/types/database.ts from the local database
+npm run db:apply     # apply migrations to the remote project (PGPASSWORD required)
+npm run db:types     # regenerate src/types/database.ts (PGPASSWORD required)
+npm run db:rls       # 52 RLS probes against the live database
 ```
 
 ## Architecture invariants
@@ -64,5 +65,8 @@ supabase/migrations   schema truth, applied in filename order
 ## Gotchas
 
 - Node 20.18 cannot `require()` ESM. `jsdom` is pinned to v26 and `vitest` to v3 for this reason. On Node ≥ 20.19 both can be raised — see `docs/DECISIONS.md`.
-- `src/types/database.ts` is currently a loose placeholder. Embedded-relation queries need `as unknown as T` casts until `npm run db:types` runs against a real project.
+- `src/types/database.ts` is GENERATED — never hand-edit it. Regenerate with `PGPASSWORD=... npm run db:types` (talks to Postgres directly; no Docker needed).
+- Embedded selects need an FK hint when a table has two FKs to the same target, e.g. `profiles!reviews_customer_id_fkey(full_name)`. Without it PostgREST returns HTTP 300 at runtime, which typecheck alone will not catch.
+- View columns are all typed `| null` (Postgres cannot report view nullability). Narrow once at the DAL, not in components — see ADR-010.
+- After publishing a vendor, call `refresh_vendor_search_text(vendorId)`. The search triggers fire per child-table write, so a vendor created in one pass has incomplete search text until refreshed.
 - Route stubs rendering `MilestonePlaceholder` are intentional and must be replaced in the milestone named on each one. They must not ship to production.
