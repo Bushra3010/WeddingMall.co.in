@@ -1,0 +1,125 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens (PRD 7.1): warm neutral base, one deep brand colour, one
+ * restrained accent. Every colour used in a component comes from a token —
+ * no raw hex values in JSX.
+ */
+
+@theme {
+  /* Warm neutral base */
+  --color-sand-50: oklch(0.99 0.005 85);
+  --color-sand-100: oklch(0.975 0.009 82);
+  --color-sand-200: oklch(0.94 0.014 80);
+  --color-sand-300: oklch(0.89 0.018 78);
+  --color-sand-400: oklch(0.76 0.02 76);
+  --color-sand-500: oklch(0.63 0.02 74);
+  --color-sand-600: oklch(0.51 0.018 72);
+  --color-sand-700: oklch(0.4 0.016 70);
+  --color-sand-800: oklch(0.28 0.014 68);
+  --color-sand-900: oklch(0.19 0.012 66);
+  --color-sand-950: oklch(0.13 0.01 64);
+
+  /* Deep brand — indigo-plum */
+  --color-brand-50: oklch(0.96 0.02 320);
+  --color-brand-100: oklch(0.92 0.04 320);
+  --color-brand-200: oklch(0.84 0.07 320);
+  --color-brand-300: oklch(0.74 0.1 320);
+  --color-brand-400: oklch(0.62 0.13 320);
+  --color-brand-500: oklch(0.52 0.15 320);
+  --color-brand-600: oklch(0.44 0.145 320);
+  --color-brand-700: oklch(0.36 0.125 320);
+  --color-brand-800: oklch(0.29 0.1 320);
+  --color-brand-900: oklch(0.23 0.08 320);
+
+  /* Restrained accent — antique gold */
+  --color-accent-100: oklch(0.94 0.05 85);
+  --color-accent-300: oklch(0.85 0.1 85);
+  --color-accent-500: oklch(0.74 0.13 82);
+  --color-accent-700: oklch(0.6 0.12 78);
+
+  --color-success: oklch(0.6 0.13 150);
+  --color-warning: oklch(0.75 0.14 75);
+  --color-danger: oklch(0.55 0.19 25);
+
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-heading), Georgia, serif;
+
+  --radius-card: 0.875rem;
+
+  /* PRD 7.4 — content-led breakpoints */
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+}
+
+@layer base {
+  :root {
+    --surface: var(--color-sand-50);
+    --surface-raised: white;
+    --surface-sunken: var(--color-sand-100);
+    --border-subtle: var(--color-sand-200);
+    --text-primary: var(--color-sand-900);
+    --text-secondary: var(--color-sand-600);
+  }
+
+  * {
+    border-color: var(--border-subtle);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--surface);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* PRD 7.3 — visible focus on every interactive element */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* PRD 7.3 — reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 0.75rem 1rem;
+  background: var(--color-brand-700);
+  color: white;
+
+  &:focus {
+    left: 0;
+  }
+}
