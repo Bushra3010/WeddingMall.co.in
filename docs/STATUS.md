@@ -86,6 +86,22 @@ A fixed bar hides whatever is under it, so the component emits a spacer of its o
 
 Tests: 16 E2E (3 more in `mobile-home.spec.ts` — current-section marking, the More sheet opening and closing on Escape with its links intact, and the spacer). 90 unit. Lint, typecheck, build clean.
 
+## Mobile performance (2026-08-02)
+
+Reported as "running slow on mobile". Measured before touching anything: production TTFB was **0.9-1.1s** with `x-vercel-cache: MISS` on every request.
+
+Three causes, in order of size:
+
+1. **The function ran on the wrong continent.** `x-vercel-id: bom1::iad1` — requests entered at the Mumbai edge but executed in Virginia, while the Supabase project is in Tokyo (`ap-northeast-1`). Every query crossed the Pacific after crossing the Atlantic. Pinned to `hnd1` in `vercel.json`, co-located with the database (ADR-028).
+2. **Seven queries for two components, two of them unbounded.** `getHomeStats` fetched every vendor's rating columns to average in JavaScript; `getCategoryTiles` fetched every `vendor_categories` row with nested media to count twelve tiles. Replaced by `homepage_stats()` and `category_tiles()` in migration `0017` — seven round trips become two, neither scaling with the catalogue (ADR-029).
+3. **Three unused font files.** `Cormorant_Garamond` loaded weights 500/600/700; only 600 is ever used with `font-display`.
+
+Files: `supabase/migrations/0017_homepage_aggregates.sql`, `vercel.json`, `dal/homepage.ts`, `app/layout.tsx`, `src/types/database.ts` (regenerated).
+
+Both new functions are `security invoker` — every table they read already grants anon a select, so RLS stays the boundary and no new privilege surface is added. They were verified through PostgREST as `anon`, not over the superuser connection that bypasses RLS and would have passed regardless.
+
+**Not yet done, and it is the real fix:** the page is still `MISS` on every request because it renders dynamically (outstanding item 10). Statically rendering public pages would let the Mumbai edge answer Indian traffic without invoking a function at all, which beats any amount of query tuning.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

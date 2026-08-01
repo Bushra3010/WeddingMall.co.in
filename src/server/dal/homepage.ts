@@ -24,49 +24,62 @@ export interface HomeStat {
   decimals?: number
 }
 
+/**
+ * Shape of `homepage_stats()`. The type generator emits `Returns: unknown` for
+ * every function, so RPC rows are declared here and cast — the same pattern as
+ * `search_vendors` in `dal/search.ts`.
+ *
+ * `bigint` and `numeric` arrive from PostgREST as JSON *strings*, because
+ * neither fits an IEEE double faithfully. Every field is therefore widened and
+ * pushed through `Number()` rather than trusted.
+ */
+interface HomeStatsRow {
+  vendors_total: number | string
+  vendors_verified: number | string
+  cities_total: number | string
+  categories_total: number | string
+  rating_average: number | string
+  rating_count: number | string
+}
+
+/**
+ * One round trip, aggregated in SQL (migration `0017`).
+ *
+ * This previously ran five queries, four of them through `public_vendors` —
+ * whose lateral join rebuilds a listing snapshot per row, which a `count(*)`
+ * has no use for — and a fifth that selected `rating_average, rating_count`
+ * for every vendor in order to average them in JavaScript. That last one grew
+ * linearly with the catalogue and discarded every row after summing.
+ */
 export const getHomeStats = cache(async (): Promise<HomeStat[]> => {
   try {
     const supabase = createPublicClient()
 
-    const [vendors, verified, cities, categories, reviews] = await Promise.all([
-      supabase
-        .from('public_vendors')
-        .select('id', { count: 'exact', head: true })
-        .then((r) => r.count ?? 0),
-      supabase
-        .from('public_vendors')
-        .select('id', { count: 'exact', head: true })
-        .eq('verification_status', 'verified')
-        .then((r) => r.count ?? 0),
-      supabase
-        .from('cities')
-        .select('id', { count: 'exact', head: true })
-        .eq('active', true)
-        .then((r) => r.count ?? 0),
-      supabase
-        .from('categories')
-        .select('id', { count: 'exact', head: true })
-        .eq('active', true)
-        .then((r) => r.count ?? 0),
-      supabase
-        .from('public_vendors')
-        .select('rating_average, rating_count')
-        .then((r) => r.data ?? []),
-    ])
+    const { data, error } = await supabase.rpc('homepage_stats')
+    if (error) throw error
 
-    // Weighted by review count, so a single 5.0 does not outrank the field.
-    const rated = reviews.filter((v) => (v.rating_count ?? 0) > 0)
-    const totalReviews = rated.reduce((sum, v) => sum + Number(v.rating_count ?? 0), 0)
-    const weighted = rated.reduce(
-      (sum, v) => sum + Number(v.rating_average ?? 0) * Number(v.rating_count ?? 0),
-      0,
-    )
-    const average = totalReviews > 0 ? weighted / totalReviews : 0
+    const row = ((data ?? []) as unknown as HomeStatsRow[])[0]
+    if (!row) return []
+
+    const vendors = Number(row.vendors_total ?? 0)
+    const verified = Number(row.vendors_verified ?? 0)
+    const totalReviews = Number(row.rating_count ?? 0)
+    const average = Number(row.rating_average ?? 0)
 
     const stats: HomeStat[] = [
       { key: 'vendors', value: verified || vendors, suffix: '+', label: 'Verified vendors' },
-      { key: 'cities', value: cities, suffix: '+', label: 'Cities covered' },
-      { key: 'categories', value: categories, suffix: '+', label: 'Service categories' },
+      {
+        key: 'cities',
+        value: Number(row.cities_total ?? 0),
+        suffix: '+',
+        label: 'Cities covered',
+      },
+      {
+        key: 'categories',
+        value: Number(row.categories_total ?? 0),
+        suffix: '+',
+        label: 'Service categories',
+      },
     ]
 
     // Only claim a rating when approved reviews actually back it (PRD 11.2).
@@ -103,53 +116,38 @@ export interface CategoryTile {
   imagePath: string | null
 }
 
-/** Categories with a live vendor count, ordered as the admin arranged them. */
+/** Shape of `category_tiles()`; see the note on `HomeStatsRow`. */
+interface CategoryTileRow {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  vendor_count: number | string
+  image_path: string | null
+}
+
+/**
+ * Categories with a live vendor count, ordered as the admin arranged them.
+ *
+ * Counting and cover selection happen in SQL (migration `0017`). The previous
+ * version pulled every row of `vendor_categories` with its nested media and
+ * did both in JavaScript — correct, but linear in the size of the catalogue
+ * for a component that renders at most twelve tiles.
+ */
 export const getCategoryTiles = cache(async (limit = 12): Promise<CategoryTile[]> => {
   try {
     const supabase = createPublicClient()
 
-    const [{ data: categories, error }, { data: links }] = await Promise.all([
-      supabase
-        .from('categories')
-        .select('id, name, slug, description')
-        .is('parent_id', null)
-        .eq('active', true)
-        .order('sort_order')
-        .limit(limit),
-      // Only counts vendors the public can actually see.
-      supabase
-        .from('vendor_categories')
-        .select(
-          'category_id, is_primary, vendors!inner(status, vendor_media(storage_path, is_cover, moderation_status))',
-        ),
-    ])
-
+    const { data, error } = await supabase.rpc('category_tiles', { p_limit: limit })
     if (error) throw error
 
-    const counts = new Map<string, number>()
-    const covers = new Map<string, string>()
-
-    for (const link of links ?? []) {
-      if (link.vendors?.status !== 'active') continue
-      counts.set(link.category_id, (counts.get(link.category_id) ?? 0) + 1)
-
-      // First approved cover wins; a vendor listing this as its primary
-      // category is a better illustration than one that merely also serves it.
-      if (covers.has(link.category_id) && !link.is_primary) continue
-      const media = (link.vendors.vendor_media ?? []).filter(
-        (m) => m.moderation_status === 'approved',
-      )
-      const cover = media.find((m) => m.is_cover) ?? media[0]
-      if (cover?.storage_path) covers.set(link.category_id, cover.storage_path)
-    }
-
-    return (categories ?? []).map((category) => ({
-      id: category.id,
-      name: category.name,
-      slug: category.slug,
-      description: category.description,
-      vendorCount: counts.get(category.id) ?? 0,
-      imagePath: covers.get(category.id) ?? null,
+    return ((data ?? []) as unknown as CategoryTileRow[]).map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      description: row.description,
+      vendorCount: Number(row.vendor_count ?? 0),
+      imagePath: row.image_path,
     }))
   } catch (error) {
     logError('dal.getCategoryTiles', error)

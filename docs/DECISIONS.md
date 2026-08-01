@@ -397,3 +397,48 @@ The requested mobile design (compact hero card, circular category tiles, a stati
 **Trade-off accepted:** the save hearts make the homepage read the session, so it can no longer be statically rendered. The `(public)` layout already forced this (outstanding item 10), so nothing regressed today — but fixing that item now means addressing this too. The alternative, rendering every heart as unsaved and correcting it on the client, would show wrong state to exactly the people who had saved something.
 
 **Not built:** categories have no image column, and inventing one would mean an admin hand-picking stock photography. The circles show an approved cover from a real listing in that category when one exists — currently none, since `vendor_media` is empty — and the gradient icon otherwise. Both reserve identical space, so real imagery arriving later cannot shift the layout.
+
+---
+
+## ADR-028 — Put the server function next to the database, not next to the user
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+The production homepage was answering in ~950ms with `x-vercel-cache: MISS` on every request. The `x-vercel-id` header read `bom1::iad1`: the request entered at the Mumbai edge, but the serverless function executed in **Virginia**, while the Supabase project lives in **ap-northeast-1 (Tokyo)**.
+
+So each page render crossed the Pacific once per query wave, having already crossed the Atlantic to reach the function.
+
+**Decision:** pin functions to `hnd1` (Tokyo), co-located with the database.
+
+The instinct is to put the function near the user, in `bom1`. That is the wrong trade here, because the traffic is asymmetric — the function talks to the database many times per request and to the user once:
+
+| Function region | User round trip | Database round trip | Dominant cost |
+| --- | --- | --- | --- |
+| `iad1` (was) | ~250ms | ~170ms × waves | both, badly |
+| `bom1` (Mumbai) | ~10ms | ~120ms × waves | the database |
+| `hnd1` (Tokyo) | ~110ms | ~5ms × waves | the user, once |
+
+`bom1` only wins if the page makes roughly one database call. It does not, and the fix for that is bounded by how much can be aggregated into a single statement — see ADR-029.
+
+**Revisit this** if the database moves, or once public pages are statically rendered again: a cached page never invokes the function at all, so the edge serves Mumbai from Mumbai and the region stops mattering for anonymous traffic. That is the real fix, and it is still outstanding.
+
+---
+
+## ADR-029 — Aggregate on the database side, not in the render
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+The homepage issued seven queries to render two components, and two of them were unbounded:
+
+- `getHomeStats` selected `rating_average, rating_count` for **every** public vendor and computed the weighted mean in JavaScript, discarding every row after summing.
+- `getCategoryTiles` selected **every** row of `vendor_categories` with nested `vendor_media`, then counted and picked cover images in JavaScript, to render at most twelve tiles.
+
+Four of the counts also went through `public_vendors`, whose lateral join rebuilds a listing snapshot per row — work a `count(*)` has no use for.
+
+At eight vendors none of this was visible. Both were linear in the size of the catalogue, so they were defects waiting for the site to succeed.
+
+**Decision:** migration `0017` adds `homepage_stats()` and `category_tiles(limit)`. Seven queries become two, and neither scales with the catalogue.
+
+**They are `security invoker`, deliberately.** Every table they touch already grants anon a read (`vendors: public read active`, `vendor_media: public read approved`, and the taxonomy tables), so RLS remains the boundary and the migration adds no new privilege surface. A `security definer` function would have been easier to write and would have quietly become a second place where "what may the public see" is decided.
+
+**Verified as `anon`, not as `postgres`.** The first smoke test ran over a direct superuser connection, which bypasses RLS and would have passed even if the policies denied everything. Re-running both functions through PostgREST with the publishable key returned identical figures — which is the assertion that actually means something.

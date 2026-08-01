@@ -12,9 +12,11 @@ const body = Inter({
   display: 'swap',
 })
 
+// Only 600 is ever used with `font-display` — the other two weights were three
+// extra font files downloaded on a phone to render nothing.
 const heading = Cormorant_Garamond({
   subsets: ['latin'],
-  weight: ['500', '600', '700'],
+  weight: ['600'],
   variable: '--font-heading',
   display: 'swap',
 })
