@@ -65,6 +65,7 @@ export function SiteHeader({
 
   return (
     <header
+      data-probe-pathname={pathname}
       className={cn(
         'sticky top-0 z-50 transition-all duration-300',
         solid
