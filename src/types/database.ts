@@ -940,6 +940,44 @@ export interface Database {
           },
         ]
       }
+      newsletter_subscribers: {
+        Row: {
+          id: string
+          email: string
+          user_id: string | null
+          source: string
+          consented: boolean
+          unsubscribed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          email: string
+          user_id?: string | null
+          source?: string
+          consented?: boolean
+          unsubscribed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          user_id?: string | null
+          source?: string
+          consented?: boolean
+          unsubscribed_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'newsletter_subscribers_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           user_id: string

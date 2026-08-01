@@ -1,13 +1,31 @@
 import Link from 'next/link'
-import { BadgeCheck, MessageSquareText, Search, ShieldCheck, Star } from 'lucide-react'
+import {
+  ArrowRight,
+  BadgeCheck,
+  CalendarCheck,
+  Headphones,
+  MessageSquareText,
+  Search,
+  ShieldCheck,
+  Star,
+  Tag,
+} from 'lucide-react'
 
+import { CategoryCarousel } from '@/components/public/category-carousel'
+import { Hero } from '@/components/public/hero'
+import { TestimonialCarousel } from '@/components/public/testimonial-carousel'
 import { VendorCard } from '@/components/public/vendor-card'
-import { HeroSearch } from '@/components/public/hero-search'
-import { buttonVariants } from '@/components/ui/button'
+import { Reveal } from '@/components/shared/reveal'
 import { EmptyState } from '@/components/ui/states'
 import { buildMetadata } from '@/lib/seo'
 import { site } from '@/lib/site'
 import { cn } from '@/lib/utils'
+import {
+  getCategoryTiles,
+  getHomeStats,
+  getHomepageSections,
+  getTestimonials,
+} from '@/server/dal/homepage'
 import { searchVendors } from '@/server/dal/search'
 import { listCategories, listCities } from '@/server/dal/taxonomy'
 
@@ -16,87 +34,140 @@ export const metadata = buildMetadata({
   path: '/',
 })
 
-// Public discovery is server-rendered and cached; moderation/publishing
-// revalidates it (PRD 8.3).
+// Public discovery is server-rendered and cached; moderation revalidates it
+// (PRD 8.3).
 export const revalidate = 300
 
+const TRUST = [
+  {
+    icon: ShieldCheck,
+    title: 'Verified businesses',
+    body: 'Vendors submit documents before a listing can be published.',
+  },
+  {
+    icon: Star,
+    title: 'Genuine reviews',
+    body: 'Only customers with a real enquiry can review, and every review is moderated.',
+  },
+  {
+    icon: CalendarCheck,
+    title: 'One enquiry, many quotes',
+    body: 'Share your requirements once and compare replies side by side.',
+  },
+  {
+    icon: Headphones,
+    title: 'Your data stays yours',
+    body: 'Contact details reach a vendor only when you choose to share them.',
+  },
+]
+
+const STEPS = [
+  {
+    icon: Search,
+    title: 'Search and compare',
+    body: 'Filter by category, city, budget, and rating to build a realistic shortlist.',
+  },
+  {
+    icon: MessageSquareText,
+    title: 'Send one enquiry',
+    body: 'Share your requirements once. Vendors reply in a thread you control.',
+  },
+  {
+    icon: BadgeCheck,
+    title: 'Decide with confidence',
+    body: 'Read moderated reviews from customers who actually enquired.',
+  },
+]
+
 export default async function HomePage() {
-  const [categories, cities, featured] = await Promise.all([
-    listCategories(8),
-    listCities(8),
-    searchVendors({ sort: 'recommended', limit: 8, page: 1, verifiedOnly: false }),
-  ])
+  const [sections, stats, categoryTiles, categories, cities, featured, testimonials] =
+    await Promise.all([
+      getHomepageSections(),
+      getHomeStats(),
+      getCategoryTiles(12),
+      listCategories(20),
+      listCities(60),
+      searchVendors({ sort: 'recommended', limit: 8, page: 1 }),
+      getTestimonials(5),
+    ])
+
+  const hero = sections.get('hero')
+  const popular = categories.slice(0, 6)
 
   return (
     <>
-      {/* Hero */}
-      <section className="from-brand-50 to-sand-50 bg-gradient-to-b">
-        <div className="mx-auto max-w-5xl px-4 py-16 text-center sm:px-6 sm:py-24">
-          <h1 className="font-display text-brand-900 text-4xl font-semibold sm:text-5xl">
-            Plan your wedding with people you can trust
-          </h1>
-          <p className="text-sand-700 mx-auto mt-4 max-w-xl text-base sm:text-lg">
-            {site.description}
-          </p>
-          <div className="mt-8 text-left">
-            <HeroSearch categories={categories} cities={cities} />
+      {/* Pulled up behind the sticky header so the bar floats over the hero. */}
+      <div className="-mt-18">
+        <Hero
+          stats={stats}
+          categories={categories}
+          cities={cities}
+          popular={popular}
+          imagePath={typeof hero?.config.imagePath === 'string' ? hero.config.imagePath : null}
+          eyebrow={
+            typeof hero?.config.eyebrow === 'string'
+              ? hero.config.eyebrow
+              : 'Plan with verified wedding professionals'
+          }
+        />
+      </div>
+
+      {/* Categories */}
+      <section
+        aria-labelledby="home-categories"
+        className="mx-auto max-w-[90rem] px-4 py-20 sm:px-6 lg:px-10"
+      >
+        <Reveal className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 id="home-categories" className="font-display text-sand-900 text-3xl sm:text-4xl">
+              Browse by category
+            </h2>
+            <p className="text-sand-600 mt-2">Explore every kind of wedding professional.</p>
           </div>
-        </div>
-      </section>
-
-      {/* Popular categories */}
-      <section aria-labelledby="home-categories" className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-        <div className="flex items-end justify-between gap-4">
-          <h2 id="home-categories" className="font-display text-sand-900 text-2xl sm:text-3xl">
-            Browse by category
-          </h2>
-          <Link href="/categories" className="text-brand-700 text-sm font-medium hover:underline">
+          <Link
+            href="/categories"
+            className="text-brand-700 inline-flex items-center gap-1.5 text-sm font-semibold hover:underline"
+          >
             All categories
+            <ArrowRight aria-hidden="true" className="size-4" />
           </Link>
-        </div>
+        </Reveal>
 
-        {categories.length === 0 ? (
-          <div className="mt-6">
+        <Reveal delay={80} className="mt-10">
+          {categoryTiles.length > 0 ? (
+            <CategoryCarousel categories={categoryTiles} />
+          ) : (
             <EmptyState
               title="Categories are being set up"
               description="An administrator has not published any categories yet."
             />
-          </div>
-        ) : (
-          <ul className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {categories.map((category) => (
-              <li key={category.id}>
-                <Link
-                  href={`/vendors/${category.slug}`}
-                  className="border-sand-200 hover:border-brand-300 flex h-full flex-col rounded-[var(--radius-card)] border bg-white p-4 transition-colors"
-                >
-                  <span className="text-sand-900 font-medium">{category.name}</span>
-                  {category.description ? (
-                    <span className="text-sand-600 mt-1 line-clamp-2 text-xs">
-                      {category.description}
-                    </span>
-                  ) : null}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+          )}
+        </Reveal>
       </section>
 
       {/* Featured vendors */}
-      <section aria-labelledby="home-featured" className="bg-white py-14">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="flex items-end justify-between gap-4">
-            <h2 id="home-featured" className="font-display text-sand-900 text-2xl sm:text-3xl">
-              Featured vendors
-            </h2>
-            <Link href="/vendors" className="text-brand-700 text-sm font-medium hover:underline">
-              Browse all
+      <section aria-labelledby="home-featured" className="bg-white py-20">
+        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-10">
+          <Reveal className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 id="home-featured" className="font-display text-sand-900 text-3xl sm:text-4xl">
+                Featured vendors
+              </h2>
+              <p className="text-sand-600 mt-2">
+                Highly rated businesses, ranked by reviews, responsiveness, and listing quality.
+              </p>
+            </div>
+            <Link
+              href="/vendors"
+              className="text-brand-700 inline-flex items-center gap-1.5 text-sm font-semibold hover:underline"
+            >
+              View all
+              <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
-          </div>
+          </Reveal>
 
           {featured.results.length === 0 ? (
-            <div className="mt-6">
+            <div className="mt-10">
               <EmptyState
                 title="No published vendors yet"
                 description="Approved listings appear here as soon as vendors are verified."
@@ -104,123 +175,135 @@ export default async function HomePage() {
               />
             </div>
           ) : (
-            <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {featured.results.map((vendor) => (
-                <li key={vendor.vendorId}>
+            <ul className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {featured.results.map((vendor, index) => (
+                <Reveal as="li" key={vendor.vendorId} delay={index * 60}>
                   <VendorCard vendor={vendor} />
-                </li>
+                </Reveal>
               ))}
             </ul>
           )}
         </div>
       </section>
 
-      {/* How it works */}
-      <section aria-labelledby="home-how" className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-        <h2 id="home-how" className="font-display text-sand-900 text-2xl sm:text-3xl">
-          How it works
+      {/* Trust bar */}
+      <section
+        aria-labelledby="home-trust"
+        className="mx-auto max-w-[90rem] px-4 py-20 sm:px-6 lg:px-10"
+      >
+        <h2 id="home-trust" className="sr-only">
+          Why couples trust us
         </h2>
-        <ol className="mt-6 grid gap-4 sm:grid-cols-3">
-          {[
-            {
-              icon: Search,
-              title: 'Search and compare',
-              body: 'Filter by category, city, budget, and rating to build a realistic shortlist.',
-            },
-            {
-              icon: MessageSquareText,
-              title: 'Send one enquiry',
-              body: 'Share your requirements once. Vendors reply in a thread you control.',
-            },
-            {
-              icon: Star,
-              title: 'Decide with confidence',
-              body: 'Read moderated reviews from customers who actually enquired.',
-            },
-          ].map((step, index) => (
-            <li
-              key={step.title}
-              className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-5"
+        <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {TRUST.map((item, index) => (
+            <Reveal
+              as="li"
+              key={item.title}
+              delay={index * 70}
+              className="border-sand-200 rounded-[var(--radius-panel)] border bg-white p-6 transition-shadow hover:shadow-[var(--shadow-raised)]"
             >
-              <step.icon aria-hidden="true" className="text-brand-600 size-5" />
-              <h3 className="text-sand-900 mt-3 font-medium">
-                {index + 1}. {step.title}
-              </h3>
-              <p className="text-sand-600 mt-1 text-sm">{step.body}</p>
-            </li>
+              <span className="from-brand-500 to-lavender-500 inline-flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-[var(--shadow-soft)]">
+                <item.icon aria-hidden="true" className="size-5" />
+              </span>
+              <h3 className="text-sand-900 mt-4 font-medium">{item.title}</h3>
+              <p className="text-sand-600 mt-1 text-sm">{item.body}</p>
+            </Reveal>
           ))}
-        </ol>
+        </ul>
       </section>
 
-      {/* Trust */}
-      <section aria-labelledby="home-trust" className="bg-brand-900 py-14 text-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <h2 id="home-trust" className="font-display text-2xl sm:text-3xl">
-            Why couples trust us
-          </h2>
-          <ul className="mt-6 grid gap-4 sm:grid-cols-3">
-            {[
-              {
-                icon: BadgeCheck,
-                title: 'Verified businesses',
-                body: 'Vendors submit documents before a listing can be published.',
-              },
-              {
-                icon: Star,
-                title: 'Genuine reviews',
-                body: 'Only customers with a real enquiry can review, and every review is moderated.',
-              },
-              {
-                icon: ShieldCheck,
-                title: 'Your data stays yours',
-                body: 'Your contact details are shared with a vendor only when you consent.',
-              },
-            ].map((item) => (
-              <li key={item.title} className="bg-brand-800 rounded-[var(--radius-card)] p-5">
-                <item.icon aria-hidden="true" className="text-accent-300 size-5" />
-                <h3 className="mt-3 font-medium">{item.title}</h3>
-                <p className="text-brand-100 mt-1 text-sm">{item.body}</p>
-              </li>
+      {/* How it works */}
+      <section
+        aria-labelledby="home-how"
+        className="from-brand-50 to-blush-50 bg-gradient-to-br py-20"
+      >
+        <div className="mx-auto max-w-[90rem] px-4 sm:px-6 lg:px-10">
+          <Reveal>
+            <h2 id="home-how" className="font-display text-sand-900 text-3xl sm:text-4xl">
+              How it works
+            </h2>
+            <p className="text-sand-600 mt-2">Three steps from browsing to booked.</p>
+          </Reveal>
+
+          <ol className="mt-10 grid gap-6 sm:grid-cols-3">
+            {STEPS.map((step, index) => (
+              <Reveal
+                as="li"
+                key={step.title}
+                delay={index * 90}
+                className="relative rounded-[var(--radius-panel)] bg-white p-7 shadow-[var(--shadow-soft)]"
+              >
+                <span className="text-brand-100 font-display absolute top-5 right-6 text-5xl font-semibold">
+                  {index + 1}
+                </span>
+                <span className="from-brand-600 to-blush-500 inline-flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br text-white">
+                  <step.icon aria-hidden="true" className="size-5" />
+                </span>
+                <h3 className="text-sand-900 mt-4 font-medium">{step.title}</h3>
+                <p className="text-sand-600 mt-1 text-sm">{step.body}</p>
+              </Reveal>
             ))}
-          </ul>
+          </ol>
         </div>
       </section>
 
-      {/* Vendor acquisition */}
-      <section aria-labelledby="home-vendors" className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-        <div className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-8 text-center">
-          <h2 id="home-vendors" className="font-display text-sand-900 text-2xl sm:text-3xl">
-            Are you a wedding professional?
-          </h2>
-          <p className="text-sand-600 mx-auto mt-2 max-w-prose text-sm">
-            Showcase your work, receive qualified enquiries, and grow your wedding business.
-          </p>
-          <Link href="/vendor/join" className={cn(buttonVariants({ size: 'lg' }), 'mt-6')}>
-            List your business
-          </Link>
-        </div>
-      </section>
-
-      {/* Popular cities — SEO links */}
-      {cities.length > 0 ? (
-        <section aria-labelledby="home-cities" className="mx-auto max-w-7xl px-4 pb-14 sm:px-6">
-          <h2 id="home-cities" className="font-display text-sand-900 text-2xl sm:text-3xl">
-            Popular cities
-          </h2>
-          <ul className="mt-4 flex flex-wrap gap-2">
-            {cities.map((city) => (
-              <li key={city.id}>
-                <Link
-                  href={`/vendors?city=${city.slug}`}
-                  className="border-sand-300 text-sand-700 hover:border-brand-300 hover:text-brand-700 inline-flex rounded-full border bg-white px-4 py-2 text-sm"
-                >
-                  {city.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
+      {/* Testimonials */}
+      {testimonials.length > 0 ? (
+        <section
+          aria-labelledby="home-testimonials"
+          className="mx-auto max-w-4xl px-4 py-20 sm:px-6"
+        >
+          <Reveal className="text-center">
+            <h2 id="home-testimonials" className="font-display text-sand-900 text-3xl sm:text-4xl">
+              Couples who planned with us
+            </h2>
+          </Reveal>
+          <Reveal delay={80} className="mt-10">
+            <TestimonialCarousel testimonials={testimonials} />
+          </Reveal>
         </section>
       ) : null}
+
+      {/* Vendor acquisition */}
+      <section
+        aria-labelledby="home-vendors"
+        className="mx-auto max-w-[90rem] px-4 pb-24 sm:px-6 lg:px-10"
+      >
+        <Reveal
+          className={cn(
+            'relative overflow-hidden rounded-[var(--radius-panel)] p-10 text-center sm:p-16',
+            'brand-gradient',
+          )}
+        >
+          <div
+            aria-hidden="true"
+            className="absolute -top-20 -right-16 size-72 rounded-full bg-white/10 blur-3xl"
+          />
+          <div className="relative">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs font-medium text-white">
+              <Tag aria-hidden="true" className="size-3.5" />
+              Free to list
+            </span>
+            <h2
+              id="home-vendors"
+              className="font-display mt-5 text-3xl font-semibold text-white sm:text-4xl"
+            >
+              Are you a wedding professional?
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-white/80">
+              Showcase your work, receive qualified enquiries from couples who are actively
+              planning, and manage every conversation in one place.
+            </p>
+            <Link
+              href="/vendor/join"
+              className="text-brand-700 mt-8 inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-semibold shadow-[var(--shadow-float)] transition-transform hover:-translate-y-0.5"
+            >
+              List your business
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          </div>
+        </Reveal>
+      </section>
     </>
   )
 }

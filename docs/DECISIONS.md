@@ -313,3 +313,46 @@ Journey 1 begins "customer signs up". Driving the real sign-up form makes the wh
 **Decision:** `journey-1-customer.spec.ts` creates its account through the Auth admin API and drives everything after that through the UI. A separate, smaller test exercises the sign-up form and **skips itself** when it detects the rate limit.
 
 **Caveat worth stating plainly:** the journey therefore does not prove sign-up works on every run. It is covered, but by a test that is allowed to skip. Configuring a real SMTP provider (Resend, per PRD 8.1) removes the limit and lets the sign-up test run reliably — that is the proper fix and it is listed as outstanding.
+
+---
+
+## ADR-023 — Homepage statistics are counted, never claimed
+
+**Date:** 2026-08-01 · **Status:** accepted
+
+The homepage design called for trust counters reading "5,000+ Verified Vendors", "100+ Cities", "50,000+ Happy Couples", "4.9 Average Rating". The marketplace currently has 8 vendors, 8 cities, and no approved reviews. PRD 6.1 acceptance is explicit: _"no unverifiable numerical claim is hard-coded."_
+
+**Decision:** `getHomeStats()` counts everything from live data, and a stat with nothing behind it is dropped rather than padded. The average rating appears only when approved reviews actually back it, matching the same rule that governs `aggregateRating` structured data (PRD 11.2).
+
+The counters animate exactly as designed — they just count to the truth. Today the hero reads "3+ verified vendors, 8+ cities". That is a smaller number and a defensible one, and it grows on its own as the marketplace does.
+
+The same reasoning applies to the category tiles, which show a live vendor count or "Coming soon" rather than a decorative figure.
+
+---
+
+## ADR-024 — The hero image is configuration, not an asset
+
+**Date:** 2026-08-01 · **Status:** accepted
+
+The design centres on a cinematic photograph of a wedding couple. Shipping one would mean inventing an image of people who do not exist, or appropriating a real couple's photograph — neither is acceptable in a product whose entire pitch is trust.
+
+**Decision:** the hero reads `homepage_sections` where `code = 'hero'` for `{"imagePath": "...", "eyebrow": "..."}`, and falls back to a layered brand gradient with drifting blooms. The site looks finished on first deploy and becomes photographic the moment an admin sets an image — which is also what PRD 6.1 asks for ("content sections can be hidden/reordered by admin configuration").
+
+To set one: upload to the `vendor-media` bucket and update the row —
+`update homepage_sections set config_json = '{"imagePath":"<path>"}'::jsonb where code = 'hero';`
+
+---
+
+## ADR-025 — Animation is additive, never load-bearing
+
+**Date:** 2026-08-01 · **Status:** accepted
+
+The brief asked for scroll reveals, count-ups, parallax, and carousels. Each of those can hide content from someone who does not receive the animation.
+
+**Decision:** every motion effect degrades to the finished state.
+
+- `Reveal` renders visible by default and only sets the hidden "pending" state once JavaScript runs _and_ the user has not asked for reduced motion. A crawler, a no-JS visitor, and a reduced-motion user all see the content.
+- `CountUp` renders the final value during SSR and for reduced-motion users; the animation only ever replaces a correct number with the same correct number.
+- The testimonial carousel pauses on hover and keyboard focus, and does not auto-advance under reduced motion. A carousel that moves while someone is reading is an accessibility defect, not a flourish.
+
+`prefers-reduced-motion` is honoured globally in `globals.css` as well, so a missed `motion-safe:` prefix fails safe.
