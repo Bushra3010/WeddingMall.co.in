@@ -74,6 +74,18 @@ Three defects found by measuring rather than looking:
 
 Tests: 90 unit, 13 E2E (6 new in `tests/e2e/mobile-home.spec.ts` at a 390px viewport, covering collapsed-filter submission, the city selector, no horizontal overflow, rail gutter, the signed-out save link, and single-render statistics). Lint, typecheck, and build clean.
 
+## Bottom tab bar (2026-08-02)
+
+Mobile navigation moved from the header's hamburger into a fixed bottom bar: Home, Explore, Shortlist, More. It renders below `lg` in both the `(public)` and `(customer)` layouts — "Shortlist" points into `/account/*`, so dropping the bar on arrival would strand someone one tap inside their account.
+
+The header below `lg` is now just the wordmark and the city selector; its shortlist link, account controls, sign-in, and "List your business" all raised from `sm:` to `lg:` rather than competing with the bar for a narrow strip. The "More" sheet carries everything the hamburger did, plus categories, cities, wedding ideas, and venues.
+
+Files: `components/public/bottom-nav.tsx` added; `site-header.tsx` (hamburger and mobile panel removed, breakpoints raised); `(public)/layout.tsx`, `(customer)/layout.tsx`.
+
+A fixed bar hides whatever is under it, so the component emits a spacer of its own height in normal flow. That height is `4rem + 1px` — the `1px` is the bar's top border, which sits outside its `h-16` content box, and without it the footer's last line ends one pixel underneath. Asserted as a pixel overlap rather than a boolean, because sub-pixel layout puts the footer's edge a fraction below the bar's while a missing spacer would bury it by the full 65px.
+
+Tests: 16 E2E (3 more in `mobile-home.spec.ts` — current-section marking, the More sheet opening and closing on Escape with its links intact, and the spacer). 90 unit. Lint, typecheck, build clean.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

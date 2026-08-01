@@ -79,6 +79,47 @@ test('a signed-out visitor gets a sign-in link, not a failing save', async ({ pa
   await expect(save).toHaveAttribute('href', /\/auth\/sign-in\?next=/)
 })
 
+test('the bottom bar marks the current section', async ({ page }) => {
+  await page.goto('/vendors')
+
+  const bar = page.getByRole('navigation', { name: 'Primary' })
+  await expect(bar.locator('[aria-current="page"]')).toHaveText('Explore')
+})
+
+test('the More sheet opens, closes on Escape, and reaches the rest of the site', async ({
+  page,
+}) => {
+  await page.goto('/')
+
+  await page.getByRole('button', { name: 'More' }).click()
+  const sheet = page.locator('#more-menu')
+  await expect(sheet).toBeVisible()
+  // Everything the old hamburger menu carried has to survive the move.
+  await expect(sheet.getByRole('link', { name: 'Categories' })).toBeVisible()
+  await expect(sheet.getByRole('link', { name: 'List your business' })).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
+})
+
+test('the fixed bar does not cover the end of the page', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+
+  // The bar is fixed, so the layout has to reserve its height; otherwise the
+  // page scrolls to its end with the last row still hidden underneath.
+  // Measured as an overlap in pixels rather than a boolean: sub-pixel layout
+  // puts the footer's edge a fraction below the bar's, while a missing spacer
+  // would bury it by the bar's full 65px.
+  const overlap = await page.evaluate(() => {
+    const bar = document.querySelector('nav[aria-label="Primary"]')!.getBoundingClientRect()
+    const footer = document.querySelector('footer')!.getBoundingClientRect()
+    return footer.bottom - bar.top
+  })
+
+  expect(overlap).toBeLessThanOrEqual(1)
+})
+
 test('statistics appear exactly once', async ({ page }) => {
   await page.goto('/')
 

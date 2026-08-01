@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { BottomNav } from '@/components/public/bottom-nav'
 import { SiteHeader } from '@/components/public/site-header'
 import { signOut } from '@/features/auth/actions'
 import { getActor } from '@/server/dal/actor'
@@ -44,6 +45,12 @@ export default async function CustomerLayout({ children }: { children: React.Rea
         </nav>
         <main id="main">{children}</main>
       </div>
+      {/*
+        The account area gets the same bar as the public site. "Shortlist"
+        points into these routes, so dropping the bar on arrival would strand
+        someone one tap into their account with no way back but the browser.
+      */}
+      <BottomNav signedIn={Boolean(actor.userId)} signOutAction={signOut} />
     </div>
   )
 }

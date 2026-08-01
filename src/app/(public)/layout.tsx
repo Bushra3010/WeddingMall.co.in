@@ -1,3 +1,4 @@
+import { BottomNav } from '@/components/public/bottom-nav'
 import { SiteFooter } from '@/components/public/site-footer'
 import { SiteHeader } from '@/components/public/site-header'
 import { signOut } from '@/features/auth/actions'
@@ -14,6 +15,7 @@ export default async function PublicLayout({ children }: { children: React.React
         {children}
       </main>
       <SiteFooter />
+      <BottomNav signedIn={Boolean(actor.userId)} signOutAction={signOut} />
     </div>
   )
 }
