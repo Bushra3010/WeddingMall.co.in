@@ -227,8 +227,14 @@
   );
 }
 
+/*
+ * Frosted bar. 92% rather than a lighter tint because `backdrop-filter` is the
+ * first thing a browser drops under load or when compositing is unavailable —
+ * at 82% the nav text was legible only while the blur was actually applied,
+ * and content scrolling underneath showed straight through it.
+ */
 @utility glass-panel {
-  background: color-mix(in oklch, white 82%, transparent);
+  background: color-mix(in oklch, white 92%, transparent);
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
 }

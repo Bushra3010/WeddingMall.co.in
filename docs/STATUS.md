@@ -58,6 +58,22 @@ Three judgement calls worth knowing about:
 
 Sections in the brief that were not built, because no data model backs them: wedding packages, the Pinterest-style inspiration gallery, and per-vendor response-time badges. Adding them would mean inventing content.
 
+## Mobile layout (2026-08-02)
+
+The phone view was rebuilt to a supplied mockup while keeping the maroon theme: compact hero card with rounded bottom that the search box overhangs, a city selector in the header, a single search bar with the other four filters behind a disclosure, four-across circular category tiles with live vendor counts, a statistics strip, and a swipeable featured-vendor rail with save hearts.
+
+Same data, two arrangements — not a second page (ADR-027). Desktop is unchanged: six-field search, tabs, hero statistics, popular-search chips.
+
+Files: `components/public/{hero,hero-search,site-header,vendor-card,category-carousel}.tsx` edited; `{category-circles,category-icons,city-selector,save-button,stat-strip,vendor-rail}` added; `(public)/{page,layout}.tsx`, `dal/homepage.ts` (category cover images), `dal/enquiries.ts` (`getShortlistedVendorIds`), `globals.css`.
+
+Three defects found by measuring rather than looking:
+
+- **Scroll snapping ate the rail's left gutter** — `scroll-snap-align: start` aligns to the padding box, so the browser scrolled the first card flush to the edge. Caught by reading `scrollLeft` (16, not 0). Fixed with `scroll-px-4`.
+- **The hero read every statistic twice aloud** — an `sr-only` `<dt>` plus a visible `<p>` with the same text. Now one `<dt>`, ordered correctly with `flex-col-reverse`. Pre-existing; surfaced by a failing count assertion.
+- **The frosted header was see-through** at 82% white whenever `backdrop-filter` was not composited. Now 92%.
+
+Tests: 90 unit, 13 E2E (6 new in `tests/e2e/mobile-home.spec.ts` at a 390px viewport, covering collapsed-filter submission, the city selector, no horizontal overflow, rail gutter, the signed-out save link, and single-render statistics). Lint, typecheck, and build clean.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
@@ -69,7 +85,7 @@ Sections in the brief that were not built, because no data model backs them: wed
 7. **Reviews, billing, and CMS remain stubs** — Milestones 5 and 6.
 8. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google.
 9. **Permission-catalogue parity is still unchecked** (ADR-004). The technique now exists — apply ADR-020's approach to `vendor_can()`.
-10. **Public pages render dynamically** because `SiteHeader` reads the session. Milestone 7.
+10. **Public pages render dynamically** because `SiteHeader` reads the session — and now the homepage's save hearts read the shortlist too (ADR-027). Fixing this means addressing both. Milestone 7.
 11. **CSP not set.** Milestone 7.
 
 ## Credentials note

@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { BadgeCheck, MapPin, Star } from 'lucide-react'
 
+import { SaveButton } from '@/components/public/save-button'
 import { formatStartingPrice, money } from '@/lib/money'
 import { storagePublicUrl } from '@/lib/supabase/storage'
 import { cn } from '@/lib/utils'
@@ -13,12 +14,19 @@ import type { VendorSearchResult } from '@/server/dal/search'
  * Explicit `fill` + `sizes` keep CLS at zero (PRD 6.1 acceptance, 14.1), and a
  * featured result is labelled "Sponsored" — paid placement must never be
  * silent (PRD 6.2).
+ *
+ * The optional save control is a sibling of the card link, not a child: a
+ * `<form>` inside an `<a>` is invalid HTML. It is only rendered when the
+ * caller supplies `save`, so cards on statically cached routes need not know
+ * anything about the session.
  */
 export function VendorCard({
   vendor,
+  save,
   className,
 }: {
   vendor: VendorSearchResult
+  save?: { signedIn: boolean; shortlisted: boolean }
   className?: string
 }) {
   const cover = storagePublicUrl('vendor-media', vendor.coverPath)
@@ -29,7 +37,7 @@ export function VendorCard({
   return (
     <article
       className={cn(
-        'group border-sand-200 hover:border-brand-200 h-full overflow-hidden rounded-[var(--radius-panel)] border bg-white transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[var(--shadow-float)]',
+        'group border-sand-200 hover:border-brand-200 relative h-full overflow-hidden rounded-[var(--radius-panel)] border bg-white transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[var(--shadow-float)]',
         className,
       )}
     >
@@ -40,7 +48,7 @@ export function VendorCard({
               src={cover}
               alt={`Work by ${vendor.displayName}`}
               fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+              sizes="(max-width: 640px) 80vw, (max-width: 1024px) 50vw, 25vw"
               className="object-cover transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
@@ -52,32 +60,31 @@ export function VendorCard({
             </div>
           )}
 
-          {/* Rating chip, top-left */}
-          {vendor.ratingCount > 0 ? (
-            <span className="text-sand-900 absolute top-3 left-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold shadow-[var(--shadow-soft)] backdrop-blur">
-              <Star aria-hidden="true" className="fill-gold-500 text-gold-500 size-3" />
-              {vendor.ratingAverage.toFixed(1)}
-            </span>
-          ) : null}
-
-          {/* Verified badge, top-right */}
-          {vendor.verificationStatus === 'verified' ? (
-            <span className="text-brand-700 absolute top-3 right-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold shadow-[var(--shadow-soft)] backdrop-blur">
-              <BadgeCheck aria-hidden="true" className="size-3.5" />
-              Verified
-            </span>
-          ) : null}
-
-          {vendor.isFeatured ? (
-            <span className="bg-gold-500 text-sand-950 absolute bottom-3 left-3 rounded-full px-2.5 py-1 text-[11px] font-semibold">
-              Sponsored
-            </span>
-          ) : null}
+          {/* Top-left stack; the right corner belongs to the save control. */}
+          <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
+            {vendor.isFeatured ? (
+              <span className="bg-gold-500 text-sand-950 rounded-full px-2.5 py-1 text-[11px] font-semibold">
+                Sponsored
+              </span>
+            ) : null}
+            {vendor.ratingCount > 0 ? (
+              <span className="text-sand-900 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold shadow-[var(--shadow-soft)] backdrop-blur">
+                <Star aria-hidden="true" className="fill-gold-500 text-gold-500 size-3" />
+                {vendor.ratingAverage.toFixed(1)}
+              </span>
+            ) : null}
+          </div>
         </div>
 
-        <div className="p-5">
-          <h3 className="text-sand-900 group-hover:text-brand-700 line-clamp-1 font-medium transition-colors">
-            {vendor.displayName}
+        <div className="p-4 sm:p-5">
+          <h3 className="text-sand-900 group-hover:text-brand-700 flex items-center gap-1 font-medium transition-colors">
+            <span className="line-clamp-1">{vendor.displayName}</span>
+            {vendor.verificationStatus === 'verified' ? (
+              <BadgeCheck
+                aria-label="Verified business"
+                className="text-brand-600 size-4 shrink-0"
+              />
+            ) : null}
           </h3>
 
           {vendor.cityName ? (
@@ -106,6 +113,17 @@ export function VendorCard({
           </div>
         </div>
       </Link>
+
+      {save ? (
+        <SaveButton
+          vendorId={vendor.vendorId}
+          vendorSlug={vendor.slug}
+          vendorName={vendor.displayName}
+          signedIn={save.signedIn}
+          shortlisted={save.shortlisted}
+          className="absolute top-3 right-3 z-10"
+        />
+      ) : null}
     </article>
   )
 }

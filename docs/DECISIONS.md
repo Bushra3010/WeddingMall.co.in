@@ -372,3 +372,28 @@ Two things worth recording.
 **A red brand makes the error state ambiguous.** `--color-danger` was `oklch(0.56 0.2 22)` — nearly the same red as the new brand, which would have made validation errors read as decoration. It is now `oklch(0.58 0.205 32)` (`#D93418`): brighter and more orange, separated from `brand-700` by both lightness and hue, still unmistakably an error rather than a warning.
 
 **Why this was cheap:** the whole app renders colour through tokens, so the swap touched `globals.css`, three files for the `lavender` → `rose` rename, and one `themeColor` hex. The 641 `sand-*` and 120 `brand-*` references across 77 files needed no edits at all. That is the payoff for banning raw hex in JSX (PRD 7.1).
+
+---
+
+## ADR-027 — The phone layout is a different arrangement, not a narrower copy
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+The requested mobile design (compact hero card, circular category tiles, a statistics strip, a swipeable vendor rail) is not the desktop page at a smaller width. Rather than build a second set of pages, each section renders one data source in two arrangements chosen by breakpoint.
+
+**Decision:** same data, two layouts, one source of truth.
+
+- Category icons and tints moved into `components/public/category-icons.ts`, shared by the desktop carousel and the mobile circles, so one category cannot pick up two different marks on the same page.
+- Statistics render in the hero from `lg` and in `StatStrip` below it. Both are in the DOM at every width and CSS picks one; the breakpoints are deliberately identical, and an E2E test counts *visible* labels so a future mismatch showing them twice or not at all fails loudly.
+- The vendor grid becomes a scroll rail below `sm` via `VendorRail`.
+
+**Hiding a control must not discard its value.** The mobile search folds category, city, budget, and date behind a disclosure. Those fields stay *mounted* while collapsed rather than being unmounted — a filter chosen, hidden, and then submitted still applies. This is asserted in `tests/e2e/mobile-home.spec.ts`, because it is exactly the kind of thing that would silently regress.
+
+**Two things the browser did that the CSS did not say.**
+
+- Scroll snapping steals the gutter. `-mx-4 px-4` bleeds a rail past the page margin, but `scroll-snap-align: start` aligns to the *padding box*, so the browser scrolled the first card flush to the viewport edge and the row lost its left margin. `scroll-px-4` fixes it. It was found by measuring `scrollLeft`, not by looking.
+- `backdrop-filter` is the first thing dropped under load or without compositing. The header's `glass-panel` at 82% white was legible only while the blur was actually applied. It is now 92%.
+
+**Trade-off accepted:** the save hearts make the homepage read the session, so it can no longer be statically rendered. The `(public)` layout already forced this (outstanding item 10), so nothing regressed today — but fixing that item now means addressing this too. The alternative, rendering every heart as unsaved and correcting it on the client, would show wrong state to exactly the people who had saved something.
+
+**Not built:** categories have no image column, and inventing one would mean an admin hand-picking stock photography. The circles show an approved cover from a real listing in that category when one exists — currently none, since `vendor_media` is empty — and the gradient icon otherwise. Both reserve identical space, so real imagery arriving later cannot shift the layout.

@@ -93,6 +93,14 @@ export interface CategoryTile {
   slug: string
   description: string | null
   vendorCount: number
+  /**
+   * Cover image of a published vendor in this category, or null. Categories
+   * have no image column of their own, and inventing one would mean an admin
+   * hand-picking stock photography; borrowing a real listing's approved cover
+   * means the tile illustrates itself with genuine work as soon as any vendor
+   * uploads. Null until then — the tile falls back to its icon.
+   */
+  imagePath: string | null
 }
 
 /** Categories with a live vendor count, ordered as the admin arranged them. */
@@ -109,15 +117,30 @@ export const getCategoryTiles = cache(async (limit = 12): Promise<CategoryTile[]
         .order('sort_order')
         .limit(limit),
       // Only counts vendors the public can actually see.
-      supabase.from('vendor_categories').select('category_id, vendors!inner(status)'),
+      supabase
+        .from('vendor_categories')
+        .select(
+          'category_id, is_primary, vendors!inner(status, vendor_media(storage_path, is_cover, moderation_status))',
+        ),
     ])
 
     if (error) throw error
 
     const counts = new Map<string, number>()
+    const covers = new Map<string, string>()
+
     for (const link of links ?? []) {
       if (link.vendors?.status !== 'active') continue
       counts.set(link.category_id, (counts.get(link.category_id) ?? 0) + 1)
+
+      // First approved cover wins; a vendor listing this as its primary
+      // category is a better illustration than one that merely also serves it.
+      if (covers.has(link.category_id) && !link.is_primary) continue
+      const media = (link.vendors.vendor_media ?? []).filter(
+        (m) => m.moderation_status === 'approved',
+      )
+      const cover = media.find((m) => m.is_cover) ?? media[0]
+      if (cover?.storage_path) covers.set(link.category_id, cover.storage_path)
     }
 
     return (categories ?? []).map((category) => ({
@@ -126,6 +149,7 @@ export const getCategoryTiles = cache(async (limit = 12): Promise<CategoryTile[]
       slug: category.slug,
       description: category.description,
       vendorCount: counts.get(category.id) ?? 0,
+      imagePath: covers.get(category.id) ?? null,
     }))
   } catch (error) {
     logError('dal.getCategoryTiles', error)

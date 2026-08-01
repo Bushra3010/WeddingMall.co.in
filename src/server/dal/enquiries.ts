@@ -286,6 +286,25 @@ export async function getShortlist(): Promise<ShortlistRow[]> {
   }
 }
 
+/**
+ * Every vendor the signed-in customer has saved, for rendering save buttons
+ * across a list of cards in one round trip instead of one query per card.
+ *
+ * RLS scopes `shortlists` to the caller, so a signed-out visitor gets an empty
+ * set from the same query rather than a special case here.
+ */
+export async function getShortlistedVendorIds(): Promise<Set<string>> {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase.from('shortlists').select('vendor_id')
+    if (error) throw error
+    return new Set((data ?? []).map((row) => row.vendor_id))
+  } catch (error) {
+    logError('dal.getShortlistedVendorIds', error)
+    return new Set()
+  }
+}
+
 export async function isShortlisted(vendorId: string): Promise<boolean> {
   try {
     const supabase = await createClient()

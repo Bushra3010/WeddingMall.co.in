@@ -2,55 +2,25 @@
 
 import Link from 'next/link'
 import { useRef } from 'react'
-import {
-  ArrowRight,
-  Building2,
-  Cake,
-  Camera,
-  ChevronLeft,
-  ChevronRight,
-  Flower2,
-  Gem,
-  Music,
-  Palette,
-  Sparkles,
-  UtensilsCrossed,
-  type LucideIcon,
-} from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 
+import { categoryIcon, categoryTint, vendorCountLabel } from '@/components/public/category-icons'
 import { cn } from '@/lib/utils'
 import type { CategoryTile } from '@/server/dal/homepage'
 
 /**
- * Category cards (PRD 6.1.3).
- *
- * Icons are matched to the seeded category slugs with a neutral fallback, so
- * an admin adding a category never produces a broken tile — it just gets the
- * generic mark.
+ * Category cards (PRD 6.1.3) — the desktop presentation. Icons and tints come
+ * from `category-icons`, shared with the mobile circles so one category cannot
+ * pick up two different marks on the same page.
  */
-const ICONS: Record<string, LucideIcon> = {
-  venues: Building2,
-  photographers: Camera,
-  'makeup-artists': Sparkles,
-  caterers: UtensilsCrossed,
-  decorators: Flower2,
-  'music-and-dj': Music,
-  'mehendi-artists': Palette,
-  planners: Gem,
-  cakes: Cake,
-}
 
-/** Rotating gradient tints so a row of tiles is not monotone. */
-const TINTS = [
-  'from-brand-500 to-rose-500',
-  'from-blush-500 to-brand-500',
-  'from-rose-400 to-brand-600',
-  'from-gold-500 to-blush-500',
-  'from-brand-600 to-blush-600',
-  'from-rose-500 to-gold-500',
-]
-
-export function CategoryCarousel({ categories }: { categories: CategoryTile[] }) {
+export function CategoryCarousel({
+  categories,
+  className,
+}: {
+  categories: CategoryTile[]
+  className?: string
+}) {
   const scroller = useRef<HTMLUListElement>(null)
 
   function scrollBy(direction: 1 | -1) {
@@ -60,13 +30,13 @@ export function CategoryCarousel({ categories }: { categories: CategoryTile[] })
   if (categories.length === 0) return null
 
   return (
-    <div className="relative">
+    <div className={cn('relative', className)}>
       <ul
         ref={scroller}
         className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2"
       >
         {categories.map((category, index) => {
-          const Icon = ICONS[category.slug] ?? Sparkles
+          const Icon = categoryIcon(category.slug)
           return (
             <li key={category.id} className="w-56 shrink-0 snap-start">
               <Link
@@ -76,7 +46,7 @@ export function CategoryCarousel({ categories }: { categories: CategoryTile[] })
                 <span
                   className={cn(
                     'inline-flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-[var(--shadow-soft)] transition-transform duration-300 group-hover:scale-110 group-hover:rotate-[4deg]',
-                    TINTS[index % TINTS.length],
+                    categoryTint(index),
                   )}
                 >
                   <Icon aria-hidden="true" className="size-6" strokeWidth={2} />
@@ -92,9 +62,7 @@ export function CategoryCarousel({ categories }: { categories: CategoryTile[] })
 
                 <p className="text-sand-400 group-hover:text-brand-600 mt-auto flex items-center gap-1 pt-4 text-xs font-medium transition-colors">
                   {/* Counted live — never a decorative number (PRD 6.1). */}
-                  {category.vendorCount > 0
-                    ? `${category.vendorCount} ${category.vendorCount === 1 ? 'vendor' : 'vendors'}`
-                    : 'Coming soon'}
+                  {vendorCountLabel(category.vendorCount)}
                   <ArrowRight
                     aria-hidden="true"
                     className="size-3.5 transition-transform group-hover:translate-x-1"

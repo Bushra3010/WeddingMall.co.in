@@ -5,8 +5,10 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Heart, LogOut, Menu, UserRound, X } from 'lucide-react'
 
+import { CitySelector } from '@/components/public/city-selector'
 import { site } from '@/lib/site'
 import { cn } from '@/lib/utils'
+import type { CityRow } from '@/server/dal/taxonomy'
 
 /**
  * Sticky navigation (PRD 6.1.1).
@@ -32,9 +34,16 @@ const HERO_ROUTES = new Set(['/'])
 
 export function SiteHeader({
   signedIn,
+  cities = [],
   signOutAction,
 }: {
   signedIn: boolean
+  /**
+   * Optional: the city switcher is a discovery control, so the account area
+   * renders the same header without it rather than paying for the query. The
+   * selector renders nothing when the list is empty.
+   */
+  cities?: CityRow[]
   signOutAction: () => Promise<void>
 }) {
   const [scrolled, setScrolled] = useState(false)
@@ -98,6 +107,8 @@ export function SiteHeader({
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <CitySelector cities={cities} variant={solid ? 'dark' : 'light'} />
+
           <Link
             href="/account/shortlist"
             className={cn(
@@ -111,19 +122,25 @@ export function SiteHeader({
             Shortlist
           </Link>
 
+          {/*
+            Account controls are hidden below `sm` and repeated in the menu
+            instead. With the city selector present there is not enough width
+            for both, and "Sign in" wrapping onto two lines inside the bar is
+            worse than one more tap.
+          */}
           {signedIn ? (
             <>
               <Link
                 href="/account"
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
+                  'hidden items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition-colors sm:inline-flex',
                   solid ? 'text-sand-700 hover:bg-sand-100' : 'text-white/90 hover:bg-white/15',
                 )}
               >
                 <UserRound aria-hidden="true" className="size-4" />
-                <span className="hidden sm:inline">Account</span>
+                Account
               </Link>
-              <form action={signOutAction}>
+              <form action={signOutAction} className="hidden sm:block">
                 <button
                   type="submit"
                   aria-label="Sign out"
@@ -140,7 +157,7 @@ export function SiteHeader({
             <Link
               href="/auth/sign-in"
               className={cn(
-                'rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
+                'hidden rounded-full px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors sm:inline-block',
                 solid ? 'text-sand-700 hover:bg-sand-100' : 'text-white/90 hover:bg-white/15',
               )}
             >
@@ -196,6 +213,42 @@ export function SiteHeader({
                 </Link>
               </li>
             ))}
+            {/*
+              Only below `sm`, where the bar itself has no room for them —
+              above that the header already shows these and repeating them
+              here would be duplicate navigation.
+            */}
+            {signedIn ? (
+              <>
+                <li className="sm:hidden">
+                  <Link
+                    href="/account"
+                    className="text-sand-800 hover:bg-brand-50 block rounded-lg px-3 py-2.5 text-sm font-medium"
+                  >
+                    Account
+                  </Link>
+                </li>
+                <li className="sm:hidden">
+                  <form action={signOutAction}>
+                    <button
+                      type="submit"
+                      className="text-sand-800 hover:bg-brand-50 block w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium"
+                    >
+                      Sign out
+                    </button>
+                  </form>
+                </li>
+              </>
+            ) : (
+              <li className="sm:hidden">
+                <Link
+                  href="/auth/sign-in"
+                  className="text-sand-800 hover:bg-brand-50 block rounded-lg px-3 py-2.5 text-sm font-medium"
+                >
+                  Sign in
+                </Link>
+              </li>
+            )}
             <li>
               <Link
                 href="/vendor/join"
