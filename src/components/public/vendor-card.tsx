@@ -16,17 +16,17 @@ import type { VendorSearchResult } from '@/server/dal/search'
  * silent (PRD 6.2).
  *
  * The optional save control is a sibling of the card link, not a child: a
- * `<form>` inside an `<a>` is invalid HTML. It is only rendered when the
- * caller supplies `save`, so cards on statically cached routes need not know
- * anything about the session.
+ * `<form>` inside an `<a>` is invalid HTML. `save` only asks for the control
+ * to exist — it resolves its own session and saved state in the browser, so a
+ * card never makes its page uncacheable (ADR-030).
  */
 export function VendorCard({
   vendor,
-  save,
+  save = false,
   className,
 }: {
   vendor: VendorSearchResult
-  save?: { signedIn: boolean; shortlisted: boolean }
+  save?: boolean
   className?: string
 }) {
   const cover = storagePublicUrl('vendor-media', vendor.coverPath)
@@ -119,8 +119,6 @@ export function VendorCard({
           vendorId={vendor.vendorId}
           vendorSlug={vendor.slug}
           vendorName={vendor.displayName}
-          signedIn={save.signedIn}
-          shortlisted={save.shortlisted}
           className="absolute top-3 right-3 z-10"
         />
       ) : null}

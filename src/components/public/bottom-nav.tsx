@@ -19,6 +19,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { useSession } from '@/components/shared/session-provider'
+import { signOut } from '@/features/auth/actions'
 import { cn } from '@/lib/utils'
 
 /**
@@ -60,13 +62,9 @@ const MORE_LINKS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/vendors/venues', label: 'Wedding venues', icon: Building2 },
 ]
 
-export function BottomNav({
-  signedIn,
-  signOutAction,
-}: {
-  signedIn: boolean
-  signOutAction: () => Promise<void>
-}) {
+export function BottomNav() {
+  // Resolved in the browser so the server render stays cacheable (ADR-030).
+  const { signedIn } = useSession()
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
@@ -141,7 +139,7 @@ export function BottomNav({
 
             {signedIn ? (
               <li>
-                <form action={signOutAction}>
+                <form action={signOut}>
                   <button
                     type="submit"
                     className="text-sand-800 hover:bg-brand-50 hover:text-brand-700 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium"

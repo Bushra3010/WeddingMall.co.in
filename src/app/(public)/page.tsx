@@ -22,8 +22,6 @@ import { EmptyState } from '@/components/ui/states'
 import { buildMetadata } from '@/lib/seo'
 import { site } from '@/lib/site'
 import { cn } from '@/lib/utils'
-import { getActor } from '@/server/dal/actor'
-import { getShortlistedVendorIds } from '@/server/dal/enquiries'
 import {
   getCategoryTiles,
   getHomeStats,
@@ -84,7 +82,7 @@ const STEPS = [
 ]
 
 export default async function HomePage() {
-  const [sections, stats, categoryTiles, categories, cities, featured, testimonials, actor] =
+  const [sections, stats, categoryTiles, categories, cities, featured, testimonials] =
     await Promise.all([
       getHomepageSections(),
       getHomeStats(),
@@ -93,13 +91,7 @@ export default async function HomePage() {
       listCities(60),
       searchVendors({ sort: 'recommended', limit: 8, page: 1 }),
       getTestimonials(5),
-      getActor(),
     ])
-
-  // Only queried for a signed-in visitor; the save hearts render as sign-in
-  // links otherwise, so there is nothing to look up.
-  const signedIn = Boolean(actor.userId)
-  const shortlistedIds = signedIn ? await getShortlistedVendorIds() : new Set<string>()
 
   const hero = sections.get('hero')
   const popular = categories.slice(0, 6)
@@ -209,11 +201,7 @@ export default async function HomePage() {
               />
             </div>
           ) : (
-            <VendorRail
-              vendors={featured.results}
-              save={{ signedIn, shortlistedIds }}
-              className="mt-6 gap-4 sm:mt-10 sm:gap-6"
-            />
+            <VendorRail vendors={featured.results} save className="mt-6 gap-4 sm:mt-10 sm:gap-6" />
           )}
         </div>
       </section>

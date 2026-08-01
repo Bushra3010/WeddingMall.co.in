@@ -17,12 +17,12 @@ import type { VendorSearchResult } from '@/server/dal/search'
  */
 export function VendorRail({
   vendors,
-  save,
+  save = false,
   className,
 }: {
   vendors: VendorSearchResult[]
-  /** Per-vendor save state; omit on routes that must not read the session. */
-  save?: { signedIn: boolean; shortlistedIds: Set<string> }
+  /** Show a save control on each card; it resolves its own state (ADR-030). */
+  save?: boolean
   className?: string
 }) {
   if (vendors.length === 0) return null
@@ -46,14 +46,7 @@ export function VendorRail({
           delay={index * 60}
           className="w-[78vw] max-w-xs shrink-0 snap-start sm:w-auto sm:max-w-none"
         >
-          <VendorCard
-            vendor={vendor}
-            save={
-              save
-                ? { signedIn: save.signedIn, shortlisted: save.shortlistedIds.has(vendor.vendorId) }
-                : undefined
-            }
-          />
+          <VendorCard vendor={vendor} save={save} />
         </Reveal>
       ))}
     </ul>

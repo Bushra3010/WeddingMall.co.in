@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Cormorant_Garamond, Inter } from 'next/font/google'
 
+import { SessionProvider } from '@/components/shared/session-provider'
 import { env } from '@/lib/env'
 import { site } from '@/lib/site'
 
@@ -46,7 +47,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main" className="skip-link">
           Skip to main content
         </a>
-        {children}
+        {/*
+          Client-side session state. It carries no server data, so wrapping the
+          tree here does not stop any route from being statically rendered.
+        */}
+        <SessionProvider>{children}</SessionProvider>
       </body>
     </html>
   )

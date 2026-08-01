@@ -442,3 +442,21 @@ At eight vendors none of this was visible. Both were linear in the size of the c
 **They are `security invoker`, deliberately.** Every table they touch already grants anon a read (`vendors: public read active`, `vendor_media: public read approved`, and the taxonomy tables), so RLS remains the boundary and the migration adds no new privilege surface. A `security definer` function would have been easier to write and would have quietly become a second place where "what may the public see" is decided.
 
 **Verified as `anon`, not as `postgres`.** The first smoke test ran over a direct superuser connection, which bypasses RLS and would have passed even if the policies denied everything. Re-running both functions through PostgREST with the publishable key returned identical figures — which is the assertion that actually means something.
+
+---
+
+## ADR-030 — Session state belongs in the browser, not in the render
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+Even after co-locating the function with the database (ADR-028) and collapsing the query count (ADR-029), every public page still answered `x-vercel-cache: MISS`. The cause was one line in `(public)/layout.tsx`: `getActor()`. Reading the session opts a route out of static rendering for **every** visitor, so the whole public tree was a function invocation on another continent in order to decide whether the header says "Sign in" or "Account".
+
+**Decision:** the public shell reads no session. `SessionProvider` resolves it in the browser and the header, bottom bar, and save buttons consume it from context.
+
+Result: `/`, `/about`, `/blog`, `/categories`, `/cities`, `/contact`, `/help`, `/privacy`, and `/terms` are prerendered. `/vendors` stays dynamic, but because it reads search parameters — which is correct, not a session leak.
+
+**`getSession()` is not an authorisation signal, and the provider says so in a comment that should stay there.** It reads the cookie without revalidating the JWT, so a tampered cookie can make `signedIn` true in the browser. That is deliberately harmless: nothing in the context decides what anyone *may do*, only which label a button shows. RLS and `assertPermission` remain the boundary, and a forged cookie fails there. The danger is a future change quietly promoting this to a gate.
+
+**The check that mattered.** A prerendered page is served to everyone, so personalisation baked into it is not a stale label — it is one account's state shown to strangers. Fetching `/` with and without a session cookie returns HTML differing only in React's per-render id: no email, no "Sign out", no saved-state labels. `tests/e2e/mobile-home.spec.ts` now asserts this on every run, because it is the kind of regression that is invisible until it is a disclosure.
+
+**Cost accepted:** signed-in visitors see the signed-out affordance for one paint before the browser resolves the cookie. That is the standard price of a cached shell, and it is paid by the minority; the alternative was every visitor waiting on a function call.

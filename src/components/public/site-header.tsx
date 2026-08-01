@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react'
 import { Heart, LogOut, UserRound } from 'lucide-react'
 
 import { CitySelector } from '@/components/public/city-selector'
+import { useSession } from '@/components/shared/session-provider'
+import { signOut } from '@/features/auth/actions'
 import { site } from '@/lib/site'
 import { cn } from '@/lib/utils'
 import type { CityRow } from '@/server/dal/taxonomy'
@@ -37,19 +39,17 @@ const NAV = [
 const HERO_ROUTES = new Set(['/'])
 
 export function SiteHeader({
-  signedIn,
   cities = [],
-  signOutAction,
 }: {
-  signedIn: boolean
   /**
    * Optional: the city switcher is a discovery control, so the account area
    * renders the same header without it rather than paying for the query. The
    * selector renders nothing when the list is empty.
    */
   cities?: CityRow[]
-  signOutAction: () => Promise<void>
 }) {
+  // Resolved in the browser so the server render stays cacheable (ADR-030).
+  const { signedIn } = useSession()
   const [scrolled, setScrolled] = useState(false)
   const pathname = usePathname()
 
@@ -133,7 +133,7 @@ export function SiteHeader({
                 <UserRound aria-hidden="true" className="size-4" />
                 Account
               </Link>
-              <form action={signOutAction} className="hidden lg:block">
+              <form action={signOut} className="hidden lg:block">
                 <button
                   type="submit"
                   aria-label="Sign out"

@@ -132,3 +132,15 @@ test('statistics appear exactly once', async ({ page }) => {
 
   expect(visible).toBe(1)
 })
+
+test('the server-rendered homepage carries no session-specific markup', async ({ request }) => {
+  // The homepage is statically prerendered and edge-cached, so one visitor's
+  // HTML is served to everyone. Anything session-dependent has to be resolved
+  // in the browser; if it ever gets baked into this response it is not just a
+  // stale label, it is one account's state shown to strangers.
+  const html = await (await request.get('/')).text()
+
+  expect(html).not.toContain('Sign out')
+  // Saved-state labels only exist for a signed-in user.
+  expect(html).not.toContain('from shortlist')
+})

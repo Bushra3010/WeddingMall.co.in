@@ -100,7 +100,9 @@ Files: `supabase/migrations/0017_homepage_aggregates.sql`, `vercel.json`, `dal/h
 
 Both new functions are `security invoker` — every table they read already grants anon a select, so RLS stays the boundary and no new privilege surface is added. They were verified through PostgREST as `anon`, not over the superuser connection that bypasses RLS and would have passed regardless.
 
-**Not yet done, and it is the real fix:** the page is still `MISS` on every request because it renders dynamically (outstanding item 10). Statically rendering public pages would let the Mumbai edge answer Indian traffic without invoking a function at all, which beats any amount of query tuning.
+4. **The public shell read the session**, which opted every public page out of static rendering for every visitor — a function invocation on another continent to choose between "Sign in" and "Account". `SessionProvider` now resolves it in the browser (ADR-030). `/`, `/about`, `/blog`, `/categories`, `/cities`, `/contact`, `/help`, `/privacy`, and `/terms` are prerendered; `/vendors` stays dynamic because it reads search parameters.
+
+Because a prerendered page is served to everyone, `/` was fetched with and without a session cookie: the HTML differs only in React's per-render id. An E2E test now asserts the response carries no session markup on every run.
 
 ## Blocked / outstanding
 
@@ -113,7 +115,7 @@ Both new functions are `security invoker` — every table they read already gran
 7. **Reviews, billing, and CMS remain stubs** — Milestones 5 and 6.
 8. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google.
 9. **Permission-catalogue parity is still unchecked** (ADR-004). The technique now exists — apply ADR-020's approach to `vendor_can()`.
-10. **Public pages render dynamically** because `SiteHeader` reads the session — and now the homepage's save hearts read the shortlist too (ADR-027). Fixing this means addressing both. Milestone 7.
+10. ~~Public pages render dynamically.~~ Fixed 2026-08-02 (ADR-030). Remaining dynamic public routes are `/vendors*` (search parameters) and `/vendor/[slug]*` (personalised enquiry state), both legitimately so.
 11. **CSP not set.** Milestone 7.
 
 ## Credentials note

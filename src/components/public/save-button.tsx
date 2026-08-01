@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Heart } from 'lucide-react'
 
 import { useAction } from '@/components/shared/action-form'
+import { useSession } from '@/components/shared/session-provider'
 import { toggleShortlistAction } from '@/features/enquiries/actions'
 import { cn } from '@/lib/utils'
 
@@ -21,24 +22,25 @@ import { cn } from '@/lib/utils'
  * It must not be nested inside the card's `<Link>` — a form inside an anchor
  * is invalid HTML that browsers recover from inconsistently. The card
  * positions this as a sibling instead.
+ *
+ * Session and saved state come from the browser, not from props: asking the
+ * server would make every page carrying a vendor card uncacheable (ADR-030).
  */
 export function SaveButton({
   vendorId,
   vendorSlug,
   vendorName,
-  signedIn,
-  shortlisted,
   className,
 }: {
   vendorId: string
   vendorSlug: string
   vendorName: string
-  signedIn: boolean
-  shortlisted: boolean
   className?: string
 }) {
+  const { signedIn, shortlistedIds } = useSession()
   const [state, action, pending] = useAction(toggleShortlistAction)
-  const saved = state?.ok ? state.data.shortlisted : shortlisted
+  // A confirmed toggle outranks the loaded set, so the icon never snaps back.
+  const saved = state?.ok ? state.data.shortlisted : shortlistedIds.has(vendorId)
   const failed = state !== null && !state.ok
 
   const shell =
