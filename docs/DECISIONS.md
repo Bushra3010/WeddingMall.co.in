@@ -356,3 +356,19 @@ The brief asked for scroll reveals, count-ups, parallax, and carousels. Each of 
 - The testimonial carousel pauses on hover and keyboard focus, and does not auto-advance under reduced motion. A carousel that moves while someone is reading is an accessibility defect, not a flourish.
 
 `prefers-reduced-motion` is honoured globally in `globals.css` as well, so a missed `motion-safe:` prefix fails safe.
+
+---
+
+## ADR-026 — Maroon brand, and a danger colour that cannot be confused with it
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+The brand moved from deep purple to maroon (`#7F1C15`), with warm ivory neutrals replacing the blush-grey ones and `lavender` renamed to `rose` — a purple secondary against a maroon primary read as a clash rather than a gradient.
+
+Two things worth recording.
+
+**Ratios were measured, not assumed.** `scripts/`-adjacent working notes converted each oklch value to sRGB and computed WCAG contrast. `brand-700` is 10.05:1 on white; every shade from 500 down clears AA for body text; 400 clears AA for large text only and is used for decoration accordingly. The first draft of the ramp sat at hue 25 and rendered as crimson rather than maroon — moving to hue 29 produced `#7F1C15`, which is within a hair of canonical maroon `#800000`.
+
+**A red brand makes the error state ambiguous.** `--color-danger` was `oklch(0.56 0.2 22)` — nearly the same red as the new brand, which would have made validation errors read as decoration. It is now `oklch(0.58 0.205 32)` (`#D93418`): brighter and more orange, separated from `brand-700` by both lightness and hue, still unmistakably an error rather than a warning.
+
+**Why this was cheap:** the whole app renders colour through tokens, so the swap touched `globals.css`, three files for the `lavender` → `rose` rename, and one `themeColor` hex. The 641 `sand-*` and 120 `brand-*` references across 77 files needed no edits at all. That is the payoff for banning raw hex in JSX (PRD 7.1).

@@ -1,40 +1,44 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens (PRD 7.1). Soft-luxury palette: white and blush base, deep
- * purple as the single brand colour, lavender and champagne as restrained
- * accents. Every colour used in a component comes from a token — no raw hex
- * values in JSX.
+ * Design tokens (PRD 7.1). Soft-luxury palette: warm ivory base, deep maroon
+ * as the single brand colour, rose and champagne gold as restrained accents —
+ * the classic maroon-and-gold pairing of an Indian wedding. Every colour used
+ * in a component comes from a token; no raw hex values in JSX.
  */
 
 @theme {
-  /* Blush neutral base */
-  --color-sand-50: oklch(0.995 0.003 340);
-  --color-sand-100: oklch(0.98 0.008 340);
-  --color-sand-200: oklch(0.945 0.012 335);
-  --color-sand-300: oklch(0.9 0.016 330);
-  --color-sand-400: oklch(0.78 0.018 325);
-  --color-sand-500: oklch(0.64 0.018 320);
-  --color-sand-600: oklch(0.52 0.017 318);
-  --color-sand-700: oklch(0.41 0.016 315);
-  --color-sand-800: oklch(0.3 0.015 312);
-  --color-sand-900: oklch(0.21 0.014 310);
-  --color-sand-950: oklch(0.14 0.012 308);
+  /* Warm ivory neutrals. Hue sits near 40 so the greys read warm against
+     maroon rather than drifting cool and muddying it. */
+  --color-sand-50: oklch(0.995 0.003 60);
+  --color-sand-100: oklch(0.98 0.007 55);
+  --color-sand-200: oklch(0.945 0.011 50);
+  --color-sand-300: oklch(0.9 0.015 45);
+  --color-sand-400: oklch(0.78 0.017 42);
+  --color-sand-500: oklch(0.64 0.017 40);
+  --color-sand-600: oklch(0.52 0.016 38);
+  --color-sand-700: oklch(0.41 0.015 36);
+  --color-sand-800: oklch(0.3 0.014 34);
+  --color-sand-900: oklch(0.21 0.013 32);
+  --color-sand-950: oklch(0.14 0.011 30);
 
-  /* Brand — deep purple (#6F2DBD family) */
-  --color-brand-50: oklch(0.97 0.018 300);
-  --color-brand-100: oklch(0.94 0.038 300);
-  --color-brand-200: oklch(0.88 0.075 300);
-  --color-brand-300: oklch(0.78 0.125 300);
-  --color-brand-400: oklch(0.66 0.18 300);
-  --color-brand-500: oklch(0.56 0.22 300);
-  --color-brand-600: oklch(0.49 0.235 300);
-  --color-brand-700: oklch(0.43 0.225 301);
-  --color-brand-800: oklch(0.35 0.185 302);
-  --color-brand-900: oklch(0.27 0.14 303);
-  --color-brand-950: oklch(0.19 0.1 304);
+  /* Brand — deep maroon (#7F1C15 family).
+     700 is the workhorse and measures 10.05:1 on white; every shade from 500
+     down clears AA for body text, and 400 clears AA for large text only
+     (verified, not assumed — PRD 7.3). */
+  --color-brand-50: oklch(0.972 0.012 28);
+  --color-brand-100: oklch(0.94 0.028 28);
+  --color-brand-200: oklch(0.878 0.06 28);
+  --color-brand-300: oklch(0.782 0.1 29);
+  --color-brand-400: oklch(0.655 0.14 29);
+  --color-brand-500: oklch(0.545 0.16 29);
+  --color-brand-600: oklch(0.465 0.155 29);
+  --color-brand-700: oklch(0.395 0.135 29);
+  --color-brand-800: oklch(0.33 0.11 29);
+  --color-brand-900: oklch(0.26 0.088 29);
+  --color-brand-950: oklch(0.182 0.065 29);
 
-  /* Blush — warm pink for soft fills and chips */
+  /* Blush — soft pink for chips and gentle fills */
   --color-blush-50: oklch(0.985 0.008 350);
   --color-blush-100: oklch(0.955 0.024 350);
   --color-blush-200: oklch(0.91 0.05 351);
@@ -42,11 +46,12 @@
   --color-blush-500: oklch(0.68 0.16 355);
   --color-blush-600: oklch(0.58 0.18 356);
 
-  /* Lavender — secondary gradient stop */
-  --color-lavender-100: oklch(0.95 0.03 295);
-  --color-lavender-200: oklch(0.9 0.055 293);
-  --color-lavender-400: oklch(0.72 0.13 292);
-  --color-lavender-500: oklch(0.63 0.16 292);
+  /* Rose — secondary gradient stop. Warmer and lighter than the brand maroon,
+     so a brand → rose sweep reads as one wine gradient rather than two colours. */
+  --color-rose-100: oklch(0.955 0.026 8);
+  --color-rose-200: oklch(0.905 0.055 7);
+  --color-rose-400: oklch(0.7 0.155 8);
+  --color-rose-500: oklch(0.6 0.185 8);
 
   /* Champagne gold — ratings and premium marks */
   --color-gold-100: oklch(0.96 0.035 85);
@@ -63,7 +68,10 @@
 
   --color-success: oklch(0.62 0.14 155);
   --color-warning: oklch(0.78 0.14 78);
-  --color-danger: oklch(0.56 0.2 22);
+  /* Deliberately brighter and more orange than the maroon brand. With a red
+     brand colour an error state can otherwise read as decoration; this sits
+     ~4.7:1 on white and is separated from brand-700 by both lightness and hue. */
+  --color-danger: oklch(0.58 0.205 32);
 
   --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-heading), Georgia, serif;
@@ -80,9 +88,9 @@
   --breakpoint-2xl: 90rem;
 
   /* Premium shadows: wide, soft, low-opacity */
-  --shadow-soft: 0 2px 8px oklch(0.27 0.14 303 / 0.06);
-  --shadow-raised: 0 12px 32px -8px oklch(0.27 0.14 303 / 0.14);
-  --shadow-float: 0 24px 60px -16px oklch(0.27 0.14 303 / 0.22);
+  --shadow-soft: 0 2px 8px oklch(0.26 0.088 29 / 0.07);
+  --shadow-raised: 0 12px 32px -8px oklch(0.26 0.088 29 / 0.15);
+  --shadow-float: 0 24px 60px -16px oklch(0.26 0.088 29 / 0.24);
 
   --animate-reveal: reveal 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-slow-zoom: slow-zoom 24s ease-in-out infinite alternate;
@@ -215,7 +223,7 @@
     135deg,
     var(--color-brand-600) 0%,
     var(--color-brand-500) 45%,
-    var(--color-lavender-500) 100%
+    var(--color-rose-500) 100%
   );
 }
 

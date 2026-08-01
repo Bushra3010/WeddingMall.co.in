@@ -58,7 +58,7 @@ export function Hero({
 
         {/* Floating decorative blooms; purely ornamental. */}
         <div className="bg-blush-500/20 absolute -top-24 -left-16 size-96 rounded-full blur-3xl motion-safe:animate-[drift_14s_ease-in-out_infinite_alternate]" />
-        <div className="bg-lavender-400/20 absolute top-1/3 -right-24 size-[28rem] rounded-full blur-3xl motion-safe:animate-[drift_18s_ease-in-out_infinite_alternate-reverse]" />
+        <div className="bg-rose-400/20 absolute top-1/3 -right-24 size-[28rem] rounded-full blur-3xl motion-safe:animate-[drift_18s_ease-in-out_infinite_alternate-reverse]" />
       </div>
 
       <div className="mx-auto max-w-[90rem] px-4 pt-16 pb-10 sm:px-6 sm:pt-24 lg:px-10 lg:pt-28">

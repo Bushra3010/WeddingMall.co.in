@@ -202,7 +202,7 @@ export default async function HomePage() {
               delay={index * 70}
               className="border-sand-200 rounded-[var(--radius-panel)] border bg-white p-6 transition-shadow hover:shadow-[var(--shadow-raised)]"
             >
-              <span className="from-brand-500 to-lavender-500 inline-flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-[var(--shadow-soft)]">
+              <span className="from-brand-500 to-rose-500 inline-flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-[var(--shadow-soft)]">
                 <item.icon aria-hidden="true" className="size-5" />
               </span>
               <h3 className="text-sand-900 mt-4 font-medium">{item.title}</h3>

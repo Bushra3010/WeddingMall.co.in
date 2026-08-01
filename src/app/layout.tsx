@@ -31,7 +31,8 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#4a2545',
+  // Matches brand-900; tints browser chrome on mobile.
+  themeColor: '#460c07',
   width: 'device-width',
   initialScale: 1,
 }

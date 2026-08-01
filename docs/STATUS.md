@@ -48,7 +48,7 @@ Updated: 2026-08-01
 
 ## Homepage redesign (2026-08-01)
 
-Soft-luxury restyle: deep purple brand tokens, blush neutrals, champagne accents; sticky navbar that goes solid on scroll; full-bleed hero with a six-field search card and tabs; live-counted trust statistics; category carousel with gradient icon tiles; premium vendor cards; testimonial carousel; multi-column footer with a working newsletter signup.
+Soft-luxury restyle: deep maroon brand tokens (#7F1C15), warm ivory neutrals, rose and champagne-gold accents; sticky navbar that goes solid on scroll; full-bleed hero with a six-field search card and tabs; live-counted trust statistics; category carousel with gradient icon tiles; premium vendor cards; testimonial carousel; multi-column footer with a working newsletter signup.
 
 Three judgement calls worth knowing about:
 

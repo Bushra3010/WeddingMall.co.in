@@ -42,12 +42,12 @@ const ICONS: Record<string, LucideIcon> = {
 
 /** Rotating gradient tints so a row of tiles is not monotone. */
 const TINTS = [
-  'from-brand-500 to-lavender-500',
+  'from-brand-500 to-rose-500',
   'from-blush-500 to-brand-500',
-  'from-lavender-400 to-brand-600',
+  'from-rose-400 to-brand-600',
   'from-gold-500 to-blush-500',
   'from-brand-600 to-blush-600',
-  'from-lavender-500 to-gold-500',
+  'from-rose-500 to-gold-500',
 ]
 
 export function CategoryCarousel({ categories }: { categories: CategoryTile[] }) {
