@@ -21,6 +21,9 @@ export async function proxy(request: NextRequest) {
     for (const cookie of response.cookies.getAll()) {
       redirectResponse.cookies.set(cookie)
     }
+    // The redirect is part of the private area, so it carries the same
+    // directive as the page would have (PRD 11.1).
+    redirectResponse.headers.set('X-Robots-Tag', 'noindex, nofollow')
     return redirectResponse
   }
 

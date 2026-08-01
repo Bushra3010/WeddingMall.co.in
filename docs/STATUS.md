@@ -6,77 +6,83 @@ Updated: 2026-08-01
 
 - **Prompt 0 — repository blueprint.** Next.js 16 / React 19 / TS strict / Tailwind v4, structure per PRD 8.2, pinned dependencies, env schema, CI.
 - **Milestone 1 — foundation.** App shell, three Supabase clients, SSR session refresh, profile trigger, permission catalogue (TS + SQL), route protection, env validation, error boundaries, design tokens.
-- **Milestone 2 — vendor onboarding.** Taxonomy admin, vendor organisations and memberships, onboarding draft with completion score, private verification uploads, submission, admin approve / request-changes / reject / suspend with audit events.
-- **Milestone 3 — listings and discovery.** Versioned listing editor, packages, portfolio with media moderation, availability, admin listing moderation with before/after comparison, slug redirects, and attribute-driven category filters.
-- **Schema:** migrations `0001`–`0013` applied to the live project.
+- **Milestone 2 — vendor onboarding.** Taxonomy admin, vendor organisations and memberships, onboarding with completion score, private verification uploads, admin approve / request-changes / reject / suspend with audit events.
+- **Milestone 3 — listings and discovery.** Versioned listing editor, packages, portfolio with media moderation, availability, listing moderation with before/after comparison, slug redirects, attribute-driven filters.
+- **Milestone 4 — customer marketplace.** Wedding profile, shortlist, idempotent enquiries with explicit contact consent, trigger-enforced lifecycle, participant-authorised messaging, in-app notifications, email adapter, and vendor inbox.
+- **Deployed** to Vercel at `wedding-mall-co-in.vercel.app`; source at `github.com/Bushra3010/WeddingMall.co.in`.
+- **Schema:** migrations `0001`–`0015` applied to the live project.
 
 ## Verified
 
-| Check               | Result                                                                  |
-| ------------------- | ----------------------------------------------------------------------- |
-| `npm run lint`      | pass, 0 warnings                                                        |
-| `npm run typecheck` | pass                                                                    |
-| `npm run test`      | **90 passed** across 6 files                                            |
-| `npm run build`     | pass                                                                    |
-| `npm run db:rls`    | **116 passed** (28 anon + 24 cross-tenant + 38 onboarding + 26 listing) |
-| Migrations          | 13/13 applied clean                                                     |
-| Route smoke test    | public 200, dashboards 307, genuine 404 → **404**                       |
+| Check               | Result                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `npm run lint`      | pass, 0 warnings                                                                     |
+| `npm run typecheck` | pass                                                                                 |
+| `npm run test`      | **90 passed** across 6 files                                                         |
+| `npm run build`     | pass                                                                                 |
+| `npm run db:rls`    | **139 passed** (28 anon + 24 cross-tenant + 38 onboarding + 26 listing + 23 enquiry) |
+| `npm run test:e2e`  | **9 passed**, 0 failed — includes PRD Journey 1 end to end                           |
+| Migrations          | 15/15 applied clean                                                                  |
 
-### What the Milestone 3 probes prove
+### Journey 1, in a real browser
 
-The central guarantee is that an edit to an approved listing does not reach the public until a moderator approves it. Every one of these failed before migration 0011:
+`tests/e2e/journey-1-customer.spec.ts` drives sign-in → search → vendor profile → shortlist (asserted to survive a reload) → enquiry → message, then re-loads the list to confirm persistence. It also asserts that an enquiry belonging to nobody returns 404, since RLS makes "not yours" and "not found" indistinguishable by design.
 
-- Editing the draft does not change the public page, and the unreviewed text is not searchable.
-- Submitting an edit leaves the published version live; a second submission is refused while one is pending.
-- Anon cannot read a pending version, a draft listing row, or an unmoderated image.
-- A vendor cannot approve their own edit; an admin without `listing.moderate` cannot either.
-- `request_changes` is refused without a reason, and rejecting an edit leaves the published version untouched.
-- Approving publishes the new text, archives the version it replaces (rather than deleting it), and makes the new text searchable.
-- Availability rows are unreadable by anon; the public view exposes the status signal and no private note.
-- Renaming records a redirect, a second rename does not create a chain, and a live slug never redirects to itself.
+### What the Milestone 4 probes prove
 
-## Fixed during Milestone 3
+- **Idempotency:** replaying a submission key returns the original enquiry, and exactly one row exists.
+- **Lifecycle:** a customer cannot `PATCH status` past the transition map (403 from the trigger); a transition needing a reason is refused without one; an unrelated user cannot transition at all; every step writes an event; a participant cannot delete lifecycle events.
+- **Parity:** all 576 (from × to × actor) combinations of `enquiry_transitions` match `checkTransition()` in TypeScript, compiled from the real source.
+- **Thread privacy:** an unrelated user reads zero messages, the vendor reads the thread, nobody can post as someone else, anon reads nothing.
+- **SLA and notifications:** the first vendor reply sets `first_response_at`; each side is notified; a user sees only their own notifications.
+- **Shortlist:** private from other customers _and_ from the vendor; unique per vendor; a customer cannot write into another customer's shortlist.
+- **Consent:** defaults to false, and vendor-side contact details are withheld unless consent was given _and_ the member holds `lead.view_pii`.
 
-1. **Unreviewed edits went live instantly.** `public_vendors` read `vendor_listings` directly and `vendor_listing_versions` was never written to (ADR-015). Fixed in `0011`.
-2. **Draft content was publicly readable.** `vendor_listings` keeps `status = 'approved'` on the draft row after publication, so its public-read policy exposed the vendor's unreviewed working copy to anon — the exact content 0011 was written to protect. Fixed in `0013`.
-3. **Every 404 on the site returned HTTP 200.** A root `loading.tsx` wrapped all routes in Suspense, so streaming began before `notFound()` ran and the status could no longer be set. Soft 404s get indexed. Same cause made `permanentRedirect()` degrade to a meta-refresh (ADR-016).
-4. **The public availability signal never worked.** `public_vendor_availability` was `security_invoker` over a table anon cannot read, so it always returned zero rows (ADR-013 pattern again). Fixed in `0013`.
-5. **A render-phase `setState`** in the package editor would have thrown in React.
+## Fixed during Milestone 4
+
+1. **A customer could set any enquiry status directly.** RLS is row-level, so the `participant update` policy exposed `status` to a raw PATCH. Now enforced by triggers (ADR-019).
+2. **Every message insert failed.** An uncast `CASE` into an enum column raised 42804. It hid behind three green "nobody can read the thread" assertions — there was no thread (ADR-021).
+3. **The sign-out button had no accessible name.** Icon-only, `label=""`, unusable by screen reader or voice control. Found by clicking it accidentally in the browser.
+4. **The `x-robots-tag` E2E assertion was never true** — `page.goto` follows the redirect, so it read the sign-in page's headers. The proxy now sets the directive on the redirect too, and the test inspects the 307 without following.
+5. **A dead `.refine()`** in the enquiry schema that could never fail.
 
 ## Blocked / outstanding
 
-1. **Numeric attribute filters are exact-match only.** Range filtering needs an `attributeRanges` parameter in `search_vendors` — the seeded `capacity` and `price_per_plate` attributes are only usable as exact values today (ADR-018).
-2. **Media has no bulk reordering UI.** `reorderMedia` exists in the service layer but nothing calls it; ordering is by upload order plus cover selection.
-3. **Media is approved wholesale with the listing.** An admin cannot reject one image while approving the rest.
-4. **Enquiries, reviews, billing, and CMS remain stubs** — Milestones 4–6.
-5. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google.
-6. **Playwright E2E has never been run.** Journey 2 was verified manually in Milestone 2; the specs are still `test.skip`.
-7. **No check that the TS and SQL permission matrices agree** (ADR-004).
-8. **Public pages render dynamically** because `SiteHeader` reads the session. Milestone 7.
-9. **CSP not set.** Milestone 7.
+1. **No SMTP provider configured.** Supabase's default mail is rate-limited to a few per hour, so sign-up confirmations and the sign-up E2E test are unreliable. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) — the adapter is written and will pick it up (ADR-022).
+2. **Email notifications are logged, not sent,** for the same reason. `sendEmail()` falls back to a console provider that records a redacted line.
+3. **Message attachments are not implemented.** PRD 6.7 wants them, but they need malware scanning first; `message_attachments` has no insert policy, so the table is inert rather than half-open.
+4. **Realtime is not wired.** `FEATURE_REALTIME_CHAT` is false; the thread refreshes on navigation.
+5. **Numeric attribute filters are exact-match only** (ADR-018).
+6. **Media is approved wholesale with the listing** — an admin cannot reject one image.
+7. **Reviews, billing, and CMS remain stubs** — Milestones 5 and 6.
+8. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google.
+9. **Permission-catalogue parity is still unchecked** (ADR-004). The technique now exists — apply ADR-020's approach to `vendor_can()`.
+10. **Public pages render dynamically** because `SiteHeader` reads the session. Milestone 7.
+11. **CSP not set.** Milestone 7.
 
 ## Credentials note
 
-`.env.local` holds the live project URL, anon key, service-role key, and a generated `CRON_SECRET`. It is gitignored and was never committed. **The anon key, service-role key, and database password were shared in a chat transcript** — rotate all three before this project handles real user data.
+**The Vercel token, Supabase anon key, service-role key, and database password were all shared in a chat transcript.** Rotate all four. The service-role key is the urgent one — it bypasses RLS entirely. After rotating Supabase keys, update `.env.local` _and_ the Vercel environment.
 
 ## Next task
 
-Milestone 4 (PRD 19.7) — customer and enquiry:
+Milestone 5 (PRD 19.8) — vendor CRM and reviews:
 
-1. Wedding profile and shortlist.
-2. Enquiry submission with idempotency and explicit contact consent.
-3. Lifecycle events on every transition (`enquiry_events` is append-only by design).
-4. Participant-authorised conversation thread and messages.
-5. In-app and email notifications.
-6. E2E journey 1.
+1. Enquiry pipeline and table views, assignment, internal notes, follow-up dates.
+2. SLA reminder job (`enquiry_events` already records `first_response`).
+3. `vendor_metrics_daily` aggregation.
+4. Review eligibility (an enquiry that reached a qualifying state), moderation, vendor response.
+5. Rating aggregates recompute from approved reviews only — the trigger exists in `0005`.
+6. E2E journey 2.
 
-The transition map already exists and is unit-tested in `src/features/enquiries/status.ts` — wire the service layer to it rather than re-deriving the rules.
+Reviews will need the same treatment as enquiries: eligibility enforced in SQL, not only in the service.
 
-Keep extending `npm run db:rls` with each boundary, in **both** directions: that the unauthorised are denied and that the authorised can see what they need. That asymmetry hid two separate bugs across Milestones 2 and 3.
+Keep extending `npm run db:rls` in **both** directions — denied _and_ permitted. That asymmetry has now hidden bugs in three consecutive milestones (ADR-013, ADR-021).
 
 ## Notes
 
-- All seed and demo data is fictional (PRD 2.3, Epic G). `node --env-file=.env.local scripts/seed-demo-vendors.mjs --clean` removes the demo vendors.
-- Grant yourself admin with `npm run grant-admin -- you@example.com`. There is no public admin sign-up (PRD 6.4).
+- All seed and demo data is fictional (PRD 2.3, Epic G). `npm run seed:demo -- --clean` removes the demo vendors.
+- Grant yourself admin with `npm run grant-admin -- you@example.com`.
 - Do not add a `loading.tsx` above any route that calls `notFound()` or `redirect()` — see ADR-016.
+- E2E needs `npx playwright install chromium` once.
 - Legal text in `supabase/seed.sql` is placeholder and must go to counsel before launch (PRD 14.3).

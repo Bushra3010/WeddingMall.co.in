@@ -33,11 +33,19 @@ test('search page renders an honest empty state with no inventory', async ({ pag
   await expect(page.getByText(/No vendors match|vendors/i).first()).toBeVisible()
 })
 
-test('dashboards are not indexable and redirect an anonymous visitor', async ({ page }) => {
-  const response = await page.goto('/account')
-
+test('dashboards are not indexable and redirect an anonymous visitor', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/account')
   await expect(page).toHaveURL(/\/auth\/sign-in/)
-  expect(response?.headers()['x-robots-tag'] ?? '').toContain('noindex')
+
+  // page.goto follows the redirect, so its headers belong to the sign-in page.
+  // The directive under test is on the 307 itself, so fetch it without
+  // following (PRD 11.1).
+  const redirect = await request.get('/account', { maxRedirects: 0 })
+  expect(redirect.status()).toBe(307)
+  expect(redirect.headers()['x-robots-tag'] ?? '').toContain('noindex')
 })
 
 test('robots.txt disallows private areas', async ({ request }) => {

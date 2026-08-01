@@ -64,7 +64,7 @@ export async function SiteHeader() {
                 <UserRound aria-hidden="true" />
                 <span className="hidden sm:inline">Account</span>
               </Link>
-              <SignOutButton className="hidden sm:inline-flex" label="" />
+              <SignOutButton className="hidden sm:inline-flex" showLabel={false} />
             </>
           ) : (
             <Link

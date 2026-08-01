@@ -261,3 +261,55 @@ Next emits **308**, not the 301 the PRD names. Both are permanent and search eng
 **Decision:** the admin form exposes one "Answer type" control and derives `data_type` from it. Filter semantics are OR within an attribute code and AND across codes, which is what a shopper expects from faceted search.
 
 **Known gap:** numeric attributes are stored and matched as exact values. Range filtering ("capacity ≥ 400") needs a `attributeRanges` parameter in `search_vendors`; the seeded numeric attributes are currently only usable as exact matches.
+
+---
+
+## ADR-019 — The enquiry lifecycle is enforced by triggers, not by services
+
+**Date:** 2026-08-01 · **Status:** accepted, security-relevant
+
+`enquiries: participant update` (migration 0005) lets a participant write the row, and RLS is row-level, not column-level. So a customer could `PATCH status='booked'` straight through PostgREST and skip the transition map entirely — the service layer would never see it. PRD 6.6 requires transitions to be validated server-side, and the service layer alone does not satisfy that when the table is directly writable.
+
+**Decision:** a `BEFORE UPDATE OF status` trigger validates every transition against `public.enquiry_transitions`, and an `AFTER UPDATE OF status` trigger writes the `enquiry_events` row. Both hold no matter which path performs the write.
+
+The reason travels through `set_config('app.transition_reason', …, true)` — transaction-scoped, because the reason belongs to the event, not to the enquiry row.
+
+Service-role callers (jobs, webhooks) run without a JWT and are allowed through; they are trusted by construction.
+
+---
+
+## ADR-020 — The transition map is a table, and parity is asserted
+
+**Date:** 2026-08-01 · **Status:** accepted
+
+ADR-004 accepted that the permission catalogue is duplicated in TypeScript and SQL, and flagged the missing drift check as a known cost. The enquiry lifecycle would have repeated that mistake.
+
+**Decision:** the map lives in SQL as **data** (`enquiry_transitions`) rather than as branching logic, and `scripts/rls-enquiry-probe.mjs` diffs all 12 × 12 × 4 combinations against `checkTransition()` in TypeScript. A divergence fails the probe run.
+
+The probe imports the **real** TypeScript source, compiled on the fly by the esbuild that ships inside vite — Node 20 cannot strip types. A hand-copied map in the probe would pass happily while the application drifted, which would be worse than no check at all.
+
+Extending this technique to the permission catalogue would close ADR-004 properly; it is still outstanding.
+
+---
+
+## ADR-021 — Assertions of absence prove nothing on their own
+
+**Date:** 2026-08-01 · **Status:** accepted, process
+
+The `on_message_sent` trigger inserted into an enum column from an uncast `CASE`, which Postgres types as `text`. It raised 42804 and aborted **every** message insert.
+
+The probe suite did not catch it, because the messaging assertions were all of the form "an unrelated user cannot read the thread — rows 0". With no message ever created, those passed trivially. Three genuinely broken behaviours sat behind three green checks.
+
+**Rule:** every "X cannot see Y" assertion needs a paired "the authorised party CAN see Y" in the same run. This is the second time the same asymmetry hid a bug — ADR-013 was the first — so it is now written into `docs/STATUS.md` as a standing instruction for each milestone.
+
+---
+
+## ADR-022 — E2E account creation bypasses the sign-up form
+
+**Date:** 2026-08-01 · **Status:** accepted, with a caveat
+
+Journey 1 begins "customer signs up". Driving the real sign-up form makes the whole journey depend on Supabase's default SMTP, which rate-limits confirmation emails to a handful per hour. The journey then fails on an email quota rather than on anything it is testing.
+
+**Decision:** `journey-1-customer.spec.ts` creates its account through the Auth admin API and drives everything after that through the UI. A separate, smaller test exercises the sign-up form and **skips itself** when it detects the rate limit.
+
+**Caveat worth stating plainly:** the journey therefore does not prove sign-up works on every run. It is covered, but by a test that is allowed to skip. Configuring a real SMTP provider (Resend, per PRD 8.1) removes the limit and lets the sign-up test run reliably — that is the proper fix and it is listed as outstanding.

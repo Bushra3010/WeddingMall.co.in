@@ -11,6 +11,9 @@ import { formatRange, money } from '@/lib/money'
 import { breadcrumbSchema, buildMetadata, vendorSchema } from '@/lib/seo'
 import { storagePublicUrl } from '@/lib/supabase/storage'
 import { cn } from '@/lib/utils'
+import { ShortlistButton } from '@/components/customer/shortlist-button'
+import { getActor } from '@/server/dal/actor'
+import { isShortlisted } from '@/server/dal/enquiries'
 import { getPublicVendor, getRatingDistribution, getVendorReviews } from '@/server/dal/vendors'
 import { resolveSlugRedirect } from '@/server/dal/taxonomy'
 
@@ -62,9 +65,11 @@ export default async function VendorProfilePage({ params }: { params: Params }) 
     notFound()
   }
 
-  const [reviews, distribution] = await Promise.all([
+  const actor = await getActor()
+  const [reviews, distribution, shortlisted] = await Promise.all([
     getVendorReviews(vendor.id),
     getRatingDistribution(vendor.id),
+    actor.userId ? isShortlisted(vendor.id) : Promise.resolve(false),
   ])
 
   const cover = vendor.media.find((item) => item.is_cover) ?? vendor.media[0]
@@ -350,12 +355,21 @@ export default async function VendorProfilePage({ params }: { params: Params }) 
             >
               Request a quote
             </Link>
-            <Link
-              href="/account/shortlist"
-              className={cn(buttonVariants({ variant: 'outline' }), 'mt-2 w-full')}
-            >
-              Save to shortlist
-            </Link>
+            {actor.userId ? (
+              <ShortlistButton
+                vendorId={vendor.id}
+                vendorSlug={vendor.slug}
+                shortlisted={shortlisted}
+                className="mt-2"
+              />
+            ) : (
+              <Link
+                href={`/auth/sign-in?next=${encodeURIComponent(`/vendor/${vendor.slug}`)}`}
+                className={cn(buttonVariants({ variant: 'outline' }), 'mt-2 w-full')}
+              >
+                Sign in to save
+              </Link>
+            )}
 
             {vendor.serviceAreas.length > 0 ? (
               <div className="border-sand-200 mt-5 border-t pt-4">

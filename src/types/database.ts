@@ -13,12 +13,12 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
-      "admin_memberships": {
+      admin_memberships: {
         Row: {
           id: string
           user_id: string
           role_id: string
-          status: Database["public"]["Enums"]["membership_status"]
+          status: Database['public']['Enums']['membership_status']
           invited_by: string | null
           created_at: string
           updated_at: string
@@ -27,7 +27,7 @@ export interface Database {
           id?: string
           user_id: string
           role_id: string
-          status?: Database["public"]["Enums"]["membership_status"]
+          status?: Database['public']['Enums']['membership_status']
           invited_by?: string | null
           created_at?: string
           updated_at?: string
@@ -36,36 +36,36 @@ export interface Database {
           id?: string
           user_id?: string
           role_id?: string
-          status?: Database["public"]["Enums"]["membership_status"]
+          status?: Database['public']['Enums']['membership_status']
           invited_by?: string | null
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "admin_memberships_invited_by_fkey"
-          columns: ["invited_by"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "admin_memberships_role_id_fkey"
-          columns: ["role_id"]
-          isOneToOne: false
-          referencedRelation: "admin_roles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "admin_memberships_user_id_fkey"
-          columns: ["user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'admin_memberships_invited_by_fkey'
+            columns: ['invited_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'admin_memberships_role_id_fkey'
+            columns: ['role_id']
+            isOneToOne: false
+            referencedRelation: 'admin_roles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'admin_memberships_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "admin_permissions": {
+      admin_permissions: {
         Row: {
           id: string
           code: string
@@ -81,9 +81,9 @@ export interface Database {
           code?: string
           description?: string | null
         }
-      Relationships: []
+        Relationships: []
       }
-      "admin_role_permissions": {
+      admin_role_permissions: {
         Row: {
           role_id: string
           permission_id: string
@@ -96,24 +96,24 @@ export interface Database {
           role_id?: string
           permission_id?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "admin_role_permissions_permission_id_fkey"
-          columns: ["permission_id"]
-          isOneToOne: false
-          referencedRelation: "admin_permissions"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "admin_role_permissions_role_id_fkey"
-          columns: ["role_id"]
-          isOneToOne: false
-          referencedRelation: "admin_roles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'admin_role_permissions_permission_id_fkey'
+            columns: ['permission_id']
+            isOneToOne: false
+            referencedRelation: 'admin_permissions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'admin_role_permissions_role_id_fkey'
+            columns: ['role_id']
+            isOneToOne: false
+            referencedRelation: 'admin_roles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "admin_roles": {
+      admin_roles: {
         Row: {
           id: string
           code: string
@@ -129,9 +129,9 @@ export interface Database {
           code?: string
           name?: string
         }
-      Relationships: []
+        Relationships: []
       }
-      "analytics_events": {
+      analytics_events: {
         Row: {
           id: string
           anonymous_id: string | null
@@ -165,17 +165,17 @@ export interface Database {
           properties_json?: Json
           occurred_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "analytics_events_user_id_fkey"
-          columns: ["user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'analytics_events_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "areas": {
+      areas: {
         Row: {
           id: string
           city_id: string
@@ -206,21 +206,21 @@ export interface Database {
           active?: boolean
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "areas_city_id_fkey"
-          columns: ["city_id"]
-          isOneToOne: false
-          referencedRelation: "cities"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'areas_city_id_fkey'
+            columns: ['city_id']
+            isOneToOne: false
+            referencedRelation: 'cities'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "audit_logs": {
+      audit_logs: {
         Row: {
           id: string
           actor_user_id: string | null
-          actor_type: Database["public"]["Enums"]["actor_type"]
+          actor_type: Database['public']['Enums']['actor_type']
           action: string
           entity_type: string
           entity_id: string | null
@@ -234,7 +234,7 @@ export interface Database {
         Insert: {
           id?: string
           actor_user_id?: string | null
-          actor_type?: Database["public"]["Enums"]["actor_type"]
+          actor_type?: Database['public']['Enums']['actor_type']
           action: string
           entity_type: string
           entity_id?: string | null
@@ -248,7 +248,7 @@ export interface Database {
         Update: {
           id?: string
           actor_user_id?: string | null
-          actor_type?: Database["public"]["Enums"]["actor_type"]
+          actor_type?: Database['public']['Enums']['actor_type']
           action?: string
           entity_type?: string
           entity_id?: string | null
@@ -259,17 +259,17 @@ export interface Database {
           request_id?: string | null
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "audit_logs_actor_user_id_fkey"
-          columns: ["actor_user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'audit_logs_actor_user_id_fkey'
+            columns: ['actor_user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "categories": {
+      categories: {
         Row: {
           id: string
           parent_id: string | null
@@ -315,17 +315,17 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "categories_parent_id_fkey"
-          columns: ["parent_id"]
-          isOneToOne: false
-          referencedRelation: "categories"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'categories_parent_id_fkey'
+            columns: ['parent_id']
+            isOneToOne: false
+            referencedRelation: 'categories'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "category_attributes": {
+      category_attributes: {
         Row: {
           id: string
           category_id: string
@@ -374,17 +374,17 @@ export interface Database {
           sort_order?: number
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "category_attributes_category_id_fkey"
-          columns: ["category_id"]
-          isOneToOne: false
-          referencedRelation: "categories"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'category_attributes_category_id_fkey'
+            columns: ['category_id']
+            isOneToOne: false
+            referencedRelation: 'categories'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "cities": {
+      cities: {
         Row: {
           id: string
           state_id: string
@@ -436,17 +436,17 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "cities_state_id_fkey"
-          columns: ["state_id"]
-          isOneToOne: false
-          referencedRelation: "states"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'cities_state_id_fkey'
+            columns: ['state_id']
+            isOneToOne: false
+            referencedRelation: 'states'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "conversations": {
+      conversations: {
         Row: {
           id: string
           enquiry_id: string
@@ -465,17 +465,17 @@ export interface Database {
           status?: string
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "conversations_enquiry_id_fkey"
-          columns: ["enquiry_id"]
-          isOneToOne: true
-          referencedRelation: "enquiries"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'conversations_enquiry_id_fkey'
+            columns: ['enquiry_id']
+            isOneToOne: true
+            referencedRelation: 'enquiries'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "countries": {
+      countries: {
         Row: {
           id: string
           code: string
@@ -500,9 +500,9 @@ export interface Database {
           active?: boolean
           created_at?: string
         }
-      Relationships: []
+        Relationships: []
       }
-      "data_requests": {
+      data_requests: {
         Row: {
           id: string
           user_id: string
@@ -530,17 +530,17 @@ export interface Database {
           completed_at?: string | null
           notes?: string | null
         }
-      Relationships: [
-        {
-          foreignKeyName: "data_requests_user_id_fkey"
-          columns: ["user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'data_requests_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "enquiries": {
+      enquiries: {
         Row: {
           id: string
           rfq_id: string | null
@@ -557,7 +557,7 @@ export interface Database {
           requirements_json: Json
           message: string | null
           preferred_contact_mode: string | null
-          status: Database["public"]["Enums"]["enquiry_status"]
+          status: Database['public']['Enums']['enquiry_status']
           contact_consent: boolean
           assigned_vendor_member_id: string | null
           idempotency_key: string | null
@@ -584,7 +584,7 @@ export interface Database {
           requirements_json?: Json
           message?: string | null
           preferred_contact_mode?: string | null
-          status?: Database["public"]["Enums"]["enquiry_status"]
+          status?: Database['public']['Enums']['enquiry_status']
           contact_consent?: boolean
           assigned_vendor_member_id?: string | null
           idempotency_key?: string | null
@@ -611,7 +611,7 @@ export interface Database {
           requirements_json?: Json
           message?: string | null
           preferred_contact_mode?: string | null
-          status?: Database["public"]["Enums"]["enquiry_status"]
+          status?: Database['public']['Enums']['enquiry_status']
           contact_consent?: boolean
           assigned_vendor_member_id?: string | null
           idempotency_key?: string | null
@@ -622,60 +622,60 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "enquiries_assigned_vendor_member_id_fkey"
-          columns: ["assigned_vendor_member_id"]
-          isOneToOne: false
-          referencedRelation: "vendor_memberships"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "enquiries_category_id_fkey"
-          columns: ["category_id"]
-          isOneToOne: false
-          referencedRelation: "categories"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "enquiries_city_id_fkey"
-          columns: ["city_id"]
-          isOneToOne: false
-          referencedRelation: "cities"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "enquiries_customer_id_fkey"
-          columns: ["customer_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "enquiries_rfq_id_fkey"
-          columns: ["rfq_id"]
-          isOneToOne: false
-          referencedRelation: "rfq_requests"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "enquiries_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'enquiries_assigned_vendor_member_id_fkey'
+            columns: ['assigned_vendor_member_id']
+            isOneToOne: false
+            referencedRelation: 'vendor_memberships'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'enquiries_category_id_fkey'
+            columns: ['category_id']
+            isOneToOne: false
+            referencedRelation: 'categories'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'enquiries_city_id_fkey'
+            columns: ['city_id']
+            isOneToOne: false
+            referencedRelation: 'cities'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'enquiries_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'enquiries_rfq_id_fkey'
+            columns: ['rfq_id']
+            isOneToOne: false
+            referencedRelation: 'rfq_requests'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'enquiries_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "enquiry_events": {
+      enquiry_events: {
         Row: {
           id: string
           enquiry_id: string
           actor_user_id: string | null
-          actor_type: Database["public"]["Enums"]["actor_type"]
+          actor_type: Database['public']['Enums']['actor_type']
           event_type: string
-          from_status: Database["public"]["Enums"]["enquiry_status"] | null
-          to_status: Database["public"]["Enums"]["enquiry_status"] | null
+          from_status: Database['public']['Enums']['enquiry_status'] | null
+          to_status: Database['public']['Enums']['enquiry_status'] | null
           reason: string | null
           metadata_json: Json
           created_at: string
@@ -684,10 +684,10 @@ export interface Database {
           id?: string
           enquiry_id: string
           actor_user_id?: string | null
-          actor_type: Database["public"]["Enums"]["actor_type"]
+          actor_type: Database['public']['Enums']['actor_type']
           event_type: string
-          from_status?: Database["public"]["Enums"]["enquiry_status"] | null
-          to_status?: Database["public"]["Enums"]["enquiry_status"] | null
+          from_status?: Database['public']['Enums']['enquiry_status'] | null
+          to_status?: Database['public']['Enums']['enquiry_status'] | null
           reason?: string | null
           metadata_json?: Json
           created_at?: string
@@ -696,32 +696,32 @@ export interface Database {
           id?: string
           enquiry_id?: string
           actor_user_id?: string | null
-          actor_type?: Database["public"]["Enums"]["actor_type"]
+          actor_type?: Database['public']['Enums']['actor_type']
           event_type?: string
-          from_status?: Database["public"]["Enums"]["enquiry_status"] | null
-          to_status?: Database["public"]["Enums"]["enquiry_status"] | null
+          from_status?: Database['public']['Enums']['enquiry_status'] | null
+          to_status?: Database['public']['Enums']['enquiry_status'] | null
           reason?: string | null
           metadata_json?: Json
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "enquiry_events_actor_user_id_fkey"
-          columns: ["actor_user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "enquiry_events_enquiry_id_fkey"
-          columns: ["enquiry_id"]
-          isOneToOne: false
-          referencedRelation: "enquiries"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'enquiry_events_actor_user_id_fkey'
+            columns: ['actor_user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'enquiry_events_enquiry_id_fkey'
+            columns: ['enquiry_id']
+            isOneToOne: false
+            referencedRelation: 'enquiries'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "enquiry_notes": {
+      enquiry_notes: {
         Row: {
           id: string
           enquiry_id: string
@@ -749,31 +749,52 @@ export interface Database {
           follow_up_at?: string | null
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "enquiry_notes_author_user_id_fkey"
-          columns: ["author_user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "enquiry_notes_enquiry_id_fkey"
-          columns: ["enquiry_id"]
-          isOneToOne: false
-          referencedRelation: "enquiries"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "enquiry_notes_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'enquiry_notes_author_user_id_fkey'
+            columns: ['author_user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'enquiry_notes_enquiry_id_fkey'
+            columns: ['enquiry_id']
+            isOneToOne: false
+            referencedRelation: 'enquiries'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'enquiry_notes_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "faqs": {
+      enquiry_transitions: {
+        Row: {
+          from_status: Database['public']['Enums']['enquiry_status']
+          to_status: Database['public']['Enums']['enquiry_status']
+          actor_type: Database['public']['Enums']['actor_type']
+          requires_reason: boolean
+        }
+        Insert: {
+          from_status: Database['public']['Enums']['enquiry_status']
+          to_status: Database['public']['Enums']['enquiry_status']
+          actor_type: Database['public']['Enums']['actor_type']
+          requires_reason?: boolean
+        }
+        Update: {
+          from_status?: Database['public']['Enums']['enquiry_status']
+          to_status?: Database['public']['Enums']['enquiry_status']
+          actor_type?: Database['public']['Enums']['actor_type']
+          requires_reason?: boolean
+        }
+        Relationships: []
+      }
+      faqs: {
         Row: {
           id: string
           scope: string
@@ -804,9 +825,9 @@ export interface Database {
           sort_order?: number
           created_at?: string
         }
-      Relationships: []
+        Relationships: []
       }
-      "homepage_sections": {
+      homepage_sections: {
         Row: {
           id: string
           code: string
@@ -834,9 +855,9 @@ export interface Database {
           sort_order?: number
           updated_at?: string
         }
-      Relationships: []
+        Relationships: []
       }
-      "message_attachments": {
+      message_attachments: {
         Row: {
           id: string
           message_id: string
@@ -864,17 +885,17 @@ export interface Database {
           scan_status?: string
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "message_attachments_message_id_fkey"
-          columns: ["message_id"]
-          isOneToOne: false
-          referencedRelation: "messages"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'message_attachments_message_id_fkey'
+            columns: ['message_id']
+            isOneToOne: false
+            referencedRelation: 'messages'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "messages": {
+      messages: {
         Row: {
           id: string
           conversation_id: string
@@ -902,57 +923,57 @@ export interface Database {
           read_at?: string | null
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "messages_conversation_id_fkey"
-          columns: ["conversation_id"]
-          isOneToOne: false
-          referencedRelation: "conversations"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "messages_sender_user_id_fkey"
-          columns: ["sender_user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'messages_conversation_id_fkey'
+            columns: ['conversation_id']
+            isOneToOne: false
+            referencedRelation: 'conversations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'messages_sender_user_id_fkey'
+            columns: ['sender_user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "notification_preferences": {
+      notification_preferences: {
         Row: {
           user_id: string
-          channel: Database["public"]["Enums"]["notification_channel"]
+          channel: Database['public']['Enums']['notification_channel']
           notification_group: string
           enabled: boolean
         }
         Insert: {
           user_id: string
-          channel: Database["public"]["Enums"]["notification_channel"]
+          channel: Database['public']['Enums']['notification_channel']
           notification_group: string
           enabled?: boolean
         }
         Update: {
           user_id?: string
-          channel?: Database["public"]["Enums"]["notification_channel"]
+          channel?: Database['public']['Enums']['notification_channel']
           notification_group?: string
           enabled?: boolean
         }
-      Relationships: [
-        {
-          foreignKeyName: "notification_preferences_user_id_fkey"
-          columns: ["user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'notification_preferences_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "notification_templates": {
+      notification_templates: {
         Row: {
           id: string
           code: string
-          channel: Database["public"]["Enums"]["notification_channel"]
+          channel: Database['public']['Enums']['notification_channel']
           locale: string
           subject: string | null
           body: string
@@ -963,7 +984,7 @@ export interface Database {
         Insert: {
           id?: string
           code: string
-          channel: Database["public"]["Enums"]["notification_channel"]
+          channel: Database['public']['Enums']['notification_channel']
           locale?: string
           subject?: string | null
           body: string
@@ -974,7 +995,7 @@ export interface Database {
         Update: {
           id?: string
           code?: string
-          channel?: Database["public"]["Enums"]["notification_channel"]
+          channel?: Database['public']['Enums']['notification_channel']
           locale?: string
           subject?: string | null
           body?: string
@@ -982,14 +1003,14 @@ export interface Database {
           active?: boolean
           created_at?: string
         }
-      Relationships: []
+        Relationships: []
       }
-      "notifications": {
+      notifications: {
         Row: {
           id: string
           user_id: string | null
           code: string
-          channel: Database["public"]["Enums"]["notification_channel"]
+          channel: Database['public']['Enums']['notification_channel']
           payload_json: Json
           status: string
           scheduled_at: string
@@ -1004,7 +1025,7 @@ export interface Database {
           id?: string
           user_id?: string | null
           code: string
-          channel: Database["public"]["Enums"]["notification_channel"]
+          channel: Database['public']['Enums']['notification_channel']
           payload_json?: Json
           status?: string
           scheduled_at?: string
@@ -1019,7 +1040,7 @@ export interface Database {
           id?: string
           user_id?: string | null
           code?: string
-          channel?: Database["public"]["Enums"]["notification_channel"]
+          channel?: Database['public']['Enums']['notification_channel']
           payload_json?: Json
           status?: string
           scheduled_at?: string
@@ -1030,23 +1051,23 @@ export interface Database {
           error?: string | null
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "notifications_user_id_fkey"
-          columns: ["user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'notifications_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "pages": {
+      pages: {
         Row: {
           id: string
           slug: string
           title: string
           body: string | null
-          status: Database["public"]["Enums"]["content_status"]
+          status: Database['public']['Enums']['content_status']
           seo_title: string | null
           seo_description: string | null
           canonical_url: string | null
@@ -1062,7 +1083,7 @@ export interface Database {
           slug: string
           title: string
           body?: string | null
-          status?: Database["public"]["Enums"]["content_status"]
+          status?: Database['public']['Enums']['content_status']
           seo_title?: string | null
           seo_description?: string | null
           canonical_url?: string | null
@@ -1078,7 +1099,7 @@ export interface Database {
           slug?: string
           title?: string
           body?: string | null
-          status?: Database["public"]["Enums"]["content_status"]
+          status?: Database['public']['Enums']['content_status']
           seo_title?: string | null
           seo_description?: string | null
           canonical_url?: string | null
@@ -1089,24 +1110,24 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "pages_created_by_fkey"
-          columns: ["created_by"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "pages_updated_by_fkey"
-          columns: ["updated_by"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'pages_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'pages_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "payments": {
+      payments: {
         Row: {
           id: string
           vendor_id: string
@@ -1146,24 +1167,24 @@ export interface Database {
           metadata_json?: Json
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "payments_subscription_id_fkey"
-          columns: ["subscription_id"]
-          isOneToOne: false
-          referencedRelation: "subscriptions"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "payments_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'payments_subscription_id_fkey'
+            columns: ['subscription_id']
+            isOneToOne: false
+            referencedRelation: 'subscriptions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'payments_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "plans": {
+      plans: {
         Row: {
           id: string
           code: string
@@ -1206,9 +1227,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: []
+        Relationships: []
       }
-      "posts": {
+      posts: {
         Row: {
           id: string
           slug: string
@@ -1218,7 +1239,7 @@ export interface Database {
           cover_path: string | null
           author_id: string | null
           category: string | null
-          status: Database["public"]["Enums"]["content_status"]
+          status: Database['public']['Enums']['content_status']
           seo_title: string | null
           seo_description: string | null
           canonical_url: string | null
@@ -1236,7 +1257,7 @@ export interface Database {
           cover_path?: string | null
           author_id?: string | null
           category?: string | null
-          status?: Database["public"]["Enums"]["content_status"]
+          status?: Database['public']['Enums']['content_status']
           seo_title?: string | null
           seo_description?: string | null
           canonical_url?: string | null
@@ -1254,7 +1275,7 @@ export interface Database {
           cover_path?: string | null
           author_id?: string | null
           category?: string | null
-          status?: Database["public"]["Enums"]["content_status"]
+          status?: Database['public']['Enums']['content_status']
           seo_title?: string | null
           seo_description?: string | null
           canonical_url?: string | null
@@ -1263,17 +1284,17 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "posts_author_id_fkey"
-          columns: ["author_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'posts_author_id_fkey'
+            columns: ['author_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "profiles": {
+      profiles: {
         Row: {
           id: string
           full_name: string | null
@@ -1282,7 +1303,7 @@ export interface Database {
           phone_verified_at: string | null
           locale: string
           timezone: string
-          status: Database["public"]["Enums"]["profile_status"]
+          status: Database['public']['Enums']['profile_status']
           created_at: string
           updated_at: string
         }
@@ -1294,7 +1315,7 @@ export interface Database {
           phone_verified_at?: string | null
           locale?: string
           timezone?: string
-          status?: Database["public"]["Enums"]["profile_status"]
+          status?: Database['public']['Enums']['profile_status']
           created_at?: string
           updated_at?: string
         }
@@ -1306,60 +1327,60 @@ export interface Database {
           phone_verified_at?: string | null
           locale?: string
           timezone?: string
-          status?: Database["public"]["Enums"]["profile_status"]
+          status?: Database['public']['Enums']['profile_status']
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "profiles_id_fkey"
-          columns: ["id"]
-          isOneToOne: true
-          referencedRelation: "users"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'profiles_id_fkey'
+            columns: ['id']
+            isOneToOne: true
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "review_media": {
+      review_media: {
         Row: {
           id: string
           review_id: string
           storage_path: string
-          moderation_status: Database["public"]["Enums"]["moderation_status"]
+          moderation_status: Database['public']['Enums']['moderation_status']
           created_at: string
         }
         Insert: {
           id?: string
           review_id: string
           storage_path: string
-          moderation_status?: Database["public"]["Enums"]["moderation_status"]
+          moderation_status?: Database['public']['Enums']['moderation_status']
           created_at?: string
         }
         Update: {
           id?: string
           review_id?: string
           storage_path?: string
-          moderation_status?: Database["public"]["Enums"]["moderation_status"]
+          moderation_status?: Database['public']['Enums']['moderation_status']
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "review_media_review_id_fkey"
-          columns: ["review_id"]
-          isOneToOne: false
-          referencedRelation: "reviews"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'review_media_review_id_fkey'
+            columns: ['review_id']
+            isOneToOne: false
+            referencedRelation: 'reviews'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "review_responses": {
+      review_responses: {
         Row: {
           id: string
           review_id: string
           vendor_id: string
           author_user_id: string | null
           body: string
-          status: Database["public"]["Enums"]["moderation_status"]
+          status: Database['public']['Enums']['moderation_status']
           created_at: string
           updated_at: string
         }
@@ -1369,7 +1390,7 @@ export interface Database {
           vendor_id: string
           author_user_id?: string | null
           body: string
-          status?: Database["public"]["Enums"]["moderation_status"]
+          status?: Database['public']['Enums']['moderation_status']
           created_at?: string
           updated_at?: string
         }
@@ -1379,35 +1400,35 @@ export interface Database {
           vendor_id?: string
           author_user_id?: string | null
           body?: string
-          status?: Database["public"]["Enums"]["moderation_status"]
+          status?: Database['public']['Enums']['moderation_status']
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "review_responses_author_user_id_fkey"
-          columns: ["author_user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "review_responses_review_id_fkey"
-          columns: ["review_id"]
-          isOneToOne: true
-          referencedRelation: "reviews"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "review_responses_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'review_responses_author_user_id_fkey'
+            columns: ['author_user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'review_responses_review_id_fkey'
+            columns: ['review_id']
+            isOneToOne: true
+            referencedRelation: 'reviews'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'review_responses_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "review_revisions": {
+      review_revisions: {
         Row: {
           id: string
           review_id: string
@@ -1432,17 +1453,17 @@ export interface Database {
           rating?: number | null
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "review_revisions_review_id_fkey"
-          columns: ["review_id"]
-          isOneToOne: false
-          referencedRelation: "reviews"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'review_revisions_review_id_fkey'
+            columns: ['review_id']
+            isOneToOne: false
+            referencedRelation: 'reviews'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "reviews": {
+      reviews: {
         Row: {
           id: string
           enquiry_id: string
@@ -1453,7 +1474,7 @@ export interface Database {
           title: string | null
           body: string | null
           event_date: string | null
-          status: Database["public"]["Enums"]["moderation_status"]
+          status: Database['public']['Enums']['moderation_status']
           moderation_reason: string | null
           reviewer_id: string | null
           edited_at: string | null
@@ -1470,7 +1491,7 @@ export interface Database {
           title?: string | null
           body?: string | null
           event_date?: string | null
-          status?: Database["public"]["Enums"]["moderation_status"]
+          status?: Database['public']['Enums']['moderation_status']
           moderation_reason?: string | null
           reviewer_id?: string | null
           edited_at?: string | null
@@ -1487,45 +1508,45 @@ export interface Database {
           title?: string | null
           body?: string | null
           event_date?: string | null
-          status?: Database["public"]["Enums"]["moderation_status"]
+          status?: Database['public']['Enums']['moderation_status']
           moderation_reason?: string | null
           reviewer_id?: string | null
           edited_at?: string | null
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "reviews_customer_id_fkey"
-          columns: ["customer_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "reviews_enquiry_id_fkey"
-          columns: ["enquiry_id"]
-          isOneToOne: false
-          referencedRelation: "enquiries"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "reviews_reviewer_id_fkey"
-          columns: ["reviewer_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "reviews_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'reviews_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reviews_enquiry_id_fkey'
+            columns: ['enquiry_id']
+            isOneToOne: false
+            referencedRelation: 'enquiries'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reviews_reviewer_id_fkey'
+            columns: ['reviewer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reviews_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "rfq_requests": {
+      rfq_requests: {
         Row: {
           id: string
           customer_id: string
@@ -1553,31 +1574,31 @@ export interface Database {
           status?: string
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "rfq_requests_category_id_fkey"
-          columns: ["category_id"]
-          isOneToOne: false
-          referencedRelation: "categories"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "rfq_requests_city_id_fkey"
-          columns: ["city_id"]
-          isOneToOne: false
-          referencedRelation: "cities"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "rfq_requests_customer_id_fkey"
-          columns: ["customer_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'rfq_requests_category_id_fkey'
+            columns: ['category_id']
+            isOneToOne: false
+            referencedRelation: 'categories'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'rfq_requests_city_id_fkey'
+            columns: ['city_id']
+            isOneToOne: false
+            referencedRelation: 'cities'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'rfq_requests_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "shortlists": {
+      shortlists: {
         Row: {
           id: string
           user_id: string
@@ -1602,24 +1623,24 @@ export interface Database {
           compare_flag?: boolean
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "shortlists_user_id_fkey"
-          columns: ["user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "shortlists_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'shortlists_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'shortlists_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "slug_redirects": {
+      slug_redirects: {
         Row: {
           id: string
           entity_type: string
@@ -1647,9 +1668,9 @@ export interface Database {
           status_code?: number
           created_at?: string
         }
-      Relationships: []
+        Relationships: []
       }
-      "states": {
+      states: {
         Row: {
           id: string
           country_id: string
@@ -1674,17 +1695,17 @@ export interface Database {
           active?: boolean
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "states_country_id_fkey"
-          columns: ["country_id"]
-          isOneToOne: false
-          referencedRelation: "countries"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'states_country_id_fkey'
+            columns: ['country_id']
+            isOneToOne: false
+            referencedRelation: 'countries'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "subscriptions": {
+      subscriptions: {
         Row: {
           id: string
           vendor_id: string
@@ -1692,7 +1713,7 @@ export interface Database {
           provider: string
           provider_customer_id: string | null
           provider_subscription_id: string | null
-          status: Database["public"]["Enums"]["subscription_status"]
+          status: Database['public']['Enums']['subscription_status']
           period_start: string | null
           period_end: string | null
           cancel_at_period_end: boolean
@@ -1706,7 +1727,7 @@ export interface Database {
           provider?: string
           provider_customer_id?: string | null
           provider_subscription_id?: string | null
-          status?: Database["public"]["Enums"]["subscription_status"]
+          status?: Database['public']['Enums']['subscription_status']
           period_start?: string | null
           period_end?: string | null
           cancel_at_period_end?: boolean
@@ -1720,31 +1741,31 @@ export interface Database {
           provider?: string
           provider_customer_id?: string | null
           provider_subscription_id?: string | null
-          status?: Database["public"]["Enums"]["subscription_status"]
+          status?: Database['public']['Enums']['subscription_status']
           period_start?: string | null
           period_end?: string | null
           cancel_at_period_end?: boolean
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "subscriptions_plan_id_fkey"
-          columns: ["plan_id"]
-          isOneToOne: false
-          referencedRelation: "plans"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "subscriptions_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'subscriptions_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: false
+            referencedRelation: 'plans'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'subscriptions_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "support_tickets": {
+      support_tickets: {
         Row: {
           id: string
           user_id: string | null
@@ -1787,38 +1808,38 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "support_tickets_assigned_admin_id_fkey"
-          columns: ["assigned_admin_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "support_tickets_enquiry_id_fkey"
-          columns: ["enquiry_id"]
-          isOneToOne: false
-          referencedRelation: "enquiries"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "support_tickets_user_id_fkey"
-          columns: ["user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "support_tickets_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'support_tickets_assigned_admin_id_fkey'
+            columns: ['assigned_admin_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'support_tickets_enquiry_id_fkey'
+            columns: ['enquiry_id']
+            isOneToOne: false
+            referencedRelation: 'enquiries'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'support_tickets_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'support_tickets_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "testimonials": {
+      testimonials: {
         Row: {
           id: string
           author_name: string
@@ -1849,9 +1870,9 @@ export interface Database {
           sort_order?: number
           created_at?: string
         }
-      Relationships: []
+        Relationships: []
       }
-      "user_consents": {
+      user_consents: {
         Row: {
           id: string
           user_id: string
@@ -1879,17 +1900,17 @@ export interface Database {
           source?: string | null
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "user_consents_user_id_fkey"
-          columns: ["user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'user_consents_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_addresses": {
+      vendor_addresses: {
         Row: {
           id: string
           vendor_id: string
@@ -1932,24 +1953,24 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_addresses_city_id_fkey"
-          columns: ["city_id"]
-          isOneToOne: false
-          referencedRelation: "cities"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_addresses_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_addresses_city_id_fkey'
+            columns: ['city_id']
+            isOneToOne: false
+            referencedRelation: 'cities'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_addresses_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_attribute_values": {
+      vendor_attribute_values: {
         Row: {
           vendor_id: string
           category_attribute_id: string
@@ -1965,30 +1986,30 @@ export interface Database {
           category_attribute_id?: string
           value_json?: Json
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_attribute_values_category_attribute_id_fkey"
-          columns: ["category_attribute_id"]
-          isOneToOne: false
-          referencedRelation: "category_attributes"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_attribute_values_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_attribute_values_category_attribute_id_fkey'
+            columns: ['category_attribute_id']
+            isOneToOne: false
+            referencedRelation: 'category_attributes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_attribute_values_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_availability": {
+      vendor_availability: {
         Row: {
           id: string
           vendor_id: string
           start_date: string
           end_date: string
-          status: Database["public"]["Enums"]["availability_status"]
+          status: Database['public']['Enums']['availability_status']
           note_private: string | null
           created_at: string
         }
@@ -1997,7 +2018,7 @@ export interface Database {
           vendor_id: string
           start_date: string
           end_date: string
-          status?: Database["public"]["Enums"]["availability_status"]
+          status?: Database['public']['Enums']['availability_status']
           note_private?: string | null
           created_at?: string
         }
@@ -2006,21 +2027,21 @@ export interface Database {
           vendor_id?: string
           start_date?: string
           end_date?: string
-          status?: Database["public"]["Enums"]["availability_status"]
+          status?: Database['public']['Enums']['availability_status']
           note_private?: string | null
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_availability_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_availability_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_categories": {
+      vendor_categories: {
         Row: {
           vendor_id: string
           category_id: string
@@ -2036,24 +2057,24 @@ export interface Database {
           category_id?: string
           is_primary?: boolean
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_categories_category_id_fkey"
-          columns: ["category_id"]
-          isOneToOne: false
-          referencedRelation: "categories"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_categories_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_categories_category_id_fkey'
+            columns: ['category_id']
+            isOneToOne: false
+            referencedRelation: 'categories'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_categories_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_documents": {
+      vendor_documents: {
         Row: {
           id: string
           verification_id: string
@@ -2081,23 +2102,23 @@ export interface Database {
           expiry_date?: string | null
           created_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_documents_verification_id_fkey"
-          columns: ["verification_id"]
-          isOneToOne: false
-          referencedRelation: "vendor_verifications"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_documents_verification_id_fkey'
+            columns: ['verification_id']
+            isOneToOne: false
+            referencedRelation: 'vendor_verifications'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_listing_versions": {
+      vendor_listing_versions: {
         Row: {
           id: string
           listing_id: string
           version_no: number
           snapshot_json: Json
-          status: Database["public"]["Enums"]["moderation_status"]
+          status: Database['public']['Enums']['moderation_status']
           reviewer_id: string | null
           reason: string | null
           created_at: string
@@ -2110,7 +2131,7 @@ export interface Database {
           listing_id: string
           version_no: number
           snapshot_json: Json
-          status?: Database["public"]["Enums"]["moderation_status"]
+          status?: Database['public']['Enums']['moderation_status']
           reviewer_id?: string | null
           reason?: string | null
           created_at?: string
@@ -2123,7 +2144,7 @@ export interface Database {
           listing_id?: string
           version_no?: number
           snapshot_json?: Json
-          status?: Database["public"]["Enums"]["moderation_status"]
+          status?: Database['public']['Enums']['moderation_status']
           reviewer_id?: string | null
           reason?: string | null
           created_at?: string
@@ -2131,35 +2152,35 @@ export interface Database {
           vendor_id?: string
           published_at?: string | null
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_listing_versions_listing_id_fkey"
-          columns: ["listing_id"]
-          isOneToOne: false
-          referencedRelation: "vendor_listings"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_listing_versions_reviewer_id_fkey"
-          columns: ["reviewer_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_listing_versions_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_listing_versions_listing_id_fkey'
+            columns: ['listing_id']
+            isOneToOne: false
+            referencedRelation: 'vendor_listings'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_listing_versions_reviewer_id_fkey'
+            columns: ['reviewer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_listing_versions_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_listings": {
+      vendor_listings: {
         Row: {
           id: string
           vendor_id: string
-          status: Database["public"]["Enums"]["moderation_status"]
+          status: Database['public']['Enums']['moderation_status']
           about: string | null
           experience_years: number | null
           languages: string[]
@@ -2174,7 +2195,7 @@ export interface Database {
         Insert: {
           id?: string
           vendor_id: string
-          status?: Database["public"]["Enums"]["moderation_status"]
+          status?: Database['public']['Enums']['moderation_status']
           about?: string | null
           experience_years?: number | null
           languages?: string[]
@@ -2189,7 +2210,7 @@ export interface Database {
         Update: {
           id?: string
           vendor_id?: string
-          status?: Database["public"]["Enums"]["moderation_status"]
+          status?: Database['public']['Enums']['moderation_status']
           about?: string | null
           experience_years?: number | null
           languages?: string[]
@@ -2201,17 +2222,17 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_listings_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: true
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_listings_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: true
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_media": {
+      vendor_media: {
         Row: {
           id: string
           vendor_id: string
@@ -2221,7 +2242,7 @@ export interface Database {
           alt_text: string | null
           sort_order: number
           is_cover: boolean
-          moderation_status: Database["public"]["Enums"]["moderation_status"]
+          moderation_status: Database['public']['Enums']['moderation_status']
           width: number | null
           height: number | null
           size_bytes: number | null
@@ -2237,7 +2258,7 @@ export interface Database {
           alt_text?: string | null
           sort_order?: number
           is_cover?: boolean
-          moderation_status?: Database["public"]["Enums"]["moderation_status"]
+          moderation_status?: Database['public']['Enums']['moderation_status']
           width?: number | null
           height?: number | null
           size_bytes?: number | null
@@ -2253,37 +2274,37 @@ export interface Database {
           alt_text?: string | null
           sort_order?: number
           is_cover?: boolean
-          moderation_status?: Database["public"]["Enums"]["moderation_status"]
+          moderation_status?: Database['public']['Enums']['moderation_status']
           width?: number | null
           height?: number | null
           size_bytes?: number | null
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_media_listing_id_fkey"
-          columns: ["listing_id"]
-          isOneToOne: false
-          referencedRelation: "vendor_listings"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_media_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_media_listing_id_fkey'
+            columns: ['listing_id']
+            isOneToOne: false
+            referencedRelation: 'vendor_listings'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_media_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_memberships": {
+      vendor_memberships: {
         Row: {
           id: string
           vendor_id: string
           user_id: string
-          role: Database["public"]["Enums"]["vendor_role"]
-          status: Database["public"]["Enums"]["membership_status"]
+          role: Database['public']['Enums']['vendor_role']
+          status: Database['public']['Enums']['membership_status']
           invited_by: string | null
           invited_email: string | null
           created_at: string
@@ -2293,8 +2314,8 @@ export interface Database {
           id?: string
           vendor_id: string
           user_id: string
-          role?: Database["public"]["Enums"]["vendor_role"]
-          status?: Database["public"]["Enums"]["membership_status"]
+          role?: Database['public']['Enums']['vendor_role']
+          status?: Database['public']['Enums']['membership_status']
           invited_by?: string | null
           invited_email?: string | null
           created_at?: string
@@ -2304,38 +2325,38 @@ export interface Database {
           id?: string
           vendor_id?: string
           user_id?: string
-          role?: Database["public"]["Enums"]["vendor_role"]
-          status?: Database["public"]["Enums"]["membership_status"]
+          role?: Database['public']['Enums']['vendor_role']
+          status?: Database['public']['Enums']['membership_status']
           invited_by?: string | null
           invited_email?: string | null
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_memberships_invited_by_fkey"
-          columns: ["invited_by"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_memberships_user_id_fkey"
-          columns: ["user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_memberships_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_memberships_invited_by_fkey'
+            columns: ['invited_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_memberships_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_memberships_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_metrics_daily": {
+      vendor_metrics_daily: {
         Row: {
           vendor_id: string
           date: string
@@ -2363,24 +2384,24 @@ export interface Database {
           messages?: number
           booked_count?: number
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_metrics_daily_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_metrics_daily_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_packages": {
+      vendor_packages: {
         Row: {
           id: string
           vendor_id: string
           category_id: string | null
           name: string
           description: string | null
-          price_type: Database["public"]["Enums"]["price_type"]
+          price_type: Database['public']['Enums']['price_type']
           min_amount_minor: number | null
           max_amount_minor: number | null
           currency: string
@@ -2398,7 +2419,7 @@ export interface Database {
           category_id?: string | null
           name: string
           description?: string | null
-          price_type?: Database["public"]["Enums"]["price_type"]
+          price_type?: Database['public']['Enums']['price_type']
           min_amount_minor?: number | null
           max_amount_minor?: number | null
           currency?: string
@@ -2416,7 +2437,7 @@ export interface Database {
           category_id?: string | null
           name?: string
           description?: string | null
-          price_type?: Database["public"]["Enums"]["price_type"]
+          price_type?: Database['public']['Enums']['price_type']
           min_amount_minor?: number | null
           max_amount_minor?: number | null
           currency?: string
@@ -2428,24 +2449,24 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_packages_category_id_fkey"
-          columns: ["category_id"]
-          isOneToOne: false
-          referencedRelation: "categories"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_packages_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_packages_category_id_fkey'
+            columns: ['category_id']
+            isOneToOne: false
+            referencedRelation: 'categories'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_packages_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_service_areas": {
+      vendor_service_areas: {
         Row: {
           id: string
           vendor_id: string
@@ -2467,36 +2488,36 @@ export interface Database {
           area_id?: string | null
           travel_available?: boolean
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_service_areas_area_id_fkey"
-          columns: ["area_id"]
-          isOneToOne: false
-          referencedRelation: "areas"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_service_areas_city_id_fkey"
-          columns: ["city_id"]
-          isOneToOne: false
-          referencedRelation: "cities"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_service_areas_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_service_areas_area_id_fkey'
+            columns: ['area_id']
+            isOneToOne: false
+            referencedRelation: 'areas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_service_areas_city_id_fkey'
+            columns: ['city_id']
+            isOneToOne: false
+            referencedRelation: 'cities'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_service_areas_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendor_verifications": {
+      vendor_verifications: {
         Row: {
           id: string
           vendor_id: string
           type: string
-          status: Database["public"]["Enums"]["verification_status"]
+          status: Database['public']['Enums']['verification_status']
           submitted_at: string | null
           decided_at: string | null
           reviewer_id: string | null
@@ -2508,7 +2529,7 @@ export interface Database {
           id?: string
           vendor_id: string
           type: string
-          status?: Database["public"]["Enums"]["verification_status"]
+          status?: Database['public']['Enums']['verification_status']
           submitted_at?: string | null
           decided_at?: string | null
           reviewer_id?: string | null
@@ -2520,7 +2541,7 @@ export interface Database {
           id?: string
           vendor_id?: string
           type?: string
-          status?: Database["public"]["Enums"]["verification_status"]
+          status?: Database['public']['Enums']['verification_status']
           submitted_at?: string | null
           decided_at?: string | null
           reviewer_id?: string | null
@@ -2528,32 +2549,32 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendor_verifications_reviewer_id_fkey"
-          columns: ["reviewer_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendor_verifications_vendor_id_fkey"
-          columns: ["vendor_id"]
-          isOneToOne: false
-          referencedRelation: "vendors"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendor_verifications_reviewer_id_fkey'
+            columns: ['reviewer_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendor_verifications_vendor_id_fkey'
+            columns: ['vendor_id']
+            isOneToOne: false
+            referencedRelation: 'vendors'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "vendors": {
+      vendors: {
         Row: {
           id: string
           legal_name: string | null
           display_name: string
           slug: string
           owner_user_id: string
-          status: Database["public"]["Enums"]["vendor_status"]
-          verification_status: Database["public"]["Enums"]["verification_status"]
+          status: Database['public']['Enums']['vendor_status']
+          verification_status: Database['public']['Enums']['verification_status']
           primary_city_id: string | null
           email: string | null
           phone: string | null
@@ -2581,8 +2602,8 @@ export interface Database {
           display_name: string
           slug: string
           owner_user_id: string
-          status?: Database["public"]["Enums"]["vendor_status"]
-          verification_status?: Database["public"]["Enums"]["verification_status"]
+          status?: Database['public']['Enums']['vendor_status']
+          verification_status?: Database['public']['Enums']['verification_status']
           primary_city_id?: string | null
           email?: string | null
           phone?: string | null
@@ -2610,8 +2631,8 @@ export interface Database {
           display_name?: string
           slug?: string
           owner_user_id?: string
-          status?: Database["public"]["Enums"]["vendor_status"]
-          verification_status?: Database["public"]["Enums"]["verification_status"]
+          status?: Database['public']['Enums']['vendor_status']
+          verification_status?: Database['public']['Enums']['verification_status']
           primary_city_id?: string | null
           email?: string | null
           phone?: string | null
@@ -2633,31 +2654,31 @@ export interface Database {
           submitted_at?: string | null
           rejection_reason?: string | null
         }
-      Relationships: [
-        {
-          foreignKeyName: "vendors_owner_user_id_fkey"
-          columns: ["owner_user_id"]
-          isOneToOne: false
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendors_plan_fk"
-          columns: ["plan_id"]
-          isOneToOne: false
-          referencedRelation: "plans"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "vendors_primary_city_id_fkey"
-          columns: ["primary_city_id"]
-          isOneToOne: false
-          referencedRelation: "cities"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'vendors_owner_user_id_fkey'
+            columns: ['owner_user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendors_plan_fk'
+            columns: ['plan_id']
+            isOneToOne: false
+            referencedRelation: 'plans'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'vendors_primary_city_id_fkey'
+            columns: ['primary_city_id']
+            isOneToOne: false
+            referencedRelation: 'cities'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "webhook_events": {
+      webhook_events: {
         Row: {
           id: string
           provider: string
@@ -2694,9 +2715,9 @@ export interface Database {
           processed_at?: string | null
           created_at?: string
         }
-      Relationships: []
+        Relationships: []
       }
-      "wedding_profiles": {
+      wedding_profiles: {
         Row: {
           id: string
           user_id: string
@@ -2742,24 +2763,24 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "wedding_profiles_primary_city_id_fkey"
-          columns: ["primary_city_id"]
-          isOneToOne: false
-          referencedRelation: "cities"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "wedding_profiles_user_id_fkey"
-          columns: ["user_id"]
-          isOneToOne: true
-          referencedRelation: "profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'wedding_profiles_primary_city_id_fkey'
+            columns: ['primary_city_id']
+            isOneToOne: false
+            referencedRelation: 'cities'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'wedding_profiles_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: true
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
-      "wedding_required_categories": {
+      wedding_required_categories: {
         Row: {
           wedding_profile_id: string
           category_id: string
@@ -2775,35 +2796,35 @@ export interface Database {
           category_id?: string
           status?: string
         }
-      Relationships: [
-        {
-          foreignKeyName: "wedding_required_categories_category_id_fkey"
-          columns: ["category_id"]
-          isOneToOne: false
-          referencedRelation: "categories"
-          referencedColumns: ["id"]
-        },
-        {
-          foreignKeyName: "wedding_required_categories_wedding_profile_id_fkey"
-          columns: ["wedding_profile_id"]
-          isOneToOne: false
-          referencedRelation: "wedding_profiles"
-          referencedColumns: ["id"]
-        }
-      ]
+        Relationships: [
+          {
+            foreignKeyName: 'wedding_required_categories_category_id_fkey'
+            columns: ['category_id']
+            isOneToOne: false
+            referencedRelation: 'categories'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'wedding_required_categories_wedding_profile_id_fkey'
+            columns: ['wedding_profile_id']
+            isOneToOne: false
+            referencedRelation: 'wedding_profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
     }
     Views: {
-      "public_vendor_availability": {
+      public_vendor_availability: {
         Row: {
           vendor_id: string | null
           start_date: string | null
           end_date: string | null
-          status: Database["public"]["Enums"]["availability_status"] | null
+          status: Database['public']['Enums']['availability_status'] | null
         }
-      Relationships: []
+        Relationships: []
       }
-      "public_vendors": {
+      public_vendors: {
         Row: {
           id: string | null
           display_name: string | null
@@ -2811,7 +2832,7 @@ export interface Database {
           primary_city_id: string | null
           website: string | null
           founded_year: number | null
-          verification_status: Database["public"]["Enums"]["verification_status"] | null
+          verification_status: Database['public']['Enums']['verification_status'] | null
           rating_average: number | null
           rating_count: number | null
           is_featured: boolean | null
@@ -2823,7 +2844,7 @@ export interface Database {
           faqs_json: Json | null
           published_version_no: number | null
         }
-      Relationships: []
+        Relationships: []
       }
     }
     Functions: {
@@ -2841,6 +2862,14 @@ export interface Database {
       }
       can_manage_taxonomy: {
         Args: Record<string, never>
+        Returns: unknown
+      }
+      enforce_enquiry_transition: {
+        Args: Record<string, never>
+        Returns: unknown
+      }
+      enquiry_actor_type: {
+        Args: { [key: string]: unknown }
         Returns: unknown
       }
       handle_new_user: {
@@ -2863,8 +2892,24 @@ export interface Database {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
+      mark_enquiry_viewed: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
       moderate_listing_version: {
         Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      on_message_sent: {
+        Args: Record<string, never>
+        Returns: unknown
+      }
+      queue_notification: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      record_enquiry_transition: {
+        Args: Record<string, never>
         Returns: unknown
       }
       record_slug_redirect: {
@@ -2895,11 +2940,19 @@ export interface Database {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
+      submit_enquiry: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
       submit_listing_for_review: {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
       submit_vendor_for_review: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      transition_enquiry: {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
@@ -2921,28 +2974,43 @@ export interface Database {
       }
     }
     Enums: {
-      actor_type: "customer" | "vendor" | "admin" | "system"
-      availability_status: "available" | "busy" | "unavailable" | "unknown"
-      content_status: "draft" | "scheduled" | "published" | "archived"
-      enquiry_status: "draft" | "submitted" | "delivered" | "viewed" | "contacted" | "qualified" | "quote_sent" | "negotiating" | "booked" | "not_booked" | "closed" | "spam"
-      membership_status: "invited" | "active" | "revoked"
-      moderation_status: "draft" | "pending" | "approved" | "rejected" | "flagged" | "archived"
-      notification_channel: "in_app" | "email" | "sms" | "whatsapp"
-      price_type: "starting_at" | "fixed" | "range" | "custom"
-      profile_status: "active" | "suspended" | "deactivated" | "deleted"
-      subscription_status: "trialing" | "active" | "past_due" | "paused" | "cancelled" | "expired"
-      vendor_role: "vendor_owner" | "vendor_manager" | "vendor_sales" | "vendor_editor" | "vendor_viewer"
-      vendor_status: "draft" | "pending_review" | "active" | "suspended" | "rejected" | "archived"
-      verification_status: "unverified" | "pending" | "verified" | "rejected" | "expired"
+      actor_type: 'customer' | 'vendor' | 'admin' | 'system'
+      availability_status: 'available' | 'busy' | 'unavailable' | 'unknown'
+      content_status: 'draft' | 'scheduled' | 'published' | 'archived'
+      enquiry_status:
+        | 'draft'
+        | 'submitted'
+        | 'delivered'
+        | 'viewed'
+        | 'contacted'
+        | 'qualified'
+        | 'quote_sent'
+        | 'negotiating'
+        | 'booked'
+        | 'not_booked'
+        | 'closed'
+        | 'spam'
+      membership_status: 'invited' | 'active' | 'revoked'
+      moderation_status: 'draft' | 'pending' | 'approved' | 'rejected' | 'flagged' | 'archived'
+      notification_channel: 'in_app' | 'email' | 'sms' | 'whatsapp'
+      price_type: 'starting_at' | 'fixed' | 'range' | 'custom'
+      profile_status: 'active' | 'suspended' | 'deactivated' | 'deleted'
+      subscription_status: 'trialing' | 'active' | 'past_due' | 'paused' | 'cancelled' | 'expired'
+      vendor_role:
+        'vendor_owner' | 'vendor_manager' | 'vendor_sales' | 'vendor_editor' | 'vendor_viewer'
+      vendor_status: 'draft' | 'pending_review' | 'active' | 'suspended' | 'rejected' | 'archived'
+      verification_status: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired'
     }
     CompositeTypes: Record<string, never>
   }
 }
 
-type PublicSchema = Database["public"]
+type PublicSchema = Database['public']
 
-export type Tables<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Row"]
-export type TablesInsert<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Insert"]
-export type TablesUpdate<T extends keyof PublicSchema["Tables"]> = PublicSchema["Tables"][T]["Update"]
-export type Views<T extends keyof PublicSchema["Views"]> = PublicSchema["Views"][T]["Row"]
-export type Enums<T extends keyof PublicSchema["Enums"]> = PublicSchema["Enums"][T]
+export type Tables<T extends keyof PublicSchema['Tables']> = PublicSchema['Tables'][T]['Row']
+export type TablesInsert<T extends keyof PublicSchema['Tables']> =
+  PublicSchema['Tables'][T]['Insert']
+export type TablesUpdate<T extends keyof PublicSchema['Tables']> =
+  PublicSchema['Tables'][T]['Update']
+export type Views<T extends keyof PublicSchema['Views']> = PublicSchema['Views'][T]['Row']
+export type Enums<T extends keyof PublicSchema['Enums']> = PublicSchema['Enums'][T]
