@@ -225,6 +225,25 @@ Verified signed in as an admin: **19/19 routes return 200 with no stub markers a
 
 Admin panel: **20 of 20 routes built.** 119 unit tests, 168 RLS assertions, 22 E2E.
 
+## Zero stubs (2026-08-02)
+
+The last eight `MilestonePlaceholder` routes are gone. Every route in the app now renders real functionality.
+
+**A latent bug found while building `/admin/settings`** (migration `0028`). Migration `0019` guarded `sla_policy` with `has_admin_permission('settings.manage')` — a permission that exists in neither `admin_permissions` nor `lib/permissions/catalogue.ts`. `has_admin_permission` returns false for a code it has never heard of, so the policy was deny-all: the response-time threshold could not be changed by anyone, including a super-admin, and a PATCH returned `204` with zero rows matched — the shape of success. It fails closed so it was never a security hole, only a feature that silently did not work.
+
+TypeScript caught it: the same invented permission name was rejected in the Server Action, which prompted checking the SQL side. This is the drift CLAUDE.md invariant 3 warns about — the catalogue is mirrored in SQL, and the mirror had only been checked in one direction. Now `admin.manage`, verified both ways (a super-admin can write, anon cannot).
+
+**Built**
+- `/admin/leads` — every enquiry across vendors, filterable by overdue/unanswered/booked/spam. Overdue comes from the `enquiry_sla` view, so this and the vendor's own dashboard cannot disagree about what late means. No customer names or contact details.
+- `/admin/customers` — accounts and activity counts, gated on `user.support`. Deliberately no contact details: a browsable directory would route around the per-enquiry consent and audit trail.
+- `/admin/reports` — marketplace KPIs. Query lives in `dal/reports.ts`, partly because reads belong there and partly because `Date.now()` in a component body is what the React Compiler purity rule exists to catch.
+- `/admin/content` and `/admin/blog` — page and post editors. Plain textarea, not rich text: bodies render as structured text, so formatting controls producing HTML the site refuses to render would misrepresent the field.
+- `/admin/settings` — response deadline and review edit window, both read by SQL rather than only by the app.
+- `/admin/admin-users` — grant and revoke roles, audited. `super_admin` is deliberately not grantable: a Server Action is a public endpoint, and Epic E requires the role not be creatable through public input, so the out-of-band script stays the only path. Revoking your own access is refused.
+- `/vendor-dashboard/settings` — where the business stands and which screen owns each field, with an explicit note on why publication and verification are not editable there.
+
+Verified signed in: all eight return 200 with the right heading, no stub markers, zero page errors. `/vendor-dashboard/settings` needed a real vendor membership to render — without one it correctly redirects to onboarding.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
