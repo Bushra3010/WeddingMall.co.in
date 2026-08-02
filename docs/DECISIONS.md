@@ -610,3 +610,21 @@ PRD 10.3 requires admin MFA and a short privileged session. The obvious implemen
 **One bug worth recording, because it took the page down rather than degrading it:** Supabase returns the enrolment QR as an `image/svg+xml` data URI, and `next/image` rejects that outright. The throw crashed the route — so the single page capable of enrolling a factor rendered a global error. It is a plain `<img>` now; there is nothing to optimise about a data URI. Found by driving the flow with a real TOTP generator rather than by reading the code.
 
 **Verified end to end**, including the parts that only matter when they fail: a wrong code is refused, a real code elevates the session, all admin routes open afterwards, and with no factor every admin route lands on the enrolment page with the enrolment button present. Codes are rate limited to 10 per 15 minutes per user — six digits is 10^6 guesses, which is minutes of brute force unthrottled.
+
+---
+
+## ADR-037 — Correcting ADR-034: the nonce never needed Partial Prerendering
+
+**Date:** 2026-08-02 · **Status:** accepted, supersedes part of ADR-034
+
+ADR-034 concluded that a nonce-based `script-src` was incompatible with static rendering, on the basis that Next only threads a nonce when the **root layout** reads it from `headers()` — which does force the entire tree dynamic (measured: static routes 12 → 2). It named Partial Prerendering as "the route out".
+
+**Both halves of that were wrong.**
+
+Reading Next's source: `app-render.js` takes the nonce from the **incoming request's** `content-security-policy` header, not from a `headers()` call anywhere in the tree. Setting the policy on the request in the proxy is enough — the layout is never involved, and static rendering is untouched. Verified: `/vendors` serves 63 nonced script tags with 12 static routes still prerendered.
+
+And PPR would not have helped. A prerendered shell is built without a request, so it cannot carry a request-specific nonce however the rest of the page streams. Enabling `cacheComponents` to try was also blocked outright — it is incompatible with the `export const revalidate` used on ~25 routes — so the migration would have been large *and* pointless.
+
+**What ships instead:** dynamic routes get `'nonce-…' 'strict-dynamic'`; prerendered public pages keep `'unsafe-inline'`. Browsers honouring `strict-dynamic` ignore `'unsafe-inline'` and `'self'` on the nonced routes, so the strong policy applies to everything behind a login plus search and vendor profiles — the surfaces that carry sessions and render user-supplied text. The weaker policy is left where the content is ours and static.
+
+**How the error happened, since that is the reusable part:** ADR-034 reasoned from an observed measurement (reading `headers()` broke static rendering — true) to a conclusion about the mechanism (a nonce requires reading `headers()` — false). The measurement was real; the inference from it was not checked against how Next actually obtains the nonce. Reading forty lines of framework source would have settled it at the time.

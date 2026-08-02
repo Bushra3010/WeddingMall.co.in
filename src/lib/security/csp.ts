@@ -1,42 +1,44 @@
 /**
  * Content Security Policy (PRD 10.3).
  *
- * ## Why there is no nonce, and what that costs
+ * ## How the nonce actually gets applied
  *
- * The strong form of a CSP for Next is `'nonce-…' 'strict-dynamic'`: trust the
- * bootstrap script by nonce, trust whatever it loads, ignore host allow-lists.
- * Next threads that nonce onto its own scripts only when the root layout reads
- * it from `headers()`.
+ * Next reads the nonce from the **incoming request's** `content-security-policy`
+ * header (`app-render.js`: `headers['content-security-policy']`), not from a
+ * `headers()` call in the root layout. So the proxy sets the policy on the
+ * request as well as the response, and Next stamps the nonce onto its own
+ * bootstrap and chunk-loading script tags.
  *
- * Reading a header in the root layout opts the **entire route tree** out of
- * static rendering. Measured on this app: static routes fell from 12 to 2, and
- * `/` went back to being a function invocation — undoing the work in ADR-030
- * that took TTFB from ~950ms to ~150ms for Indian traffic.
+ * This matters because it is the opposite of what this file used to claim.
+ * ADR-034 recorded that a nonce required reading `headers()` in the root
+ * layout — which does force the whole tree dynamic, measured at the time as
+ * static routes falling from 12 to 2 — and concluded the fix had to wait for
+ * Partial Prerendering. That was wrong. Nothing had to wait, and PPR would not
+ * have helped: a prerendered shell is built without a request, so it cannot
+ * carry a request-specific nonce no matter how the rest of the page streams.
  *
- * Worse, it is not a free choice either way. With `strict-dynamic` in force, a
- * statically prerendered page carries no nonce on its inline bootstrap, so the
- * browser blocks it and the page renders blank. Nonce and static rendering are
- * mutually exclusive here, not merely in tension.
+ * ## Why only some routes get a nonce
  *
- * **Decision:** enforce every directive that does not require a nonce, and
- * accept `'unsafe-inline'` on `script-src`. This is a genuine weakness and is
- * recorded as a launch blocker in STATUS.md rather than dressed up: it means a
- * successful HTML injection could run script. What the policy still buys is
- * substantial and is not theatre —
+ * A nonce is only meaningful on a response Next actually renders per request.
+ * A prerendered page was built without one, so its scripts carry no nonce and
+ * a nonce-only policy would block them — a blank page.
  *
- *   * `object-src 'none'` kills plugin-based execution;
- *   * `base-uri 'self'` stops `<base>` injection redirecting every relative
- *     URL, a common way to turn a small injection into total script control;
- *   * `frame-ancestors 'none'` is the clickjacking control modern browsers
- *     honour (`X-Frame-Options` is the legacy fallback);
- *   * `form-action 'self'` stops an injected form posting credentials offsite;
- *   * `default-src 'self'` closes every fetch destination not named below.
+ * So dynamic routes (everything behind a login, plus search and vendor
+ * profiles, which render user-supplied text) get `'nonce-…' 'strict-dynamic'`.
+ * Browsers that understand `strict-dynamic` ignore `'unsafe-inline'` and
+ * `'self'` entirely on those routes, which is the strong policy. Prerendered
+ * public pages keep `'unsafe-inline'`.
  *
- * The route out is Partial Prerendering: once the dynamic hole can carry a
- * nonce while the shell stays static, this becomes nonce + `strict-dynamic`
- * with no latency cost. That is the follow-up noted in STATUS.md.
+ * That leaves the weaker policy exactly where the content is ours and static,
+ * and the strong one where sessions and user-supplied text live.
+ *
+ * The other directives apply everywhere and are not decoration:
+ * `object-src 'none'` kills plugin execution, `base-uri 'self'` stops `<base>`
+ * injection turning a small injection into total script control,
+ * `frame-ancestors 'none'` is the clickjacking control modern browsers honour,
+ * and `form-action 'self'` stops an injected form posting credentials offsite.
  */
-export function buildCsp(isDev: boolean): string {
+export function buildCsp(isDev: boolean, nonce?: string): string {
   const directives: Record<string, string[]> = {
     'default-src': ["'self'"],
     'base-uri': ["'self'"],
@@ -45,8 +47,9 @@ export function buildCsp(isDev: boolean): string {
     'form-action': ["'self'"],
     'script-src': [
       "'self'",
-      // See the note above. Required by Next's inline bootstrap on statically
-      // rendered pages, which have no request and therefore no nonce.
+      ...(nonce ? [`'nonce-${nonce}'`, "'strict-dynamic'"] : []),
+      // Ignored by any browser that understands the nonce above; required on
+      // prerendered pages, which have no request and therefore no nonce.
       "'unsafe-inline'",
       // Dev only: Turbopack's HMR client evaluates code at runtime.
       ...(isDev ? ["'unsafe-eval'"] : []),
@@ -70,4 +73,16 @@ export function buildCsp(isDev: boolean): string {
 
   // Pointless on localhost; harmless in production, where all traffic is TLS.
   return isDev ? policy : `${policy}; upgrade-insecure-requests`
+}
+
+/**
+ * A fresh nonce per request.
+ *
+ * `crypto.getRandomValues` rather than `node:crypto` because the proxy runs on
+ * the edge runtime, where `Buffer` is not guaranteed to exist.
+ */
+export function newNonce(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...bytes))
 }

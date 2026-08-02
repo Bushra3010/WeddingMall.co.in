@@ -1,17 +1,39 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
-import { buildCsp } from '@/lib/security/csp'
+import { buildCsp, newNonce } from '@/lib/security/csp'
 import { updateSession } from '@/lib/supabase/middleware'
 
 const PROTECTED_PREFIXES = ['/account', '/vendor-dashboard', '/admin']
+
+/**
+ * Routes that render per request, and can therefore carry a nonce.
+ *
+ * These are also the surfaces worth protecting most: everything behind a
+ * login, plus search and vendor profiles, which render user-supplied text.
+ */
+const DYNAMIC_PREFIXES = ['/account', '/vendor-dashboard', '/admin', '/auth', '/vendors', '/vendor']
 
 export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request)
   const { pathname, search } = request.nextUrl
 
-  // Set here rather than in `next.config.ts` so the dev and production
-  // policies can differ without a second source of truth.
-  const csp = buildCsp(process.env.NODE_ENV !== 'production')
+  /*
+   * Next extracts the nonce from the *request's* `content-security-policy`
+   * header (see `app-render.js`), not from `headers()` in a layout — so a
+   * nonce costs nothing in static rendering, which is the opposite of what
+   * ADR-034 originally assumed.
+   *
+   * It only lands on scripts for routes that actually render per request. A
+   * prerendered page was built without a request and carries no nonce, so its
+   * policy has to keep `'unsafe-inline'` — which is why the nonce is added
+   * only for the dynamic surfaces below.
+   */
+  const nonce = DYNAMIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+    ? newNonce()
+    : undefined
+  const csp = buildCsp(process.env.NODE_ENV !== 'production', nonce)
+
+  if (nonce) request.headers.set('content-security-policy', csp)
   response.headers.set('content-security-policy', csp)
 
   const needsAuth = PROTECTED_PREFIXES.some(

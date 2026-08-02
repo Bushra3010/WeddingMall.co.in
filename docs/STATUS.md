@@ -258,6 +258,18 @@ Verified end to end: wrong code refused, real code elevates, all admin routes op
 
 The test factor was removed afterwards, so the account is back to an un-enrolled state and the owner can set up their own authenticator.
 
+## CSP nonce on dynamic routes (2026-08-02)
+
+Launch blocker 2 substantially closed, and a wrong entry in the decision record corrected (ADR-037).
+
+ADR-034 claimed a nonce was incompatible with static rendering and that Partial Prerendering was the way out. Both were wrong. Next takes the nonce from the **incoming request's** `content-security-policy` header, not from `headers()` in a layout — so the proxy setting the policy on the request is enough, and static rendering is untouched. PPR would not have helped anyway: a prerendered shell is built without a request and cannot carry a request-specific nonce. Enabling `cacheComponents` to try was blocked outright by the `export const revalidate` on ~25 routes.
+
+Now shipping: dynamic routes (`/admin`, `/account`, `/vendor-dashboard`, `/auth`, `/vendors`, `/vendor`) get `'nonce-…' 'strict-dynamic'`, which makes conforming browsers ignore `'unsafe-inline'` and `'self'` there. Prerendered public pages keep `'unsafe-inline'`, because their scripts were built without a request and a nonce-only policy would blank them.
+
+The strong policy now covers everything behind a login plus search and vendor profiles — the surfaces carrying sessions and user-supplied text. The weak one is left where the content is ours and static.
+
+Verified: `/vendors` serves 63 nonced script tags, 12 static routes still prerendered, and `/`, `/vendors`, `/auth/sign-in`, `/blog` and a vendor profile all load with zero CSP violations and hydration intact.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
@@ -281,7 +293,7 @@ The test factor was removed afterwards, so the account is back to an un-enrolled
 Launch blockers, highest first:
 
 1. **Rotate the four credentials** shared in the build transcript — service-role key first, since it bypasses RLS entirely. Then the anon key, database password, and Vercel token. Update `.env.local` *and* the Vercel environment.
-2. **`script-src 'unsafe-inline'`** (ADR-034). Needs Partial Prerendering to fix without giving back the latency work.
+2. **`script-src 'unsafe-inline'` on prerendered public pages only** (ADR-037). Dynamic routes now use a nonce with `strict-dynamic`. The remaining gap covers static marketing pages, whose content is ours; closing it would mean giving up prerendering, which is not a trade worth making.
 3. **No SMTP provider.** Blocks sign-up confirmation, every email notification, and E2E journeys 1-3. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` on a real domain; the adapter is written and will pick it up.
 4. ~~Admin MFA and short privileged sessions.~~ Shipped 2026-08-02 (ADR-036). **You must enrol an authenticator at `/admin/security`** — until you do, every other admin route redirects there.
 5. **Legal text still needs counsel** (PRD 14.3). `/privacy` and `/terms` now publish a truthful plain-English description of actual behaviour, clearly labelled as not lawyer-reviewed — this removed the 404s, not the legal requirement.
