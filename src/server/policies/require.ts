@@ -2,6 +2,7 @@ import 'server-only'
 
 import { redirect } from 'next/navigation'
 
+import { serverEnv } from '@/lib/env'
 import { getMfaState } from '@/lib/security/mfa'
 import { getActor } from '@/server/dal/actor'
 import {
@@ -50,6 +51,21 @@ export async function requireAdmin(permission?: Permission) {
  */
 export async function requireElevatedAdmin(permission?: Permission) {
   const actor = await requireAdmin(permission)
+
+  /*
+   * Enforcement is opt-in via `ADMIN_MFA_REQUIRED`, and off by default.
+   *
+   * PRD 10.3 asks for admin MFA, and this deployment has chosen not to require
+   * it for now — a deliberate decision, recorded in STATUS.md rather than
+   * quietly reversed. The enrolment page stays available at `/admin/security`,
+   * so an administrator can still turn on a second factor for their own
+   * account; it just no longer gates the rest of the panel.
+   *
+   * Turning it back on is one environment variable. Nothing else changes:
+   * the challenge, the 30-minute session, and the enrol-first redirect are all
+   * still here and still tested.
+   */
+  if (!serverEnv().ADMIN_MFA_REQUIRED) return actor
 
   const state = await getMfaState()
   if (state.status === 'enrol') redirect('/admin/security?reason=enrol')

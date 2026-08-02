@@ -31,6 +31,8 @@ const serverSchema = z.object({
   FEATURE_PHONE_AUTH: booleanFlag,
   FEATURE_ONLINE_PAYMENTS: booleanFlag,
   FEATURE_REALTIME_CHAT: booleanFlag,
+  /** Off by default: enforcing MFA locks out an admin who has not enrolled. */
+  ADMIN_MFA_REQUIRED: booleanFlag,
 })
 
 export type ClientEnv = z.infer<typeof clientSchema>

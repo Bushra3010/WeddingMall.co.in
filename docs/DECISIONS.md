@@ -672,3 +672,19 @@ The second matched nothing. Postgres normalises a stored policy expression: `has
 A check that has never failed is indistinguishable from one that cannot fail. This is the fifth instance of that shape in this project (ADR-013, ADR-021, ADR-031, ADR-035), and the first where the disconnected wire was in the tooling built to prevent it.
 
 **Left open, and reported rather than hidden:** `vendor_can()` holds the vendor capability matrix in a PL/pgSQL body rather than a table, so there is nothing to diff against without parsing the function. The script prints that as a SKIP with the reason. An unchecked half of an invariant should be visible.
+
+---
+
+## ADR-040 — Admin MFA becomes opt-in
+
+**Date:** 2026-08-02 · **Status:** accepted, amends ADR-036
+
+ADR-036 shipped admin MFA with staged enforcement designed to avoid a lockout: an administrator with no factor is redirected to `/admin/security` rather than refused. That worked as designed — and the practical effect was that the admin panel could not be used until an authenticator was enrolled. The owner asked for it to be removed.
+
+**Decision:** enforcement is gated on `ADMIN_MFA_REQUIRED`, default **false**. The code is not deleted.
+
+Nothing about the mechanism changed: the challenge, the signed `amr` session age, the 30-minute privileged window, the aal2 requirement to remove a factor, and the enrol-first redirect are all still present and still covered by tests. `requireElevatedAdmin` returns early when the flag is off, and `/admin/security` remains reachable so an administrator can enable a second factor on their own account voluntarily.
+
+Deleting it would have been the wrong shape of response. The feature was not wrong — the default was. A flag keeps the decision reversible by one environment variable and keeps the tested code path alive, rather than requiring it be rebuilt from the commit history later.
+
+**What this costs, stated once:** the admin panel can reveal customer contact details, and it is now protected by a password alone. PRD 10.3 asks for admin MFA, so this stays on the launch list as an open consideration rather than a completed item — recorded, not quietly dropped.
