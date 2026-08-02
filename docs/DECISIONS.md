@@ -628,3 +628,25 @@ And PPR would not have helped. A prerendered shell is built without a request, s
 **What ships instead:** dynamic routes get `'nonce-…' 'strict-dynamic'`; prerendered public pages keep `'unsafe-inline'`. Browsers honouring `strict-dynamic` ignore `'unsafe-inline'` and `'self'` on the nonced routes, so the strong policy applies to everything behind a login plus search and vendor profiles — the surfaces that carry sessions and render user-supplied text. The weaker policy is left where the content is ours and static.
 
 **How the error happened, since that is the reusable part:** ADR-034 reasoned from an observed measurement (reading `headers()` broke static rendering — true) to a conclusion about the mechanism (a nonce requires reading `headers()` — false). The measurement was real; the inference from it was not checked against how Next actually obtains the nonce. Reading forty lines of framework source would have settled it at the time.
+
+---
+
+## ADR-038 — Realtime is a second read path, so it gets the same proof as the first
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+PRD 6.7 allows Realtime for the message thread and requires that "Realtime channel access must be private and membership-authorised". The second half is the work: a live feed is a second way to read `messages`, and a second read path is a second chance to leak one.
+
+**Decision:** publish only `messages`, and let the existing `messages: participant read` policy protect the stream. Supabase evaluates the table's RLS for the subscribing user before delivering a change, so there is no separate channel ACL to keep in sync with the table's — which is the point. `enquiries` and `notifications` are deliberately not published: the enquiry row carries budget and contact-consent fields, and a stream is a poor place to reason about column exposure.
+
+`replica identity full` is required, not optional. With the default identity the change payload carries only the primary key, so a policy reading `conversation_id` cannot be evaluated at all — the choice is between full identity and a stream nobody can filter.
+
+**The same bug appeared twice, in the probe and then in the hook.** A client that subscribes before it holds a session connects as anonymous. RLS then filters out every row while the channel still reports `SUBSCRIBED` — a feed that looks healthy and delivers nothing, which is indistinguishable from a quiet thread. In the probe it was a bearer header on the REST transport, which does not authenticate the WebSocket; in the browser it was subscribing during the first render, before the session had loaded. Both now establish the session first and call `setAuth` before subscribing.
+
+**Why the paired assertion mattered here more than usual.** The first probe run reported `a non-participant receives nothing — PASS`. It was measuring nothing: the participant received nothing either. "The outsider got no events" passes when Realtime is off, when the table is unpublished, and when the socket is unauthenticated. Only the participant assertion gives it meaning — the fourth time in this project that a green light turned out to be a disconnected wire (ADR-013, ADR-021, ADR-031, ADR-035).
+
+**Polling fallback, per the PRD.** If the socket never connects — a proxy blocking WebSockets, the flag off, a transient failure — the thread refreshes on a 20-second interval, and polls *only* while disconnected so the common case costs nothing. The thread is correct either way; only latency changes.
+
+**The handler refreshes rather than appending.** The payload is a raw database row, but the thread renders sender names resolved through a join. Appending from the payload would create a second, thinner rendering path that drifts from the real one, so it calls `router.refresh()` and lets the query that already knows how to render a message do it.
+
+Shipped behind `FEATURE_REALTIME_CHAT`, which is **off**. Verified on: a message inserted elsewhere appears in a watching browser with no reload.

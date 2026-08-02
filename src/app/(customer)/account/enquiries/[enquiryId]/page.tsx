@@ -8,6 +8,7 @@ import { EnquiryActions } from '@/components/customer/enquiry-actions'
 import { ENQUIRY_STATUS_LABELS } from '@/features/enquiries/status'
 import { formatDate, formatDateTime } from '@/lib/dates'
 import { formatRange, money } from '@/lib/money'
+import { serverEnv } from '@/lib/env'
 import { NOINDEX } from '@/lib/seo'
 import { getActor } from '@/server/dal/actor'
 import { getEnquiry, getEnquiryTimeline, getMessages } from '@/server/dal/enquiries'
@@ -27,6 +28,9 @@ export default async function EnquiryDetailPage({
   const { sent } = await searchParams
 
   const actor = await getActor()
+  // Off unless the deployment turns it on; the thread polls either way.
+  const liveChat = serverEnv().FEATURE_REALTIME_CHAT
+
   const enquiry = await getEnquiry(enquiryId)
   // RLS already restricts this read to participants, so a miss is either
   // "gone" or "not yours" — both are a 404 from here.
@@ -115,6 +119,8 @@ export default async function EnquiryDetailPage({
           {enquiry.conversationId ? (
             <MessageThread
               enquiryId={enquiry.id}
+              conversationId={enquiry.conversationId}
+              liveEnabled={liveChat}
               messages={messages}
               currentUserId={actor.userId ?? ''}
               counterpartyName={enquiry.vendorName}

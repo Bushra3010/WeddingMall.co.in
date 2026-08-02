@@ -5,6 +5,7 @@ import { Send } from 'lucide-react'
 import { fieldError, FormMessage, useAction } from '@/components/shared/action-form'
 import { SubmitButton } from '@/components/shared/submit-button'
 import { Textarea } from '@/components/ui/field'
+import { useLiveMessages } from '@/components/customer/use-live-messages'
 import { sendMessageAction } from '@/features/enquiries/actions'
 import { formatDateTime } from '@/lib/dates'
 import { cn } from '@/lib/utils'
@@ -16,18 +17,24 @@ import type { MessageRow } from '@/server/dal/enquiries'
  */
 export function MessageThread({
   enquiryId,
+  conversationId,
+  liveEnabled = false,
   messages,
   currentUserId,
   counterpartyName,
   locked,
 }: {
   enquiryId: string
+  conversationId?: string | null
+  /** Off unless the deployment enables it; the thread works either way. */
+  liveEnabled?: boolean
   messages: MessageRow[]
   currentUserId: string
   counterpartyName: string
   locked: boolean
 }) {
   const [state, action] = useAction(sendMessageAction)
+  useLiveMessages(conversationId ?? null, liveEnabled)
 
   return (
     <section aria-labelledby="thread-heading" className="space-y-4">

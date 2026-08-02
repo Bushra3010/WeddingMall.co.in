@@ -9,6 +9,7 @@ import { ENQUIRY_STATUS_LABELS } from '@/features/enquiries/status'
 import { formatDate, formatDateTime } from '@/lib/dates'
 import { formatRange, money } from '@/lib/money'
 import { canVendor } from '@/lib/permissions'
+import { serverEnv } from '@/lib/env'
 import { NOINDEX } from '@/lib/seo'
 import { getActor } from '@/server/dal/actor'
 import {
@@ -30,6 +31,9 @@ export default async function VendorEnquiryPage({
 }) {
   const { enquiryId } = await params
   const actor = await getActor()
+
+  // Off unless the deployment turns it on; the thread polls either way.
+  const liveChat = serverEnv().FEATURE_REALTIME_CHAT
 
   const enquiry = await getEnquiry(enquiryId)
   if (!enquiry) notFound()
@@ -127,6 +131,8 @@ export default async function VendorEnquiryPage({
           {enquiry.conversationId ? (
             <MessageThread
               enquiryId={enquiry.id}
+              conversationId={enquiry.conversationId}
+              liveEnabled={liveChat}
               messages={messages}
               currentUserId={actor.userId ?? ''}
               counterpartyName="the customer"

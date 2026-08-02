@@ -270,12 +270,26 @@ The strong policy now covers everything behind a login plus search and vendor pr
 
 Verified: `/vendors` serves 63 nonced script tags, 12 static routes still prerendered, and `/`, `/vendors`, `/auth/sign-in`, `/blog` and a vendor profile all load with zero CSP violations and hydration intact.
 
+## Realtime message thread (2026-08-02)
+
+PRD 6.7's optional Realtime, behind `FEATURE_REALTIME_CHAT` (currently **off**). Migration `0029` publishes `messages` and sets `replica identity full` (ADR-038).
+
+Security is the existing `messages: participant read` policy — Supabase evaluates table RLS before delivering a change, so there is no second ACL to keep in sync. `enquiries` and `notifications` are deliberately unpublished; the enquiry row carries budget and contact-consent fields.
+
+**The same bug appeared twice.** A client that subscribes before it holds a session connects as anonymous; RLS filters every row while the channel still reports `SUBSCRIBED`. A feed that looks healthy and delivers nothing is indistinguishable from a quiet thread. First in the probe (a bearer header does not authenticate a WebSocket), then in the browser hook (subscribing during first render). Both now establish the session and call `setAuth` before subscribing.
+
+**The first probe run was green and meaningless:** "a non-participant receives nothing — PASS" while the participant also received nothing. That assertion passes when Realtime is off, when the table is unpublished, and when the socket is unauthenticated. Fourth time in this project a green light was a disconnected wire.
+
+Polling fallback runs only while the socket is disconnected, so the common case costs nothing. The handler calls `router.refresh()` rather than appending the payload, because the thread renders sender names through a join and a second rendering path would drift.
+
+Verified: a message inserted elsewhere appears in a watching browser with no reload. 170 RLS assertions across 8 probes.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
 2. **Email notifications are logged, not sent,** for the same reason. `sendEmail()` falls back to a console provider that records a redacted line.
 3. **Message attachments are not implemented.** PRD 6.7 wants them, but they need malware scanning first; `message_attachments` has no insert policy, so the table is inert rather than half-open.
-4. **Realtime is not wired.** `FEATURE_REALTIME_CHAT` is false; the thread refreshes on navigation.
+4. ~~Realtime is not wired.~~ Built 2026-08-02 (ADR-038), behind `FEATURE_REALTIME_CHAT`, which is off. Set it to `true` to enable; the polling fallback covers the off case.
 5. **Numeric attribute filters are exact-match only** (ADR-018).
 6. **Media is approved wholesale with the listing** — an admin cannot reject one image.
 7. ~~Screens remaining as stubs.~~ All replaced 2026-08-02. No route renders `MilestonePlaceholder`.
