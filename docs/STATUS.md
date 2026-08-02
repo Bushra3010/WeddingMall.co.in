@@ -294,9 +294,9 @@ Launch blockers, highest first:
 
 1. **Rotate the four credentials** shared in the build transcript — service-role key first, since it bypasses RLS entirely. Then the anon key, database password, and Vercel token. Update `.env.local` *and* the Vercel environment.
 2. **`script-src 'unsafe-inline'` on prerendered public pages only** (ADR-037). Dynamic routes now use a nonce with `strict-dynamic`. The remaining gap covers static marketing pages, whose content is ours; closing it would mean giving up prerendering, which is not a trade worth making.
-3. **No SMTP provider.** Blocks sign-up confirmation, every email notification, and E2E journeys 1-3. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` on a real domain; the adapter is written and will pick it up.
+3. **No SMTP provider.** *Deferred by the owner, 2026-08-02 — will be done later.* Blocks sign-up confirmation, every email notification, and E2E journeys 1-3. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` on a real domain; the adapter is written and will pick it up with no code change.
 4. ~~Admin MFA and short privileged sessions.~~ Shipped 2026-08-02 (ADR-036). **You must enrol an authenticator at `/admin/security`** — until you do, every other admin route redirects there.
-5. **Legal text still needs counsel** (PRD 14.3). `/privacy` and `/terms` now publish a truthful plain-English description of actual behaviour, clearly labelled as not lawyer-reviewed — this removed the 404s, not the legal requirement.
+5. **Legal text still needs counsel** (PRD 14.3). *Deferred by the owner, 2026-08-02 — will be done later.* `/privacy` and `/terms` publish a truthful plain-English description of actual behaviour, clearly labelled as not lawyer-reviewed. That removed the 404s, not the legal requirement. Replace the bodies via `/admin/content` when the real documents exist — no deploy needed.
 
 Then product scope: message attachments, Realtime, and Google OAuth. No placeholder routes remain.
 
