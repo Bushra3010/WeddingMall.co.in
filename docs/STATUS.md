@@ -358,6 +358,20 @@ Also gave the one nameless account a name; every profile now has one, and sign-u
 
 Tests: 125 unit, 169 RLS assertions, 23 E2E.
 
+## Navbar reverted, logo kept (2026-08-02)
+
+At the owner's request the header was restored to its pre-Milestone-5 form, with the new logo re-applied. Reverted: the "All India" city selector, the labelled "Sign out" button (back to an icon), the removal of the hamburger, and `useSession` (back to `signedIn` / `signOutAction` props).
+
+**The measured cost, since it is not visible from the page.** The header taking `signedIn` as a prop means both layouts read the session again, which opts the public tree out of static rendering. Static routes fell from **12 to 5**, and `/`, `/about`, `/blog`, `/categories`, `/cities`, `/contact`, `/help`, `/privacy` and `/terms` are dynamic again — undoing ADR-030, which had taken TTFB from ~0.95s to ~0.15s for Indian traffic. This was raised before the change and chosen deliberately.
+
+**Two consequences worth knowing.**
+- Mobile now has **two navigation systems at once**: the restored hamburger and the bottom tab bar, both listing the same destinations. Say the word and I will drop one.
+- The icon-only sign-out is back, which is the control originally reported as "why is the sign in button still there".
+
+The E2E test for the header city selector was deleted rather than weakened — a test kept alive against a removed control either fails forever or gets loosened until it asserts nothing. City filtering still works from the search page and is covered there. The "no session markup" test was kept but its rationale rewritten: it guarded a prerendered page, and now guards against a signed-out request coming back signed-in.
+
+Tests: 125 unit, 22 E2E, lint/typecheck/build clean.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

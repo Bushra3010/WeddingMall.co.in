@@ -39,13 +39,15 @@ test('collapsed filters are still submitted', async ({ page }) => {
   await expect(page).toHaveURL(/\/vendors\/photographers\/mumbai\?.*q=salt/)
 })
 
-test('the header city selector scopes a search', async ({ page }) => {
-  await page.goto('/')
-
-  await page.locator('header select[name="city"]').selectOption('jaipur')
-
-  await expect(page).toHaveURL(/\/vendors\?.*city=jaipur/)
-})
+/*
+ * The header city selector was removed when the navbar was reverted to its
+ * earlier form at the owner's request, so the test for it is gone rather than
+ * weakened — a test kept alive against a deleted control either fails forever
+ * or gets loosened until it asserts nothing.
+ *
+ * City filtering itself is unaffected: it still works from the search page,
+ * which `collapsed filters are still submitted` above covers.
+ */
 
 test('the page does not scroll sideways', async ({ page }) => {
   await page.goto('/')
@@ -134,10 +136,17 @@ test('statistics appear exactly once', async ({ page }) => {
 })
 
 test('the server-rendered homepage carries no session-specific markup', async ({ request }) => {
-  // The homepage is statically prerendered and edge-cached, so one visitor's
-  // HTML is served to everyone. Anything session-dependent has to be resolved
-  // in the browser; if it ever gets baked into this response it is not just a
-  // stale label, it is one account's state shown to strangers.
+  /*
+   * This once guarded a prerendered, edge-cached page, where session markup
+   * would have been one account's state served to strangers. The navbar revert
+   * made the homepage per-request again, so that specific risk is gone.
+   *
+   * Kept anyway, with the reason restated rather than left misleading: an
+   * unauthenticated request must still come back signed-out. If it ever
+   * carries "Sign out", the session was resolved from something other than the
+   * caller's own cookie — and if public pages are ever made static again, this
+   * is the assertion that catches the disclosure on the way back in.
+   */
   const html = await (await request.get('/')).text()
 
   expect(html).not.toContain('Sign out')
