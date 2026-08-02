@@ -1379,6 +1379,18 @@ export interface Database {
         }
       ]
       }
+      "review_eligible_statuses": {
+        Row: {
+          status: Database["public"]["Enums"]["enquiry_status"]
+        }
+        Insert: {
+          status: Database["public"]["Enums"]["enquiry_status"]
+        }
+        Update: {
+          status?: Database["public"]["Enums"]["enquiry_status"]
+        }
+      Relationships: []
+      }
       "review_media": {
         Row: {
           id: string
@@ -1410,6 +1422,21 @@ export interface Database {
           referencedColumns: ["id"]
         }
       ]
+      }
+      "review_policy": {
+        Row: {
+          id: boolean
+          edit_window_hours: number
+        }
+        Insert: {
+          id?: boolean
+          edit_window_hours?: number
+        }
+        Update: {
+          id?: boolean
+          edit_window_hours?: number
+        }
+      Relationships: []
       }
       "review_responses": {
         Row: {
@@ -1677,6 +1704,21 @@ export interface Database {
           referencedColumns: ["id"]
         }
       ]
+      }
+      "sla_policy": {
+        Row: {
+          id: boolean
+          first_response_hours: number
+        }
+        Insert: {
+          id?: boolean
+          first_response_hours?: number
+        }
+        Update: {
+          id?: boolean
+          first_response_hours?: number
+        }
+      Relationships: []
       }
       "slug_redirects": {
         Row: {
@@ -2853,6 +2895,18 @@ export interface Database {
       }
     }
     Views: {
+      "enquiry_sla": {
+        Row: {
+          enquiry_id: string | null
+          vendor_id: string | null
+          delivered_at: string | null
+          first_response_at: string | null
+          first_response_hours: number | null
+          hours_to_first_response: number | null
+          is_overdue: boolean | null
+        }
+      Relationships: []
+      }
       "public_vendor_availability": {
         Row: {
           vendor_id: string | null
@@ -2910,6 +2964,18 @@ export interface Database {
         Args: Record<string, never>
         Returns: unknown
       }
+      enforce_review_eligibility: {
+        Args: Record<string, never>
+        Returns: unknown
+      }
+      enforce_review_integrity: {
+        Args: Record<string, never>
+        Returns: unknown
+      }
+      enforce_review_response_integrity: {
+        Args: Record<string, never>
+        Returns: unknown
+      }
       enquiry_actor_type: {
         Args: { [key: string]: unknown }
         Returns: unknown
@@ -2954,12 +3020,20 @@ export interface Database {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
+      rebuild_vendor_metrics: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
       record_enquiry_transition: {
         Args: Record<string, never>
         Returns: unknown
       }
       record_slug_redirect: {
         Args: Record<string, never>
+        Returns: unknown
+      }
+      record_vendor_profile_view: {
+        Args: { [key: string]: unknown }
         Returns: unknown
       }
       refresh_vendor_rating: {
@@ -3016,6 +3090,10 @@ export interface Database {
       }
       vendor_role_of: {
         Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      write_review_revision: {
+        Args: Record<string, never>
         Returns: unknown
       }
     }

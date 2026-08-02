@@ -105,3 +105,46 @@ export function minorToRupees(value: number | null | undefined): number | undefi
   if (value === null || value === undefined) return undefined
   return Math.round(value / 100)
 }
+
+/**
+ * Vendor CRM fields (PRD 6.9 "Enquiry CRM").
+ *
+ * `quoteAmount` is entered in whole rupees and stored in minor units — money
+ * is never a float in this codebase (CLAUDE.md invariant 5).
+ */
+export const enquiryNoteSchema = z.object({
+  enquiryId: z.uuid(),
+  note: z
+    .string()
+    .trim()
+    .min(1, 'Write something before saving.')
+    .max(2000, 'Keep notes under 2000 characters.'),
+  followUpAt: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value === '' ? undefined : value)),
+})
+
+export const enquiryCrmSchema = z.object({
+  enquiryId: z.uuid(),
+  /*
+   * `preprocess` must run before coercion, not after: `z.coerce.number()`
+   * turns '' into 0, so an `.or(z.literal(''))` branch is unreachable and a
+   * blank field would record a quote of zero rupees rather than no quote.
+   * Caught by tests/review-schema.test.ts.
+   */
+  quoteAmount: z.preprocess(
+    (value) => (value === '' || value === null ? undefined : value),
+    z.coerce.number().min(0, 'A quote cannot be negative.').optional(),
+  ),
+  lostReason: z
+    .string()
+    .trim()
+    .max(500, 'Keep the reason under 500 characters.')
+    .optional()
+    .transform((value) => (value === '' ? undefined : value)),
+})
+
+export type EnquiryNoteInput = z.infer<typeof enquiryNoteSchema>
+export type EnquiryCrmInput = z.infer<typeof enquiryCrmSchema>

@@ -6,15 +6,19 @@ import { redirect } from 'next/navigation'
 import { runAction, type ActionResult } from '@/lib/action-result'
 import { getActor } from '@/server/dal/actor'
 import {
+  addEnquiryNote,
   markNotificationsRead,
   saveWeddingProfile,
   sendMessage,
   submitEnquiry,
   toggleShortlist,
   transitionEnquiry,
+  updateEnquiryCrm,
   updateShortlistNote,
 } from '@/server/services/enquiries'
 import {
+  enquiryCrmSchema,
+  enquiryNoteSchema,
   enquirySchema,
   messageSchema,
   shortlistSchema,
@@ -183,5 +187,41 @@ export async function markNotificationsReadAction(
   })
 
   if (result.ok) revalidatePath('/account/notifications')
+  return result
+}
+
+export async function addEnquiryNoteAction(
+  _prev: unknown,
+  form: FormData,
+): Promise<ActionResult<{ enquiryId: string }>> {
+  const result = await runAction('vendor.addEnquiryNote', async () => {
+    const actor = await getActor()
+    const input = enquiryNoteSchema.parse({
+      enquiryId: str(form, 'enquiryId'),
+      note: str(form, 'note'),
+      followUpAt: str(form, 'followUpAt'),
+    })
+    return addEnquiryNote(actor, input)
+  })
+
+  if (result.ok) revalidatePath(`/vendor-dashboard/enquiries/${result.data.enquiryId}`)
+  return result
+}
+
+export async function updateEnquiryCrmAction(
+  _prev: unknown,
+  form: FormData,
+): Promise<ActionResult<{ enquiryId: string }>> {
+  const result = await runAction('vendor.updateEnquiryCrm', async () => {
+    const actor = await getActor()
+    const input = enquiryCrmSchema.parse({
+      enquiryId: str(form, 'enquiryId'),
+      quoteAmount: str(form, 'quoteAmount'),
+      lostReason: str(form, 'lostReason'),
+    })
+    return updateEnquiryCrm(actor, input)
+  })
+
+  if (result.ok) revalidatePath(`/vendor-dashboard/enquiries/${result.data.enquiryId}`)
   return result
 }

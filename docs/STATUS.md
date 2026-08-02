@@ -104,6 +104,30 @@ Both new functions are `security invoker` — every table they read already gran
 
 Because a prerendered page is served to everyone, `/` was fetched with and without a session cookie: the HTML differs only in React's per-render id. An E2E test now asserts the response carries no session markup on every run.
 
+## Milestone 5 — CRM and reviews (2026-08-02)
+
+Migrations `0018`–`0021`; app layer for reviews, vendor CRM fields, and analytics.
+
+**Three live vulnerabilities found by probing before building** (ADR-031). A freshly signed-up account could review a vendor off a `draft` enquiry it had just created, PATCH its own review to `approved`, and rewrite an approved review in place. The second one took a real vendor's rating from 4.6 to 1.0 in two HTTP calls. All three are closed by triggers in `0018`, because RLS grants UPDATE per row and cannot restrict it per column.
+
+**Two more found by the probe's *permitted* assertions**, not its denials:
+- `0020` — the triggers used `has_admin_permission()`, which is `auth.uid()`-based and therefore false for the service role, so cron handlers and webhooks were refused as if they were the author.
+- `0021` — `reviews_refresh_rating` fired `after update of status`, which matches columns named in the UPDATE *statement*, not columns a BEFORE trigger changed. An edited review left public view while its stars stayed in the average.
+
+**Also shipped**
+- Reviews end to end: customer write/edit with revision history, vendor single public reply, admin moderation queue with tabs and required reasons. Replaces the `account/reviews` and `admin/reviews` stubs.
+- Vendor CRM on an enquiry: internal notes with follow-up dates, quote amount, lost reason. Notes gated on `note.manage`, not `lead.respond` — replying to a customer is not the same right as reading the team's private commentary about them.
+- `vendor_metrics_daily` is now populated. `rebuild_vendor_metrics()` recomputes rather than increments, so a missed run repairs itself; `/api/cron/vendor-metrics` drives it. Profile views come from a client beacon, not a write during render.
+- Analytics page and `enquiry_sla` view with overdue surfacing. Response rate renders as an em dash rather than 0% when nothing has been delivered.
+
+**Two schema bugs the new unit tests caught**, both the same shape — validation ordered before normalisation:
+- `z.coerce.number()` turns `''` into `0`, so a blank quote field would have recorded a ₹0 quote.
+- `.regex().optional()` validates before the transform can clear a blank, so submitting a review without an event date failed with "Use the date picker." on an optional field.
+
+Tests: 110 unit (20 new), 156 RLS assertions across 6 probes (17 new, both directions), lint/typecheck/build clean.
+
+**Not done in this milestone:** E2E journey 2 (blocked on the same missing SMTP as journey 3 — see outstanding item 1), enquiry pipeline/board view and assignment UI, CSV export, and per-vendor SLA overrides. The data and the guards exist for all of them.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
@@ -112,7 +136,7 @@ Because a prerendered page is served to everyone, `/` was fetched with and witho
 4. **Realtime is not wired.** `FEATURE_REALTIME_CHAT` is false; the thread refreshes on navigation.
 5. **Numeric attribute filters are exact-match only** (ADR-018).
 6. **Media is approved wholesale with the listing** — an admin cannot reject one image.
-7. **Reviews, billing, and CMS remain stubs** — Milestones 5 and 6.
+7. **Billing and CMS remain stubs** — Milestone 6. Reviews shipped in Milestone 5.
 8. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google.
 9. **Permission-catalogue parity is still unchecked** (ADR-004). The technique now exists — apply ADR-020's approach to `vendor_can()`.
 10. ~~Public pages render dynamically.~~ Fixed 2026-08-02 (ADR-030). Remaining dynamic public routes are `/vendors*` (search parameters) and `/vendor/[slug]*` (personalised enquiry state), both legitimately so.
@@ -124,18 +148,17 @@ Because a prerendered page is served to everyone, `/` was fetched with and witho
 
 ## Next task
 
-Milestone 5 (PRD 19.8) — vendor CRM and reviews:
+Milestone 6 (PRD 19.9) — billing, CMS, and reports:
 
-1. Enquiry pipeline and table views, assignment, internal notes, follow-up dates.
-2. SLA reminder job (`enquiry_events` already records `first_response`).
-3. `vendor_metrics_daily` aggregation.
-4. Review eligibility (an enquiry that reached a qualifying state), moderation, vendor response.
-5. Rating aggregates recompute from approved reviews only — the trigger exists in `0005`.
-6. E2E journey 2.
+1. Plans, subscriptions, and the payment webhook (`webhook_events` exists and is unused).
+2. Featured placement tied to plan entitlement — it must stay labelled "Sponsored" (PRD 6.2).
+3. CMS: blog, static pages, homepage section ordering.
+4. Admin reports and the analyst role.
+5. E2E journey 3.
 
-Reviews will need the same treatment as enquiries: eligibility enforced in SQL, not only in the service.
+Billing needs the same treatment reviews just got: entitlement enforced in SQL, not only in the service. A plan check that lives only in a Server Action is one PostgREST call away from being bypassed.
 
-Keep extending `npm run db:rls` in **both** directions — denied _and_ permitted. That asymmetry has now hidden bugs in three consecutive milestones (ADR-013, ADR-021).
+Keep extending `npm run db:rls` in **both** directions. That asymmetry has now hidden bugs in four consecutive milestones (ADR-013, ADR-021, ADR-031).
 
 ## Notes
 

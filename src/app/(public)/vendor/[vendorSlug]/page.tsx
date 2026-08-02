@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { ShortlistButton } from '@/components/customer/shortlist-button'
 import { getActor } from '@/server/dal/actor'
 import { isShortlisted } from '@/server/dal/enquiries'
+import { ViewBeacon } from '@/components/public/view-beacon'
 import { getPublicVendor, getRatingDistribution, getVendorReviews } from '@/server/dal/vendors'
 import { resolveSlugRedirect } from '@/server/dal/taxonomy'
 
@@ -78,6 +79,8 @@ export default async function VendorProfilePage({ params }: { params: Params }) 
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      {/* Counts one page load per tab; see ViewBeacon. */}
+      <ViewBeacon vendorId={vendor.id} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

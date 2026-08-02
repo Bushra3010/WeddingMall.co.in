@@ -4,7 +4,12 @@ import { createClient } from '@/lib/supabase/server'
 import { ServiceError } from '@/lib/action-result'
 import { type Actor } from '@/lib/permissions'
 import { checkTransition, type EnquiryStatus } from '@/features/enquiries/status'
-import { rupeesToMinor, type EnquiryInput } from '@/features/enquiries/schema'
+import {
+  rupeesToMinor,
+  type EnquiryCrmInput,
+  type EnquiryInput,
+  type EnquiryNoteInput,
+} from '@/features/enquiries/schema'
 import { sendEmail } from '@/lib/notifications/email'
 import { logError } from '@/lib/observability/logger'
 
@@ -301,4 +306,62 @@ export async function markNotificationsRead(actor: Actor) {
     .is('read_at', null)
 
   return { ok: true }
+}
+
+/**
+ * Vendor CRM writes (PRD 6.9).
+ *
+ * Notes are internal: `enquiry_notes` has no customer-facing policy, so what a
+ * vendor writes here is never rendered in the shared thread. The capability
+ * check is `note.manage`, re-asserted by RLS on every write.
+ */
+export async function addEnquiryNote(actor: Actor, input: EnquiryNoteInput) {
+  if (!actor.userId) throw new ServiceError('unauthenticated', 'Please sign in.')
+
+  const supabase = await createClient()
+
+  // The vendor is read from the enquiry rather than taken from the form, so a
+  // note cannot be filed against a business the caller does not belong to.
+  const { data: enquiry } = await supabase
+    .from('enquiries')
+    .select('id, vendor_id')
+    .eq('id', input.enquiryId)
+    .maybeSingle()
+
+  if (!enquiry) throw new ServiceError('not_found', 'That enquiry could not be found.')
+
+  const { error } = await supabase.from('enquiry_notes').insert({
+    enquiry_id: enquiry.id,
+    vendor_id: enquiry.vendor_id,
+    author_user_id: actor.userId,
+    note: input.note,
+    follow_up_at: input.followUpAt ?? null,
+  })
+
+  if (error) translate(error, 'Could not save that note.')
+  return { enquiryId: enquiry.id }
+}
+
+/** Quote amount and lost reason (PRD 6.9). */
+export async function updateEnquiryCrm(actor: Actor, input: EnquiryCrmInput) {
+  if (!actor.userId) throw new ServiceError('unauthenticated', 'Please sign in.')
+
+  const supabase = await createClient()
+  // Typed rather than a loose record, so a typo in a column name is a compile
+  // error instead of a silently ignored update.
+  const patch: { quote_amount_minor?: number; lost_reason?: string | null } = {}
+
+  // `undefined` means "not submitted"; clearing is expressed by an empty
+  // string, which the schema turns into undefined too — so a value is only
+  // written when one was actually given.
+  if (input.quoteAmount !== undefined) {
+    patch.quote_amount_minor = rupeesToMinor(Number(input.quoteAmount))
+  }
+  if (input.lostReason !== undefined) patch.lost_reason = input.lostReason
+
+  if (Object.keys(patch).length === 0) return { enquiryId: input.enquiryId }
+
+  const { error } = await supabase.from('enquiries').update(patch).eq('id', input.enquiryId)
+  if (error) translate(error, 'Could not save those details.')
+  return { enquiryId: input.enquiryId }
 }

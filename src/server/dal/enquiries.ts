@@ -105,6 +105,9 @@ export interface EnquiryDetail {
   cityName: string | null
   conversationId: string | null
   conversationStatus: string | null
+  /** Vendor CRM fields (PRD 6.9). RLS keeps these off the customer's page. */
+  quoteAmountMinor: number | null
+  lostReason: string | null
 }
 
 export async function getEnquiry(enquiryId: string): Promise<EnquiryDetail | null> {
@@ -116,6 +119,7 @@ export async function getEnquiry(enquiryId: string): Promise<EnquiryDetail | nul
         `id, status, created_at, event_date, flexible_date, guest_count,
          budget_min_minor, budget_max_minor, currency, message, contact_consent,
          preferred_contact_mode, customer_id, vendor_id,
+         quote_amount_minor, lost_reason,
          vendors(display_name, slug), categories(name), cities(name),
          conversations(id, status)`,
       )
@@ -150,6 +154,8 @@ export async function getEnquiry(enquiryId: string): Promise<EnquiryDetail | nul
       cityName: data.cities?.name ?? null,
       conversationId: conversation?.id ?? null,
       conversationStatus: conversation?.status ?? null,
+      quoteAmountMinor: data.quote_amount_minor,
+      lostReason: data.lost_reason,
     }
   } catch (error) {
     logError('dal.getEnquiry', error, { enquiryId })
@@ -450,5 +456,42 @@ export async function getCustomerContact(enquiryId: string) {
   } catch (error) {
     logError('dal.getCustomerContact', error, { enquiryId })
     return null
+  }
+}
+
+export interface EnquiryNoteRow {
+  id: string
+  note: string
+  followUpAt: string | null
+  createdAt: string
+}
+
+/**
+ * Internal vendor notes on an enquiry (PRD 6.9).
+ *
+ * RLS scopes `enquiry_notes` to vendor members and admins with `lead.read`,
+ * so a customer calling this gets an empty list rather than a refusal — which
+ * is the correct shape, since the notes are not theirs to know about.
+ */
+export async function getEnquiryNotes(enquiryId: string): Promise<EnquiryNoteRow[]> {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('enquiry_notes')
+      .select('id, note, follow_up_at, created_at')
+      .eq('enquiry_id', enquiryId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      note: row.note,
+      followUpAt: row.follow_up_at,
+      createdAt: row.created_at,
+    }))
+  } catch (error) {
+    logError('dal.getEnquiryNotes', error, { enquiryId })
+    return []
   }
 }

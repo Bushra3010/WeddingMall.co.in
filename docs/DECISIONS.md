@@ -460,3 +460,28 @@ Result: `/`, `/about`, `/blog`, `/categories`, `/cities`, `/contact`, `/help`, `
 **The check that mattered.** A prerendered page is served to everyone, so personalisation baked into it is not a stale label — it is one account's state shown to strangers. Fetching `/` with and without a session cookie returns HTML differing only in React's per-render id: no email, no "Sign out", no saved-state labels. `tests/e2e/mobile-home.spec.ts` now asserts this on every run, because it is the kind of regression that is invisible until it is a disclosure.
 
 **Cost accepted:** signed-in visitors see the signed-out affordance for one paint before the browser resolves the cookie. That is the standard price of a cached shell, and it is paid by the minority; the alternative was every visitor waiting on a function call.
+
+---
+
+## ADR-031 — Review eligibility and moderation belong in triggers, not policies
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+Probing the Milestone 1 review policies against the live database, a freshly signed-up account could do three things it should not:
+
+1. **Review a vendor it had no relationship with.** `reviews: customer create` checked only that the enquiry linked the same customer and vendor — so creating a `draft` enquiry and immediately reviewing off it passed.
+2. **Self-approve.** `reviews: customer edit` granted UPDATE on the row, and RLS is row-level: granting UPDATE grants it on *every column*, including `status`. Two HTTP calls took a real vendor's public rating from 4.6 to 1.0.
+3. **Publish a bait-and-switch.** An approved review could be rewritten in place and stayed approved.
+
+This is the same shape as ADR-019. RLS decides *which rows*; only a trigger can decide *which columns*, and only a trigger can consult another table — here, the enquiry's lifecycle state.
+
+**Decision:** migration `0018` moves eligibility, moderation immutability, the edit window, and revision history into triggers. Eligible states live in `review_eligible_statuses`, a table, mirroring how `enquiry_transitions` already drives the lifecycle — so "which states earn a review" is configuration rather than a literal in a function body (PRD 6.8 asks for it to be configurable).
+
+Editing an approved review now returns it to `pending` and files the previous text as a revision. The author keeps the right to edit; they lose the ability to edit *unsupervised*.
+
+**Two follow-ups the probe found, which is the point of writing it:**
+
+- `0020` — the triggers asked `has_admin_permission('review.moderate')`, which resolves through `auth.uid()` and is therefore false for the service role. Cron handlers and webhooks were being treated as the review's author and refused. One predicate, three red assertions.
+- `0021` — `reviews_refresh_rating` was declared `after update of status, overall_rating`. That column list matches columns named in the UPDATE *statement*, not columns a BEFORE trigger subsequently changed. So an edited review dropped out of public view while its stars stayed in the vendor's average — a rating partly composed of text nobody could read.
+
+Neither would have surfaced from the denial assertions alone. Both were caught by the paired *permitted* assertions ("a real moderator can approve", "un-approving removes it from the aggregate again"), which is the asymmetry ADR-013 and ADR-021 warned about, now paying for itself a third time.

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { EnquiryTimeline } from '@/components/customer/enquiry-timeline'
 import { MessageThread } from '@/components/customer/message-thread'
 import { EnquiryActions } from '@/components/customer/enquiry-actions'
+import { EnquiryDealFields, EnquiryNotes } from '@/components/vendor/enquiry-crm'
 import { ENQUIRY_STATUS_LABELS } from '@/features/enquiries/status'
 import { formatDate, formatDateTime } from '@/lib/dates'
 import { formatRange, money } from '@/lib/money'
@@ -13,6 +14,7 @@ import { getActor } from '@/server/dal/actor'
 import {
   getCustomerContact,
   getEnquiry,
+  getEnquiryNotes,
   getEnquiryTimeline,
   getMessages,
 } from '@/server/dal/enquiries'
@@ -37,7 +39,7 @@ export default async function VendorEnquiryPage({
   await markEnquiryViewed(actor, enquiryId)
   await markMessagesRead(actor, enquiryId)
 
-  const [messages, timeline, contact] = await Promise.all([
+  const [messages, timeline, contact, notes] = await Promise.all([
     enquiry.conversationId ? getMessages(enquiry.conversationId) : Promise.resolve([]),
     getEnquiryTimeline(enquiryId),
     // Contact details are released only with the customer's consent, and only
@@ -45,6 +47,9 @@ export default async function VendorEnquiryPage({
     canVendor(actor, enquiry.vendorId, 'lead.view_pii')
       ? getCustomerContact(enquiryId)
       : Promise.resolve(null),
+    // RLS returns an empty list for anyone who may not read the team's notes,
+    // so this is safe to fetch before the capability check below.
+    getEnquiryNotes(enquiryId),
   ])
 
   const budget = formatRange(
@@ -132,7 +137,24 @@ export default async function VendorEnquiryPage({
 
         <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
           {canVendor(actor, enquiry.vendorId, 'lead.respond') ? (
-            <EnquiryActions enquiryId={enquiry.id} status={enquiry.status} actorType="vendor" />
+            <>
+              <EnquiryActions enquiryId={enquiry.id} status={enquiry.status} actorType="vendor" />
+              <EnquiryDealFields
+                enquiryId={enquiry.id}
+                quoteAmountMinor={enquiry.quoteAmountMinor}
+                lostReason={enquiry.lostReason}
+                currency={enquiry.currency}
+              />
+            </>
+          ) : null}
+
+          {/*
+            Notes are gated on `note.manage`, not `lead.respond`: a member who
+            may reply to a customer is not automatically one who may read the
+            team's private commentary about them.
+          */}
+          {canVendor(actor, enquiry.vendorId, 'note.manage') ? (
+            <EnquiryNotes enquiryId={enquiry.id} notes={notes} />
           ) : null}
           <div className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-5">
             <EnquiryTimeline events={timeline} />

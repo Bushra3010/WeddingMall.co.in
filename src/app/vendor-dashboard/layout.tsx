@@ -18,6 +18,7 @@ const NAV = [
   { href: '/vendor-dashboard/portfolio', label: 'Portfolio' },
   { href: '/vendor-dashboard/availability', label: 'Availability' },
   { href: '/vendor-dashboard/enquiries', label: 'Enquiries' },
+  { href: '/vendor-dashboard/reviews', label: 'Reviews' },
   { href: '/vendor-dashboard/team', label: 'Team' },
   { href: '/vendor-dashboard/analytics', label: 'Analytics' },
   { href: '/vendor-dashboard/plan', label: 'Plan' },
