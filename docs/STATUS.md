@@ -284,6 +284,18 @@ Polling fallback runs only while the socket is disconnected, so the common case 
 
 Verified: a message inserted elsewhere appears in a watching browser with no reload. 170 RLS assertions across 8 probes.
 
+## Permission drift check (2026-08-02)
+
+`npm run check:permissions` closes outstanding item 9 (ADR-039). It compares the real `catalogue.ts` — compiled and imported, never copied — against the database: permission codes both directions, roles both directions, the role→permission matrix both directions, and every permission named by a **deployed** policy or function.
+
+That last one is the check that would have caught the `settings.manage` bug, and it took two attempts to get right.
+
+The first version scanned migration *files*. Wrong twice over: the pattern matched text inside SQL comments, so `0028` — the migration that fixes the bug — read as if it still had it; and it reported history rather than current state, which cannot be corrected because a superseded migration must never be edited. It now reads `pg_policies` and `pg_proc`.
+
+The second version passed a deliberately broken policy. Postgres normalises a stored policy expression, so `has_admin_permission('x')` comes back as `has_admin_permission('x'::text)` — the pattern matched no policy at all, and the codes it did find came only from function bodies. Proven by injecting a policy naming `totally.invented`, watching the check stay green, fixing the cast, and watching it fail with the offending permission and the exact policy named. Referenced-permission count went 8 → 12 once policies were actually being read.
+
+A check that has never failed is indistinguishable from one that cannot fail, which is the fifth time that shape of problem has appeared here.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
@@ -294,9 +306,9 @@ Verified: a message inserted elsewhere appears in a watching browser with no rel
 6. **Media is approved wholesale with the listing** — an admin cannot reject one image.
 7. ~~Screens remaining as stubs.~~ All replaced 2026-08-02. No route renders `MilestonePlaceholder`.
 8. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google.
-9. **Permission-catalogue parity is still unchecked** (ADR-004) — and it has now cost something: `0019` shipped a policy naming a permission that does not exist, leaving `sla_policy` writable by nobody until `0028` (ADR-036). Apply ADR-020's drift-check technique to both `admin_permissions` and `vendor_can()`.
+9. ~~Permission-catalogue parity is unchecked.~~ Checked 2026-08-02 by `npm run check:permissions` (ADR-039): codes, roles, and the role→permission matrix in both directions, plus every permission named by a **deployed** policy or function. The `vendor_can()` half stays open — that matrix lives in a PL/pgSQL body with no table to diff against, and the script reports the gap rather than skipping it silently.
 10. ~~Public pages render dynamically.~~ Fixed 2026-08-02 (ADR-030). Remaining dynamic public routes are `/vendors*` (search parameters) and `/vendor/[slug]*` (personalised enquiry state), both legitimately so.
-11. ~~CSP not set.~~ Enforced 2026-08-02. **`script-src` still allows `'unsafe-inline'`** — a launch blocker, not a completed item (ADR-034). A nonce requires reading `headers()` in the root layout, which drops static routes from 12 to 2 and undoes ADR-030's 6x TTFB win; and with `strict-dynamic` in force a prerendered page has no nonce on its bootstrap and renders blank. Resolve with Partial Prerendering, which lets a dynamic hole carry a nonce while the shell stays static.
+11. ~~CSP not set.~~ Enforced 2026-08-02. Dynamic routes use `'nonce-…' 'strict-dynamic'`; prerendered public pages keep `'unsafe-inline'` because their scripts were built without a request (ADR-037). The earlier claim here — that a nonce required Partial Prerendering — was wrong and is corrected in ADR-037.
 
 ## Credentials note
 

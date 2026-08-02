@@ -650,3 +650,25 @@ PRD 6.7 allows Realtime for the message thread and requires that "Realtime chann
 **The handler refreshes rather than appending.** The payload is a raw database row, but the thread renders sender names resolved through a join. Appending from the payload would create a second, thinner rendering path that drifts from the real one, so it calls `router.refresh()` and lets the query that already knows how to render a message do it.
 
 Shipped behind `FEATURE_REALTIME_CHAT`, which is **off**. Verified on: a message inserted elsewhere appears in a watching browser with no reload.
+
+---
+
+## ADR-039 — A drift check is worthless until you have watched it fail
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+CLAUDE.md invariant 3 says the permission catalogue is mirrored in SQL — change one, change the other. Nothing enforced it, and ADR-004 recorded the gap. It then cost something real: `0019` guarded `sla_policy` with `has_admin_permission('settings.manage')`, a code that exists in neither the catalogue nor `admin_permissions`. The function returns false for a code it has never heard of, so the policy was deny-all until `0028`.
+
+**Decision:** `npm run check:permissions` compares the compiled real catalogue against the database — codes, roles, and the role→permission matrix, each in both directions — plus every permission named by a deployed policy or function.
+
+**Two wrong versions, both of which passed.**
+
+The first scanned migration *files*. It matched text inside SQL comments, so `0028` — the fix — read as if it still contained the bug; and it asserted on history, which cannot be corrected, because a superseded migration must never be edited. Reading `pg_policies` and `pg_proc` describes what is actually deployed, which is the only thing worth asserting on.
+
+The second matched nothing. Postgres normalises a stored policy expression: `has_admin_permission('x')` is returned by `pg_policies` as `has_admin_permission('x'::text)`. A pattern without the cast silently matched no policy at all, and the twelve codes it appeared to find came only from `pg_get_functiondef`, where the original source text survives.
+
+**Both were caught by injecting a policy that names `totally.invented` and confirming the check goes red**, then removing it and confirming it goes green again. Version two stayed green with the broken policy in place. Version three names the permission and the policy holding it.
+
+A check that has never failed is indistinguishable from one that cannot fail. This is the fifth instance of that shape in this project (ADR-013, ADR-021, ADR-031, ADR-035), and the first where the disconnected wire was in the tooling built to prevent it.
+
+**Left open, and reported rather than hidden:** `vendor_can()` holds the vendor capability matrix in a PL/pgSQL body rather than a table, so there is nothing to diff against without parsing the function. The script prints that as a SKIP with the reason. An unchecked half of an invariant should be visible.
