@@ -87,3 +87,46 @@ export const getPost = cache(async (slug: string): Promise<PostDetail | null> =>
     return null
   }
 })
+
+export interface StaticPage {
+  slug: string
+  title: string
+  body: string | null
+  seoTitle: string | null
+  seoDescription: string | null
+  publishedAt: string | null
+}
+
+/**
+ * A published static page (PRD 6.11, 9.5).
+ *
+ * Cookie-free client, so `/about`, `/help`, `/privacy` and `/terms` stay
+ * statically rendered. RLS restricts anon to `status = 'published'`, so a
+ * draft cannot be reached by URL guessing even before the filter below.
+ */
+export const getPage = cache(async (slug: string): Promise<StaticPage | null> => {
+  try {
+    const supabase = createPublicClient()
+    const { data, error } = await supabase
+      .from('pages')
+      .select('slug, title, body, seo_title, seo_description, published_at')
+      .eq('slug', slug)
+      .eq('status', 'published')
+      .maybeSingle()
+
+    if (error) throw error
+    if (!data) return null
+
+    return {
+      slug: data.slug,
+      title: data.title,
+      body: data.body,
+      seoTitle: data.seo_title,
+      seoDescription: data.seo_description,
+      publishedAt: data.published_at,
+    }
+  } catch (error) {
+    logError('dal.getPage', error, { slug })
+    return null
+  }
+})
