@@ -143,3 +143,54 @@ export async function saveCityAction(
   }
   return result
 }
+
+/**
+ * Show or hide a state (PRD 6.11).
+ *
+ * States are seeded for the whole country (migration `0026`) but start
+ * inactive: a state with no cities would otherwise appear in public filters as
+ * an empty destination. This is how an admin turns one on once there is
+ * something in it.
+ */
+export async function toggleStateAction(
+  _prev: unknown,
+  form: FormData,
+): Promise<ActionResult<{ id: string; active: boolean }>> {
+  return runAction('taxonomy.toggleState', async () => {
+    await assertTaxonomyPermission()
+
+    const id = str(form, 'id')
+    const active = form.get('active') === 'true'
+    if (!id) throw new ServiceError('validation_error', 'Missing state.')
+
+    const supabase = await createClient()
+
+    /*
+     * Hiding a state hides its cities from public filters by implication, so
+     * the admin is told how many that is rather than discovering it from a
+     * support ticket. The cities themselves are left alone — deactivating a
+     * state is reversible and must not quietly rewrite rows underneath it.
+     */
+    const { count } = await supabase
+      .from('cities')
+      .select('id', { count: 'exact', head: true })
+      .eq('state_id', id)
+      .eq('active', true)
+
+    // Checked BEFORE the write. Updating first and then throwing would apply
+    // the change and report failure — the worst of both, and the user would
+    // have no reason to reload and discover it had actually happened.
+    if (!active && (count ?? 0) > 0) {
+      throw new ServiceError(
+        'conflict',
+        `That state still has ${count} active ${count === 1 ? 'city' : 'cities'}. Hide those first.`,
+      )
+    }
+
+    const { error } = await supabase.from('states').update({ active }).eq('id', id)
+    if (error) throw new ServiceError('internal_error', 'We could not update that state.')
+
+    revalidatePath('/admin/locations')
+    return { id, active }
+  })
+}

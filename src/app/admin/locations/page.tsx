@@ -1,3 +1,4 @@
+import { StateToggle } from '@/components/admin/state-toggle'
 import { NewCityForm } from '@/components/admin/taxonomy-forms'
 import { EmptyState } from '@/components/ui/states'
 import { NOINDEX } from '@/lib/seo'
@@ -14,11 +15,19 @@ export default async function AdminLocationsPage() {
   const [{ data: cities }, { data: states }] = await Promise.all([
     supabase
       .from('cities')
-      .select('id, name, slug, active, sort_order, states(name)')
+      .select('id, name, slug, active, sort_order, state_id, states(name)')
       .order('sort_order')
       .order('name'),
-    supabase.from('states').select('id, name').order('name'),
+    supabase.from('states').select('id, name, slug, active').order('name'),
   ])
+
+  // Cities per state, so an admin can see which states are worth activating
+  // and which would show up empty.
+  const cityCounts = new Map<string, number>()
+  for (const city of cities ?? []) {
+    if (!city.state_id) continue
+    cityCounts.set(city.state_id, (cityCounts.get(city.state_id) ?? 0) + 1)
+  }
 
   return (
     <div className="space-y-6">
@@ -74,8 +83,61 @@ export default async function AdminLocationsPage() {
           )}
         </div>
 
-        <NewCityForm states={states ?? []} />
+        <NewCityForm states={(states ?? []).filter((row) => row.active)} />
       </div>
+
+      <section aria-labelledby="admin-states" className="space-y-3">
+        <div>
+          <h2 id="admin-states" className="font-display text-sand-900 text-lg">
+            States and union territories
+          </h2>
+          <p className="text-sand-600 mt-1 max-w-prose text-sm">
+            All 36 are available. A state stays hidden until it has cities worth showing — an empty
+            state in a public filter is a dead end for someone browsing. Only visible states can be
+            chosen when adding a city.
+          </p>
+        </div>
+
+        <div className="border-sand-200 overflow-x-auto rounded-[var(--radius-card)] border">
+          <table className="w-full min-w-[34rem] text-sm">
+            <caption className="sr-only">States and union territories</caption>
+            <thead className="bg-sand-50 text-sand-600 text-left text-xs tracking-wide uppercase">
+              <tr>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  State
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Cities
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  In public filters
+                </th>
+                <th scope="col" className="px-4 py-3 text-right font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-sand-200 divide-y bg-white">
+              {(states ?? []).map((row) => (
+                <tr key={row.id}>
+                  <td className="text-sand-900 px-4 py-3 font-medium">{row.name}</td>
+                  <td className="text-sand-700 px-4 py-3">{cityCounts.get(row.id) ?? 0}</td>
+                  <td className="px-4 py-3">
+                    {row.active ? (
+                      <span className="text-[var(--color-success)]">visible</span>
+                    ) : (
+                      <span className="text-sand-500">hidden</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <StateToggle id={row.id} name={row.name} active={row.active} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   )
 }

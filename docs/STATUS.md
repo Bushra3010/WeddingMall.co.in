@@ -171,6 +171,23 @@ Scoped strictly to hardening per PRD 19.10 ("do not add new product scope"). The
 
 Evidence: 12 static routes preserved, 168 RLS assertions across 7 probes, 119 unit tests, 22 E2E, and `/`, `/vendors`, `/blog`, `/auth/sign-in` each verified in a real browser with **zero CSP violations and zero JS errors**.
 
+## Admin panel and locations (2026-08-02)
+
+**All 36 Indian states and union territories seeded** (migration `0026`). Only six existed, because Milestone 1 seeded exactly the states the eight demo vendors sit in — fine for a demo, wrong for an admin adding a real city. Constituted as of today: Ladakh separate from Jammu and Kashmir, Dadra and Nagar Haveli merged with Daman and Diu.
+
+New states land **inactive**. A state with no cities would otherwise show up in public filters as an empty destination. `/admin/locations` now lists all 36 with city counts and a Show/Hide control, and the "add a city" dropdown offers only visible states. Hiding a state that still has active cities is refused with the count, and the check runs **before** the write — an earlier draft updated first and then threw, which would have applied the change while reporting failure.
+
+**Three admin stubs replaced**, chosen because live data was already accumulating behind them:
+- `/admin/plans` — plans, prices, entitlements, and live subscriber counts per plan.
+- `/admin/payments` — payments plus recent webhook deliveries, since when money looks wrong the first question is whether the provider's event arrived. Failed deliveries are surfaced at the top.
+- `/admin/audit-log` — filterable by action, with PII reveals, exports, and role changes tinted. Read gated on `admin.manage`, because the log records whose details were revealed and reading it is itself privileged.
+
+Admin panel is now **13 of 20 routes built**. Remaining stubs: `/admin/reports`, `/content`, `/blog`, `/customers`, `/leads`, `/settings`, `/admin-users`.
+
+An admin account exists for the first time (`clatiansweb@gmail.com`, super_admin), created out-of-band via `npm run grant-admin` because there is deliberately no admin sign-up. Its password is in the build transcript and should be changed on first sign-in.
+
+Verified by driving the pages signed in as that admin: all four render, no stub markers, zero page errors, 36 states listed, and the toggle round-trips including its refusal path.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
@@ -179,7 +196,7 @@ Evidence: 12 static routes preserved, 168 RLS assertions across 7 probes, 119 un
 4. **Realtime is not wired.** `FEATURE_REALTIME_CHAT` is false; the thread refreshes on navigation.
 5. **Numeric attribute filters are exact-match only** (ADR-018).
 6. **Media is approved wholesale with the listing** — an admin cannot reject one image.
-7. **Admin billing/reports screens remain stubs** — the data, guards, and webhook exist; the admin UI does not.
+7. **Seven admin screens remain stubs** — reports, content, blog, customers, leads, settings, admin users. Plans, payments, and the audit log shipped 2026-08-02.
 8. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google.
 9. **Permission-catalogue parity is still unchecked** (ADR-004). The technique now exists — apply ADR-020's approach to `vendor_can()`.
 10. ~~Public pages render dynamically.~~ Fixed 2026-08-02 (ADR-030). Remaining dynamic public routes are `/vendors*` (search parameters) and `/vendor/[slug]*` (personalised enquiry state), both legitimately so.
@@ -199,7 +216,7 @@ Launch blockers, highest first:
 4. **Admin MFA and short privileged sessions** (PRD 10.3) — not started.
 5. **Legal text** in `supabase/seed.sql` is placeholder and must go to counsel (PRD 14.3).
 
-Then product scope: the 10 admin screens still on `MilestonePlaceholder`, message attachments, Realtime, and Google OAuth.
+Then product scope: the seven admin screens still on `MilestonePlaceholder`, message attachments, Realtime, and Google OAuth.
 
 Keep probing before building. A live privilege escalation has been found this way in each of the last three milestones — reviews (ADR-031), vendor columns (ADR-032), analytics (ADR-035) — and in every case reading the code looked fine.
 
