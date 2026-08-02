@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -75,12 +76,33 @@ export function SiteHeader({
       <div className="mx-auto flex h-18 max-w-[90rem] items-center gap-6 px-4 sm:px-6 lg:px-10">
         <Link
           href="/"
+          aria-label={`${site.name} — home`}
           className={cn(
-            'font-display text-2xl font-semibold tracking-tight transition-colors',
+            'flex items-center gap-2 transition-colors',
             solid ? 'text-brand-700' : 'text-white',
           )}
         >
-          {site.name}
+          {/*
+            The supplied artwork already contains the wordmark, so no text sits
+            beside it — a second "WeddingMall" would read as a mistake.
+
+            Over the homepage hero the header is transparent and the backdrop
+            is near-black maroon, where the logo's own maroon strokes all but
+            disappear. `brightness-0 invert` paints it flat white for that
+            state. A hue-preserving lighten was tried first and turned the
+            maroon salmon-pink, which looked washed out beside the gold.
+          */}
+          <Image
+            src="/logo-wordmark.png"
+            alt={site.name}
+            width={390}
+            height={93}
+            priority
+            className={cn(
+              'h-8 w-auto transition-[filter] duration-300 sm:h-9',
+              solid ? '' : 'brightness-0 invert',
+            )}
+          />
         </Link>
 
         <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">

@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 
 import { NewsletterForm } from '@/components/public/newsletter-form'
@@ -19,7 +20,18 @@ export async function SiteFooter() {
       <div className="mx-auto max-w-[90rem] px-4 py-16 sm:px-6 lg:px-10">
         <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
-            <p className="font-display text-2xl font-semibold">{site.name}</p>
+            {/*
+              The footer sits on the dark maroon panel, so the logo takes the
+              same flat-white treatment the header uses over the hero. `alt`
+              carries the name, because the artwork *is* the wordmark.
+            */}
+            <Image
+              src="/logo-wordmark.png"
+              alt={site.name}
+              width={390}
+              height={93}
+              className="h-9 w-auto brightness-0 invert"
+            />
             <p className="mt-3 max-w-sm text-sm text-white/65">{site.tagline}</p>
 
             <div className="mt-8 max-w-sm">
