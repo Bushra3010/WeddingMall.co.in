@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
 import { ServiceError } from '@/lib/action-result'
+import { translateDbError } from '@/lib/db-errors'
 import { type Actor } from '@/lib/permissions'
 import { audit } from '@/lib/security/audit'
 import { LIMITS, callerKey, enforceRateLimit } from '@/lib/security/rate-limit'
@@ -18,17 +19,10 @@ import type { ReviewEditInput, ReviewInput, ReviewModerationInput } from '@/feat
  */
 
 function translate(error: { code?: string; message?: string } | null, fallback: string): never {
-  // 42501 is what the integrity triggers raise for a denied write.
-  if (error?.code === '42501' || error?.code === 'P0001') {
-    throw new ServiceError('forbidden', error.message ?? fallback)
-  }
-  if (error?.code === '23505') {
-    throw new ServiceError('conflict', 'You have already reviewed this enquiry.')
-  }
-  if (error?.code === '23503') {
-    throw new ServiceError('not_found', 'That enquiry no longer exists.')
-  }
-  throw new ServiceError('internal_error', fallback)
+  return translateDbError(error, fallback, {
+    conflict: 'You have already reviewed this enquiry.',
+    notFound: 'That enquiry no longer exists.',
+  })
 }
 
 export async function createReview(actor: Actor, input: ReviewInput) {

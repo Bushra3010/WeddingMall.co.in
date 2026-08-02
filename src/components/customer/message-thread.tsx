@@ -25,6 +25,7 @@ export function MessageThread({
   customerId,
   counterpartyName,
   locked,
+  canSend = true,
 }: {
   enquiryId: string
   conversationId?: string | null
@@ -36,6 +37,13 @@ export function MessageThread({
   customerId?: string
   counterpartyName: string
   locked: boolean
+  /**
+   * Whether the viewer is one of the two parties. False for an administrator
+   * reading a thread for support — they may look, and `0030` stops them
+   * writing. Showing a composer that the database will refuse produces a raw
+   * failure at the end of a message someone took the trouble to type.
+   */
+  canSend?: boolean
 }) {
   const [state, action] = useAction(sendMessageAction)
   useLiveMessages(conversationId ?? null, liveEnabled)
@@ -88,7 +96,12 @@ export function MessageThread({
         </ol>
       )}
 
-      {locked ? (
+      {!canSend ? (
+        <p className="border-sand-300 bg-sand-50 text-sand-700 rounded-lg border p-3 text-sm">
+          You are viewing this conversation as an administrator. Only the customer and the vendor
+          can write in it.
+        </p>
+      ) : locked ? (
         <p className="border-sand-300 bg-sand-50 text-sand-700 rounded-lg border p-3 text-sm">
           This conversation is closed. Reopen the enquiry to continue.
         </p>

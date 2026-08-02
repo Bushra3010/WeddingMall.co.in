@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
 import { ServiceError } from '@/lib/action-result'
+import { translateDbError } from '@/lib/db-errors'
 import { type Actor } from '@/lib/permissions'
 import { checkTransition, type EnquiryStatus } from '@/features/enquiries/status'
 import {
@@ -23,17 +24,15 @@ import { LIMITS, callerKey, enforceRateLimit } from '@/lib/security/rate-limit'
  * side effects that do not belong in the database.
  */
 
+/**
+ * Thin wrapper so this file reads as before; the rule lives in `lib/db-errors`
+ * because every service needs it and one of them getting it wrong put a raw
+ * Postgres message in front of a customer.
+ */
 function translate(error: { code?: string; message?: string } | null, fallback: string): never {
-  if (error?.code === 'P0001' || error?.code === 'P0002') {
-    throw new ServiceError('invalid_state', error.message ?? fallback)
-  }
-  if (error?.code === '42501') {
-    throw new ServiceError('forbidden', error.message ?? 'You do not have permission to do that.')
-  }
-  if (error?.code === '23505') {
-    throw new ServiceError('conflict', 'That has already been saved.')
-  }
-  throw new ServiceError('internal_error', fallback)
+  return translateDbError(error, fallback, {
+    conflict: 'That has already been saved.',
+  })
 }
 
 export interface SubmitResult {

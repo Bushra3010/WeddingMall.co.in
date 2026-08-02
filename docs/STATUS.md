@@ -310,6 +310,22 @@ Migration `0030` adds `is_enquiry_party()` — customer or vendor member only, d
 
 Tests: 125 unit (6 new), 169 RLS assertions, 22 E2E. Lint, typecheck, build clean; 12 static routes preserved.
 
+## Reported from production: RLS error on send, and a hidden sign-out (2026-08-02)
+
+Both reported from a real session. Neither was the fix in `0030` being wrong — it was working — but both were real defects around it.
+
+**A raw Postgres message reached a customer's screen.** `new row violates row-level security policy for table "messages"` was rendered under the compose box. `translate()` mapped `42501` to `forbidden` but passed `error.message` through in preference to its own friendly text, so Postgres's internal phrasing — naming the table — went straight to the UI. That breaks CLAUDE.md invariant 7.
+
+The fix could not be a blanket replacement: our own triggers `raise exception … using errcode = '42501'` with text written to be read ("Featured placement requires a plan that includes it"). `lib/db-errors.ts` now matches Postgres's built-in phrasings explicitly and replaces only those, leaving deliberate messages intact. Shared by the enquiry and review services so one of them cannot drift again.
+
+**The composer was offered to someone who could not use it.** The account was an administrator viewing a customer's thread — allowed to read, blocked from writing by `0030`. The UI showed a compose box anyway, so the refusal arrived at the end of a typed message. `MessageThread` now takes `canSend`, mirroring the database's party check, and explains why instead.
+
+**The header's sign-out was invisible and inert.** It was a second inline `<form action={signOut}>` with an icon and no label — read by the reporter as "there is no sign-out button" — and because it bypassed `SignOutButton`, it never got the client-session clearing, so the header kept showing "Account" after signing out. Replaced with the shared component. Verified: the header now reads `… Shortlist | Account | Sign out | List your business`, with no "Sign in".
+
+**What the thread confirmed.** The enquiry had three senders: the customer, a vendor member, and a `super_admin` with two messages who is neither party — the exact incident `0030` was written for, still visible in the data.
+
+Tests: 125 unit, 169 RLS assertions, 22 E2E.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

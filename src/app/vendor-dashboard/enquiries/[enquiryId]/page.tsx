@@ -132,6 +132,7 @@ export default async function VendorEnquiryPage({
             <MessageThread
               enquiryId={enquiry.id}
               customerId={enquiry.customerId}
+              canSend={Boolean(actor.vendorRoles[enquiry.vendorId])}
               conversationId={enquiry.conversationId}
               liveEnabled={liveChat}
               messages={messages}

@@ -120,6 +120,9 @@ export default async function EnquiryDetailPage({
             <MessageThread
               enquiryId={enquiry.id}
               customerId={enquiry.customerId}
+              // The party check the database makes, mirrored so the composer
+              // is not offered to an admin whose write RLS will refuse (0030).
+              canSend={actor.userId === enquiry.customerId}
               conversationId={enquiry.conversationId}
               liveEnabled={liveChat}
               messages={messages}

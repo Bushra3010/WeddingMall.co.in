@@ -3,11 +3,11 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Heart, LogOut, UserRound } from 'lucide-react'
+import { Heart, UserRound } from 'lucide-react'
 
 import { CitySelector } from '@/components/public/city-selector'
 import { useSession } from '@/components/shared/session-provider'
-import { signOut } from '@/features/auth/actions'
+import { SignOutButton } from '@/components/shared/sign-out-button'
 import { site } from '@/lib/site'
 import { cn } from '@/lib/utils'
 import type { CityRow } from '@/server/dal/taxonomy'
@@ -133,18 +133,20 @@ export function SiteHeader({
                 <UserRound aria-hidden="true" className="size-4" />
                 Account
               </Link>
-              <form action={signOut} className="hidden lg:block">
-                <button
-                  type="submit"
-                  aria-label="Sign out"
-                  className={cn(
-                    'inline-flex items-center rounded-full p-2 transition-colors',
-                    solid ? 'text-sand-600 hover:bg-sand-100' : 'text-white/80 hover:bg-white/15',
-                  )}
-                >
-                  <LogOut aria-hidden="true" className="size-4" />
-                </button>
-              </form>
+              {/*
+                The shared button, not a second inline form. The old copy here
+                was icon-only — indistinguishable from a decoration, and read
+                by people as "there is no sign-out button" — and it bypassed
+                the client-side session clearing in `SignOutButton`, so the
+                header went on showing "Account" to somebody who had signed
+                out.
+              */}
+              <SignOutButton
+                className={cn(
+                  'hidden rounded-full px-3 py-2 text-sm font-medium transition-colors lg:inline-flex',
+                  solid ? 'text-sand-700 hover:bg-sand-100' : 'text-white/90 hover:bg-white/15',
+                )}
+              />
             </>
           ) : (
             <Link
