@@ -232,6 +232,29 @@ for (const [index, item] of DEMO.entries()) {
     }),
   })
 
+  /*
+   * The featured vendor gets the plan that entitles it. Migration `0022` ties
+   * `is_featured` to a live subscription whose plan grants it, so seeding a
+   * featured vendor without one would produce a state no client could ever
+   * reach — and would quietly become wrong the first time a webhook touched
+   * that vendor.
+   */
+  if (index === 1) {
+    const premium = (await rest('plans?select=id&code=eq.premium')).body?.[0]
+    if (premium) {
+      await rest('subscriptions', {
+        method: 'POST',
+        body: JSON.stringify({
+          vendor_id: vendor.id,
+          plan_id: premium.id,
+          provider: 'manual',
+          status: 'active',
+          period_start: new Date().toISOString(),
+        }),
+      })
+    }
+  }
+
   await rest('vendor_memberships', {
     method: 'POST',
     body: JSON.stringify({

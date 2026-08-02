@@ -2956,6 +2956,14 @@ export interface Database {
         Args: Record<string, never>
         Returns: unknown
       }
+      can_moderate_reviews: {
+        Args: Record<string, never>
+        Returns: unknown
+      }
+      can_moderate_vendors: {
+        Args: Record<string, never>
+        Returns: unknown
+      }
       category_tiles: {
         Args: { [key: string]: unknown }
         Returns: unknown
@@ -2973,6 +2981,10 @@ export interface Database {
         Returns: unknown
       }
       enforce_review_response_integrity: {
+        Args: Record<string, never>
+        Returns: unknown
+      }
+      enforce_vendor_column_guard: {
         Args: Record<string, never>
         Returns: unknown
       }
@@ -3085,6 +3097,10 @@ export interface Database {
         Returns: unknown
       }
       vendor_can: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      vendor_may_be_featured: {
         Args: { [key: string]: unknown }
         Returns: unknown
       }

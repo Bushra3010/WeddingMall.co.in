@@ -12,6 +12,8 @@ export default defineConfig({
   use: { baseURL, trace: 'on-first-retry' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
+    // The webhook spec needs PAYMENT_WEBHOOK_SECRET and Supabase credentials,
+    // which `npm run dev` already loads from .env.local.
     command: 'npm run dev',
     url: baseURL,
     reuseExistingServer: !process.env.CI,

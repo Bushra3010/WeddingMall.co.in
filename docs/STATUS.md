@@ -128,6 +128,30 @@ Tests: 110 unit (20 new), 156 RLS assertions across 6 probes (17 new, both direc
 
 **Not done in this milestone:** E2E journey 2 (blocked on the same missing SMTP as journey 3 — see outstanding item 1), enquiry pipeline/board view and assignment UI, CSV export, and per-vendor SLA overrides. The data and the guards exist for all of them.
 
+## Milestone 6 — billing, CMS, export (2026-08-02)
+
+Migrations `0022`–`0023`; payment adapter, webhook, plan screens, CMS blog, CSV export.
+
+**Five more self-granted privileges found by probing first** (ADR-032). A vendor owner with `listing.edit` could PATCH `is_featured`, `verification_status`, `status`, `plan_id`, and their own `rating_average`/`rating_count`. An earlier pass reported two of those as "accepted" when the row already held the target value, which proves nothing — it was redone writing values the row did not hold. `0022` makes all of them immutable from the client.
+
+**Featured placement is now checked against the plan, for admins too.** `vendor_may_be_featured()` reads the live subscription's entitlements. Comping placement means changing the plan, which leaves a record. "Sponsored" is a disclosure (PRD 6.2); it has to correspond to someone paying. Cancellation retracts the flag, because the guard can only block setting it.
+
+**Two webhook faults, both found by sending a signed request to the running route** (ADR-033):
+- The idempotency claim was permanent. A first delivery that failed was answered `200 {"status":"duplicate"}` on every retry — the provider considered it delivered and the event was lost. Only `processed`/`ignored` short-circuit now.
+- `subscriptions_provider_sub_idx` was a partial unique index, which Postgres will not infer for `ON CONFLICT` without a repeated predicate. Every `subscription.created` failed. `0023` makes it a plain unique index.
+
+**Also shipped**
+- Mock payment adapter behind a `PaymentAdapter` interface, signing with the same HMAC scheme a real provider uses — verifying signatures against an unsigned mock would verify nothing.
+- Webhook route: raw-body HMAC verification before parsing, unknown event types recorded and ignored rather than retried.
+- Vendor plan page: current entitlements, plan comparison, billing history. Replaces the `vendor-dashboard/plan` stub.
+- CMS blog index and post pages from `posts`, statically rendered. Post bodies render as text, not `dangerouslySetInnerHTML` — editor HTML needs sanitising first (PRD 12).
+- CSV export gated twice: `lead.read` for admins, plan entitlement for vendors, with RLS scoping rows a third time. Customer PII is deliberately excluded — export is bulk egress, and contact details are released per enquiry with consent (PRD 2.3). Cells beginning `=`, `+`, `-`, or `@` are neutralised against spreadsheet formula injection.
+- `seed-demo-vendors.mjs` now creates the premium subscription for its featured vendor; the existing row was backfilled.
+
+Tests: 119 unit (9 new), 168 RLS assertions across 7 probes (12 new), 22 E2E (3 new for the webhook). Lint, typecheck, build clean.
+
+**Not done in this milestone:** admin plans/payments/reports screens (10 admin stubs remain), notification templates and the notifications log, audit-log writing on billing events, and E2E journey 3 — still blocked on the same missing SMTP as journeys 1 and 2.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
@@ -136,7 +160,7 @@ Tests: 110 unit (20 new), 156 RLS assertions across 6 probes (17 new, both direc
 4. **Realtime is not wired.** `FEATURE_REALTIME_CHAT` is false; the thread refreshes on navigation.
 5. **Numeric attribute filters are exact-match only** (ADR-018).
 6. **Media is approved wholesale with the listing** — an admin cannot reject one image.
-7. **Billing and CMS remain stubs** — Milestone 6. Reviews shipped in Milestone 5.
+7. **Admin billing/reports screens remain stubs** — the data, guards, and webhook exist; the admin UI does not.
 8. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google.
 9. **Permission-catalogue parity is still unchecked** (ADR-004). The technique now exists — apply ADR-020's approach to `vendor_can()`.
 10. ~~Public pages render dynamically.~~ Fixed 2026-08-02 (ADR-030). Remaining dynamic public routes are `/vendors*` (search parameters) and `/vendor/[slug]*` (personalised enquiry state), both legitimately so.
@@ -148,17 +172,16 @@ Tests: 110 unit (20 new), 156 RLS assertions across 6 probes (17 new, both direc
 
 ## Next task
 
-Milestone 6 (PRD 19.9) — billing, CMS, and reports:
+Milestone 7 (PRD 19.10) — launch hardening:
 
-1. Plans, subscriptions, and the payment webhook (`webhook_events` exists and is unused).
-2. Featured placement tied to plan entitlement — it must stay labelled "Sponsored" (PRD 6.2).
-3. CMS: blog, static pages, homepage section ordering.
-4. Admin reports and the analyst role.
-5. E2E journey 3.
+1. CSP and the remaining security headers.
+2. Admin screens still on `MilestonePlaceholder` (10 of them) — plans, payments, reports, content, blog, audit log, admin users, customers, leads, settings.
+3. Audit logging on billing and moderation events; `audit_logs` exists and is unwritten.
+4. Notification templates and the delivery log.
+5. Rate limiting on enquiry submission and the webhook.
+6. The SMTP provider, which unblocks E2E journeys 1-3 in one go.
 
-Billing needs the same treatment reviews just got: entitlement enforced in SQL, not only in the service. A plan check that lives only in a Server Action is one PostgREST call away from being bypassed.
-
-Keep extending `npm run db:rls` in **both** directions. That asymmetry has now hidden bugs in four consecutive milestones (ADR-013, ADR-021, ADR-031).
+Do the probe-first pass again before building. It has found a live privilege escalation in each of the last three milestones — reviews (ADR-031), vendor columns (ADR-032), and the webhook's idempotency (ADR-033) — and in every case the reading of the code looked fine.
 
 ## Notes
 

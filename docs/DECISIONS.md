@@ -485,3 +485,47 @@ Editing an approved review now returns it to `pending` and files the previous te
 - `0021` — `reviews_refresh_rating` was declared `after update of status, overall_rating`. That column list matches columns named in the UPDATE *statement*, not columns a BEFORE trigger subsequently changed. So an edited review dropped out of public view while its stars stayed in the vendor's average — a rating partly composed of text nobody could read.
 
 Neither would have surfaced from the denial assertions alone. Both were caught by the paired *permitted* assertions ("a real moderator can approve", "un-approving removes it from the aggregate again"), which is the asymmetry ADR-013 and ADR-021 warned about, now paying for itself a third time.
+
+---
+
+## ADR-032 — Commercial standing is not the vendor's to write, and "Sponsored" must be paid for
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+`vendors: member update` grants UPDATE to any member holding `listing.edit`. RLS is row-level, so that covers every column. Probed against the live database, a vendor owner could set:
+
+| Column | What it buys |
+| --- | --- |
+| `is_featured` | Paid placement, top of search, free |
+| `verification_status` | The trust badge the marketplace sells |
+| `status` | Self-publish, skipping moderation entirely |
+| `plan_id` | Self-upgrade to any plan |
+| `rating_average` / `rating_count` | An invented reputation |
+
+Each was confirmed by writing a value the row did not already hold — an earlier pass reported "accepted" on two columns that were already at the target value, which proves nothing, so it was redone.
+
+**Decision:** migration `0022` adds a BEFORE UPDATE guard making those columns immutable from the client.
+
+**The trigger is SECURITY INVOKER, deliberately.** The legitimate writers — `submit_vendor_for_review()`, `admin_decide_vendor()`, `refresh_vendor_rating()` — are all SECURITY DEFINER, so inside them `current_user` is the function owner rather than `authenticated`. Running the guard as INVOKER lets it see that difference and step aside. The alternative was re-declaring every one of those functions to set a transaction-local flag, which is more code and one more thing to forget when the next one is written.
+
+**Featured placement is checked against the plan, for everyone including admins.** `vendor_may_be_featured()` reads the live subscription's entitlements. An admin cannot flip the flag on an unpaid vendor; comping placement is done by changing the plan, which leaves a record, rather than by setting a boolean that leaves none. "Sponsored" is a disclosure (PRD 6.2) — it has to correspond to someone actually paying, or the label is a lie.
+
+**Cancellation retracts it.** The guard only blocks *setting* the flag; it cannot retract one already set. `cancelSubscription` clears `is_featured` when the vendor is no longer entitled, because otherwise a lapsed vendor keeps top placement until someone notices.
+
+**Consequence for the seed:** `seed-demo-vendors.mjs` created a featured vendor with no subscription — a state no client could now reach. The seed creates the matching premium subscription, and the existing row was backfilled.
+
+---
+
+## ADR-033 — An idempotency key that is claimed before the work is done can lose the event
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+The payment webhook claims `webhook_events (provider, external_event_id)` with a unique insert, so a duplicate delivery loses at the database rather than in application logic two concurrent deliveries could both pass. That much was right.
+
+What was wrong: **any** claimed id was reported as a duplicate. Driving the real endpoint exposed the consequence — the first delivery 500'd on an unrelated bug, and the retry came back `200 {"status":"duplicate"}`. The provider considered it delivered. The event was gone.
+
+**Decision:** only a *terminal* outcome short-circuits. `processed` and `ignored` return duplicate; `received` and `failed` are reprocessed with `attempts` incremented. Every write in the handler is an upsert or tolerates `23505`, so reprocessing is safe.
+
+The unrelated bug is worth recording too, because it is a trap: `subscriptions_provider_sub_idx` was a **partial** unique index (`where provider_subscription_id is not null`). Postgres will not infer a partial index for `ON CONFLICT` unless the statement repeats the predicate, and PostgREST does not emit one — so the upsert failed with "there is no unique or exclusion constraint matching the ON CONFLICT specification". Migration `0023` makes it a plain unique index; NULLs are distinct by default, so manual subscriptions still do not collide.
+
+Neither fault was visible by reading the code. Both came from sending a signed request to the running route.
