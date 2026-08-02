@@ -1379,6 +1379,27 @@ export interface Database {
         }
       ]
       }
+      "rate_limits": {
+        Row: {
+          bucket: string
+          subject: string
+          window_start: string
+          count: number
+        }
+        Insert: {
+          bucket: string
+          subject: string
+          window_start: string
+          count?: number
+        }
+        Update: {
+          bucket?: string
+          subject?: string
+          window_start?: string
+          count?: number
+        }
+      Relationships: []
+      }
       "review_eligible_statuses": {
         Row: {
           status: Database["public"]["Enums"]["enquiry_status"]
@@ -2968,6 +2989,10 @@ export interface Database {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
+      consume_rate_limit: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
       enforce_enquiry_transition: {
         Args: Record<string, never>
         Returns: unknown
@@ -3026,6 +3051,10 @@ export interface Database {
       }
       on_message_sent: {
         Args: Record<string, never>
+        Returns: unknown
+      }
+      prune_rate_limits: {
+        Args: { [key: string]: unknown }
         Returns: unknown
       }
       queue_notification: {

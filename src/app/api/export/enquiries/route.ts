@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getActor } from '@/server/dal/actor'
 import { getEntitlements } from '@/server/dal/billing'
 import { logError } from '@/lib/observability/logger'
+import { audit } from '@/lib/security/audit'
 
 /**
  * Enquiry export (PRD 6.9 "export according to plan/permission", 6.11).
@@ -82,6 +83,18 @@ export async function GET(request: NextRequest) {
       quote_amount_minor: row.quote_amount_minor ?? '',
       lost_reason: row.lost_reason ?? '',
     }))
+
+    // PRD 10.3 audits exports. Recorded after the rows are gathered so the
+    // count is real, and before the response so a client that disconnects
+    // mid-download is still on the record as having requested it.
+    void audit({
+      action: 'data.export',
+      entityType: 'enquiries',
+      entityId: vendorId,
+      actorUserId: actor.userId,
+      actorType: isAdmin ? 'admin' : 'vendor',
+      after: { rows: rows.length, scope: vendorId ? 'vendor' : 'all' },
+    })
 
     const filename = `enquiries-${new Date().toISOString().slice(0, 10)}.csv`
 

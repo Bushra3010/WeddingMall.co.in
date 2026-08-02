@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
 import { logError } from '@/lib/observability/logger'
+import { audit } from '@/lib/security/audit'
 import type { EnquiryStatus } from '@/features/enquiries/status'
 
 /**
@@ -442,16 +443,42 @@ export async function getVendorEnquiries(vendorId: string): Promise<EnquiryListR
  * Customer contact details, released only with consent (PRD 2.3, 6.6 — a
  * vendor must not see customer PII before consent).
  */
+/**
+ * Releases the customer's name and phone to a vendor.
+ *
+ * PRD 10.3 requires PII reveals to be audited, and this is the only path that
+ * returns a customer's contact details to another party — so the audit line is
+ * written here rather than at a call site that could be bypassed by a new one.
+ * Only a successful reveal is recorded: a refused read is not a disclosure.
+ */
 export async function getCustomerContact(enquiryId: string) {
   try {
     const supabase = await createClient()
     const { data } = await supabase
       .from('enquiries')
-      .select('contact_consent, profiles!enquiries_customer_id_fkey(full_name, phone)')
+      .select('contact_consent, vendor_id, profiles!enquiries_customer_id_fkey(full_name, phone)')
       .eq('id', enquiryId)
       .maybeSingle()
 
     if (!data?.contact_consent) return null
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    // Not awaited into the response path: the vendor should not wait on the
+    // audit write, and `audit` never throws.
+    void audit({
+      action: 'pii.reveal',
+      entityType: 'enquiry',
+      entityId: enquiryId,
+      actorUserId: user?.id ?? null,
+      actorType: 'vendor',
+      // The disclosed values are deliberately not copied into the log — the
+      // record is that a reveal happened, not a second copy of the data.
+      after: { fields: ['full_name', 'phone'], vendorId: data.vendor_id },
+    })
+
     return { fullName: data.profiles?.full_name ?? null, phone: data.profiles?.phone ?? null }
   } catch (error) {
     logError('dal.getCustomerContact', error, { enquiryId })

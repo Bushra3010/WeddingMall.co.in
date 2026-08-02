@@ -48,8 +48,16 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    log.info('cron.vendorMetrics', { from: yesterday, to: today, rows: data })
-    return NextResponse.json({ ok: true, from: yesterday, to: today, rows: data })
+    /*
+     * Housekeeping rides along with the nightly job rather than getting its own
+     * schedule: the rate-limit table only ever costs disk, so a missed prune is
+     * harmless and a second cron entry is one more thing to configure and
+     * forget.
+     */
+    const { data: pruned } = await supabase.rpc('prune_rate_limits', { p_older_than_hours: 24 })
+
+    log.info('cron.vendorMetrics', { from: yesterday, to: today, rows: data, pruned })
+    return NextResponse.json({ ok: true, from: yesterday, to: today, rows: data, pruned })
   } catch (error) {
     logError('cron.vendorMetrics', error)
     return NextResponse.json({ error: 'failed' }, { status: 500 })

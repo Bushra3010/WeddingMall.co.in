@@ -6,6 +6,7 @@ import { ServiceError } from '@/lib/action-result'
 import { type Actor } from '@/lib/permissions'
 import { paymentAdapter, type ProviderEvent } from '@/lib/payments/adapter'
 import { log, logError } from '@/lib/observability/logger'
+import { LIMITS, callerKey, enforceRateLimit } from '@/lib/security/rate-limit'
 
 /**
  * Billing services (PRD 6.10, 15).
@@ -18,6 +19,8 @@ import { log, logError } from '@/lib/observability/logger'
 
 export async function startCheckout(actor: Actor, vendorId: string, planCode: string) {
   if (!actor.userId) throw new ServiceError('unauthenticated', 'Please sign in.')
+
+  await enforceRateLimit(LIMITS.checkout, await callerKey(actor.userId))
 
   const supabase = await createClient()
   const { data: plan } = await supabase

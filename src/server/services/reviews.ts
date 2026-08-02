@@ -3,6 +3,8 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { ServiceError } from '@/lib/action-result'
 import { type Actor } from '@/lib/permissions'
+import { audit } from '@/lib/security/audit'
+import { LIMITS, callerKey, enforceRateLimit } from '@/lib/security/rate-limit'
 import type { ReviewEditInput, ReviewInput, ReviewModerationInput } from '@/features/reviews/schema'
 
 /**
@@ -31,6 +33,8 @@ function translate(error: { code?: string; message?: string } | null, fallback: 
 
 export async function createReview(actor: Actor, input: ReviewInput) {
   if (!actor.userId) throw new ServiceError('unauthenticated', 'Please sign in to leave a review.')
+
+  await enforceRateLimit(LIMITS.review, await callerKey(actor.userId))
 
   const supabase = await createClient()
 
@@ -128,6 +132,17 @@ export async function moderateReview(actor: Actor, input: ReviewModerationInput)
     .eq('id', input.reviewId)
 
   if (error) translate(error, 'Could not record that decision.')
+
+  void audit({
+    action: 'review.moderate',
+    entityType: 'review',
+    entityId: input.reviewId,
+    actorUserId: actor.userId,
+    actorType: 'admin',
+    after: { decision: input.decision },
+    reason: input.reason ?? null,
+  })
+
   return { reviewId: input.reviewId, decision: input.decision }
 }
 

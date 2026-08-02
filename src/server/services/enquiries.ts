@@ -12,6 +12,7 @@ import {
 } from '@/features/enquiries/schema'
 import { sendEmail } from '@/lib/notifications/email'
 import { logError } from '@/lib/observability/logger'
+import { LIMITS, callerKey, enforceRateLimit } from '@/lib/security/rate-limit'
 
 /**
  * Customer marketplace services (PRD 6.5–6.7).
@@ -43,6 +44,10 @@ export interface SubmitResult {
 
 export async function submitEnquiry(actor: Actor, input: EnquiryInput): Promise<SubmitResult> {
   if (!actor.userId) throw new ServiceError('unauthenticated', 'Please sign in to send an enquiry.')
+
+  // Before any work: a flood should cost the attacker a rejection, not a
+  // round trip through validation and the database (PRD 10.3).
+  await enforceRateLimit(LIMITS.enquiry, await callerKey(actor.userId))
 
   const supabase = await createClient()
   const { data, error } = await supabase.rpc('submit_enquiry', {
@@ -141,6 +146,7 @@ export async function transitionEnquiry(
 }
 
 export async function sendMessage(actor: Actor, enquiryId: string, body: string) {
+  await enforceRateLimit(LIMITS.message, await callerKey(actor.userId))
   if (!actor.userId) throw new ServiceError('unauthenticated', 'Please sign in first.')
 
   const supabase = await createClient()

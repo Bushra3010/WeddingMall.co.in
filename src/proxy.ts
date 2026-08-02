@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { buildCsp } from '@/lib/security/csp'
 import { updateSession } from '@/lib/supabase/middleware'
 
 const PROTECTED_PREFIXES = ['/account', '/vendor-dashboard', '/admin']
@@ -7,6 +8,11 @@ const PROTECTED_PREFIXES = ['/account', '/vendor-dashboard', '/admin']
 export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request)
   const { pathname, search } = request.nextUrl
+
+  // Set here rather than in `next.config.ts` so the dev and production
+  // policies can differ without a second source of truth.
+  const csp = buildCsp(process.env.NODE_ENV !== 'production')
+  response.headers.set('content-security-policy', csp)
 
   const needsAuth = PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
@@ -24,6 +30,7 @@ export async function proxy(request: NextRequest) {
     // The redirect is part of the private area, so it carries the same
     // directive as the page would have (PRD 11.1).
     redirectResponse.headers.set('X-Robots-Tag', 'noindex, nofollow')
+    redirectResponse.headers.set('content-security-policy', csp)
     return redirectResponse
   }
 

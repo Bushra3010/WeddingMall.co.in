@@ -529,3 +529,39 @@ What was wrong: **any** claimed id was reported as a duplicate. Driving the real
 The unrelated bug is worth recording too, because it is a trap: `subscriptions_provider_sub_idx` was a **partial** unique index (`where provider_subscription_id is not null`). Postgres will not infer a partial index for `ON CONFLICT` unless the statement repeats the predicate, and PostgREST does not emit one — so the upsert failed with "there is no unique or exclusion constraint matching the ON CONFLICT specification". Migration `0023` makes it a plain unique index; NULLs are distinct by default, so manual subscriptions still do not collide.
 
 Neither fault was visible by reading the code. Both came from sending a signed request to the running route.
+
+---
+
+## ADR-034 — CSP without a nonce, because a nonce would cost static rendering
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+The strong CSP for a Next app is `'nonce-…' 'strict-dynamic'`: trust the bootstrap script by nonce, trust what it loads, ignore host allow-lists. Next only threads that nonce onto its own scripts when the **root layout** reads it from `headers()`.
+
+Reading a header in the root layout opts the entire route tree out of static rendering. Measured on this app: static routes fell from **12 to 2** and `/` became a function invocation again — undoing ADR-030, which took TTFB from ~950ms to ~150ms.
+
+It is not a free choice in the other direction either. With `strict-dynamic` in force, a statically prerendered page carries no nonce on its inline bootstrap, so the browser blocks it and the page renders blank. Nonce and static rendering are mutually exclusive here, not merely in tension.
+
+**Decision:** enforce every directive that does not need a nonce and accept `'unsafe-inline'` on `script-src`.
+
+This is a real weakness and is listed as a launch blocker in STATUS.md rather than dressed up: a successful HTML injection could run script. What remains is not theatre — `object-src 'none'` kills plugin execution, `base-uri 'self'` stops `<base>` injection turning a small injection into total script control, `frame-ancestors 'none'` is the clickjacking control modern browsers actually honour, and `form-action 'self'` stops an injected form posting credentials offsite.
+
+Verified against the running app rather than assumed: `/`, `/vendors`, `/blog`, and `/auth/sign-in` each load with **zero CSP violations, zero JavaScript errors, and hydration intact**. A policy that blanks the page is worse than no policy, so that check is the point.
+
+The route out is Partial Prerendering — once a dynamic hole can carry a nonce while the shell stays static, this becomes nonce + `strict-dynamic` at no latency cost.
+
+---
+
+## ADR-035 — Verify a write by reading the table, not the status code
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+The Milestone 7 review probed whether `anon` could forge analytics events. The first run reported **blocked** — HTTP 401. It was wrong. The insert had used `Prefer: return=representation`, and `anon` has no SELECT on `analytics_events`, so a *successful write* came back as an authorisation error. Re-running without the header and then checking the table with the service role found the row sitting there.
+
+The same artefact appeared in the membership probe: a self-escalation PATCH returned `role: null`, which read as "blocked" but was only the filtered read-back. That one turned out to be genuinely blocked — confirmed by reading the row.
+
+**Decision:** a probe asserting that a write was refused must confirm it by reading the target table with a privileged client. The response status of the write is evidence about the *response*, not about the database.
+
+This is the fourth time in this project that a green assertion turned out to be measuring nothing (ADR-013, ADR-021, ADR-031). The failure mode is always the same shape: the check and the thing being checked are not actually connected.
+
+**What it was hiding:** `analytics_events: anyone insert` granted INSERT to `anon` with no `WITH CHECK`. Anyone with the publishable key — which ships in the browser — could write forged `vendor_profile_view` rows naming any vendor. Those rows feed `rebuild_vendor_metrics()`, so a competitor could inflate a rival's numbers, or a vendor could inflate their own and dispute the invoice. Closed in `0024`; the beacon now goes through `record_vendor_profile_view()`, which pins the event name and de-duplicates by session.

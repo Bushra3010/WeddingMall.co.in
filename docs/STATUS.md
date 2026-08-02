@@ -152,6 +152,25 @@ Tests: 119 unit (9 new), 168 RLS assertions across 7 probes (12 new), 22 E2E (3 
 
 **Not done in this milestone:** admin plans/payments/reports screens (10 admin stubs remain), notification templates and the notifications log, audit-log writing on billing events, and E2E journey 3 — still blocked on the same missing SMTP as journeys 1 and 2.
 
+## Milestone 7 — launch hardening (2026-08-02)
+
+Scoped strictly to hardening per PRD 19.10 ("do not add new product scope"). The admin-screens item previously listed here as next was deferred — it is product scope, not hardening.
+
+**Security review, run first.** Every table has RLS; every `SECURITY DEFINER` function pins `search_path`; `webhook_events` is correctly deny-all; cron is 401 without the secret in production. Two candidate gaps were probed and one was real.
+
+**`analytics_events` was an open sink** (ADR-035). `anyone insert` granted anon INSERT with no `WITH CHECK`, so anyone holding the publishable key — which ships in the browser — could write forged `vendor_profile_view` rows for any vendor. Those feed `rebuild_vendor_metrics()`, so a competitor could inflate a rival's figures or a vendor their own. Closed in `0024`.
+
+**The probe that found it first reported it blocked.** The insert used `Prefer: return=representation`; anon has no SELECT there, so a successful write returned 401. Verified properly by reading the table with the service role. That is now the standing rule: a write-refusal assertion must read the target table, never trust the write's status code.
+
+**Shipped**
+- `0024` — analytics sink closed; `record_vendor_profile_view()` de-duplicates by session over 30 minutes, so inflating a number costs a distinct session per event.
+- `0025` — Postgres-backed fixed-window rate limiting. Increment and check are one statement, so two concurrent requests cannot both pass at the ceiling. Applied to enquiry, message, review, checkout, and newsletter. Fails **open** on infrastructure error (losing real enquiries to a database blip is worse than briefly accepting extra) and **closed** on an unattributable caller.
+- CSP enforced on every response. `script-src` keeps `'unsafe-inline'` — see the blocker below.
+- Audit logging on PII reveals, exports, and review moderation. Written with the service role because `audit_logs` has a read policy and no write policy: an actor must not be able to edit the record of what they did. IPs are hashed with a salt, not stored.
+- Rate-limit pruning rides along with the nightly metrics cron.
+
+Evidence: 12 static routes preserved, 168 RLS assertions across 7 probes, 119 unit tests, 22 E2E, and `/`, `/vendors`, `/blog`, `/auth/sign-in` each verified in a real browser with **zero CSP violations and zero JS errors**.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
@@ -164,7 +183,7 @@ Tests: 119 unit (9 new), 168 RLS assertions across 7 probes (12 new), 22 E2E (3 
 8. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google.
 9. **Permission-catalogue parity is still unchecked** (ADR-004). The technique now exists — apply ADR-020's approach to `vendor_can()`.
 10. ~~Public pages render dynamically.~~ Fixed 2026-08-02 (ADR-030). Remaining dynamic public routes are `/vendors*` (search parameters) and `/vendor/[slug]*` (personalised enquiry state), both legitimately so.
-11. **CSP not set.** Milestone 7.
+11. ~~CSP not set.~~ Enforced 2026-08-02. **`script-src` still allows `'unsafe-inline'`** — a launch blocker, not a completed item (ADR-034). A nonce requires reading `headers()` in the root layout, which drops static routes from 12 to 2 and undoes ADR-030's 6x TTFB win; and with `strict-dynamic` in force a prerendered page has no nonce on its bootstrap and renders blank. Resolve with Partial Prerendering, which lets a dynamic hole carry a nonce while the shell stays static.
 
 ## Credentials note
 
@@ -172,16 +191,17 @@ Tests: 119 unit (9 new), 168 RLS assertions across 7 probes (12 new), 22 E2E (3 
 
 ## Next task
 
-Milestone 7 (PRD 19.10) — launch hardening:
+Launch blockers, highest first:
 
-1. CSP and the remaining security headers.
-2. Admin screens still on `MilestonePlaceholder` (10 of them) — plans, payments, reports, content, blog, audit log, admin users, customers, leads, settings.
-3. Audit logging on billing and moderation events; `audit_logs` exists and is unwritten.
-4. Notification templates and the delivery log.
-5. Rate limiting on enquiry submission and the webhook.
-6. The SMTP provider, which unblocks E2E journeys 1-3 in one go.
+1. **Rotate the four credentials** shared in the build transcript — service-role key first, since it bypasses RLS entirely. Then the anon key, database password, and Vercel token. Update `.env.local` *and* the Vercel environment.
+2. **`script-src 'unsafe-inline'`** (ADR-034). Needs Partial Prerendering to fix without giving back the latency work.
+3. **No SMTP provider.** Blocks sign-up confirmation, every email notification, and E2E journeys 1-3. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` on a real domain; the adapter is written and will pick it up.
+4. **Admin MFA and short privileged sessions** (PRD 10.3) — not started.
+5. **Legal text** in `supabase/seed.sql` is placeholder and must go to counsel (PRD 14.3).
 
-Do the probe-first pass again before building. It has found a live privilege escalation in each of the last three milestones — reviews (ADR-031), vendor columns (ADR-032), and the webhook's idempotency (ADR-033) — and in every case the reading of the code looked fine.
+Then product scope: the 10 admin screens still on `MilestonePlaceholder`, message attachments, Realtime, and Google OAuth.
+
+Keep probing before building. A live privilege escalation has been found this way in each of the last three milestones — reviews (ADR-031), vendor columns (ADR-032), analytics (ADR-035) — and in every case reading the code looked fine.
 
 ## Notes
 

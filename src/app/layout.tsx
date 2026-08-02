@@ -40,6 +40,14 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
+/*
+ * Deliberately does NOT read the CSP nonce from headers.
+ *
+ * Threading a nonce requires `headers()` here, and reading a header in the
+ * root layout opts the entire route tree out of static rendering — measured:
+ * static routes fell from 12 to 2, which would undo the TTFB work in ADR-030.
+ * See `lib/security/csp.ts` for what is enforced instead.
+ */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${body.variable} ${heading.variable}`}>

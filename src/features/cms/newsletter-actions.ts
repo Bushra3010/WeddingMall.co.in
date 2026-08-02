@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { runAction, ServiceError, type ActionResult } from '@/lib/action-result'
 import { createClient } from '@/lib/supabase/server'
+import { LIMITS, callerKey, enforceRateLimit } from '@/lib/security/rate-limit'
 import { getActor } from '@/server/dal/actor'
 
 const schema = z.object({
@@ -27,6 +28,14 @@ export async function subscribeAction(
     const { email } = schema.parse({ email: typeof value === 'string' ? value : '' })
 
     const actor = await getActor()
+
+    /*
+     * Anonymous and unauthenticated, so the subject is the client IP. This is
+     * the one public write path on the site and the obvious target for a
+     * signup flood (PRD 10.3).
+     */
+    await enforceRateLimit(LIMITS.newsletter, await callerKey(actor.userId))
+
     const supabase = await createClient()
 
     const { error } = await supabase.from('newsletter_subscribers').insert({
