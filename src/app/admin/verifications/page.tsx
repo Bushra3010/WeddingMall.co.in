@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { EmptyState } from '@/components/ui/states'
 import { formatRelative } from '@/lib/dates'
 import { NOINDEX } from '@/lib/seo'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 import { getReviewQueue } from '@/server/dal/admin'
 
 export const metadata = { title: 'Verifications', ...NOINDEX }
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function VerificationsPage() {
   // Redirects a non-admin and throws for an admin without the permission.
-  await requireAdmin('vendor.verify')
+  await requireElevatedAdmin('vendor.verify')
   const queue = await getReviewQueue('pending_review')
 
   return (

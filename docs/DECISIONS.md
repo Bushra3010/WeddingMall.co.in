@@ -581,3 +581,32 @@ It fails closed, so it was never a security hole. It was worse in a quieter way 
 **Decision:** `0028` re-declares the policy against `admin.manage`, which exists and already gates administrator management. Verified in both directions — a super-admin can now set the value, and anon still cannot.
 
 **The real finding is the missing check.** CLAUDE.md invariant 3 says the permission catalogue is mirrored in SQL and that changing one means changing the other. Nothing enforces it. ADR-004 flagged this and ADR-020 built the technique — compiling the real TypeScript source and comparing it against the database, which is how the enquiry transition map is kept honest. It was never applied to permissions. This is the first demonstrated cost, and it will not be the last: the failure mode is a policy that looks strict and admits nobody, which no amount of reading the SQL reveals.
+
+---
+
+## ADR-036 — Admin MFA that cannot lock out the last administrator
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+PRD 10.3 requires admin MFA and a short privileged session. The obvious implementation — require `aal2` on `/admin/*` — locks out any administrator who has not enrolled, including the only one, on the day it ships.
+
+**Decision:** enforcement is staged, and one route is deliberately exempt.
+
+| Session state | Result |
+| --- | --- |
+| No factor enrolled | Redirect to `/admin/security` (reachable at aal1) |
+| Factor enrolled, session aal1 | Redirect to the challenge |
+| Factor enrolled, session aal2, elevated < 30 min | Allowed |
+| Factor enrolled, elevation older than 30 min | Redirect to re-verify |
+
+`/admin/security` calls `requireAdmin`, never `requireElevatedAdmin`. If it required a second factor itself, the only page that can resolve a missing or stale factor would be unreachable, and recovery would mean database access.
+
+**Session age comes from the signed `amr` claim**, not from a cookie or a column we maintain. The auth server signs when the second factor was completed, so nothing in the browser can extend a privileged session by editing state.
+
+**`getMfaState` fails open, and only it.** An auth-service blip would otherwise lock every administrator out of moderation while the marketplace kept running. Authorisation is untouched — `requireAdmin` and RLS still decide what an admin may *do*; this decides only whether they are asked for a code.
+
+**Removing a factor requires aal2.** Otherwise a stolen aal1 session could strip the protection it cannot satisfy.
+
+**One bug worth recording, because it took the page down rather than degrading it:** Supabase returns the enrolment QR as an `image/svg+xml` data URI, and `next/image` rejects that outright. The throw crashed the route — so the single page capable of enrolling a factor rendered a global error. It is a plain `<img>` now; there is nothing to optimise about a data URI. Found by driving the flow with a real TOTP generator rather than by reading the code.
+
+**Verified end to end**, including the parts that only matter when they fail: a wrong code is refused, a real code elevates the session, all admin routes open afterwards, and with no factor every admin route lands on the enrolment page with the enrolment button present. Codes are rate limited to 10 per 15 minutes per user — six digits is 10^6 guesses, which is minutes of brute force unthrottled.

@@ -2,6 +2,7 @@ import 'server-only'
 
 import { redirect } from 'next/navigation'
 
+import { getMfaState } from '@/lib/security/mfa'
 import { getActor } from '@/server/dal/actor'
 import {
   assertPermission,
@@ -33,6 +34,28 @@ export async function requireAdmin(permission?: Permission) {
   const actor = await requireUser('/admin')
   if (!isAdmin(actor)) redirect('/')
   if (permission) assertPermission(actor, permission)
+  return actor
+}
+
+/**
+ * `requireAdmin` plus a live second factor (PRD 10.3).
+ *
+ * Used by every admin route except `/admin/security`, which has to stay
+ * reachable at aal1 or the only page that can fix a missing or stale factor
+ * becomes unreachable.
+ *
+ * These are redirects, not errors: an administrator who needs to enrol should
+ * land on the enrolment form, not on a permission failure that tells them
+ * nothing about what to do next.
+ */
+export async function requireElevatedAdmin(permission?: Permission) {
+  const actor = await requireAdmin(permission)
+
+  const state = await getMfaState()
+  if (state.status === 'enrol') redirect('/admin/security?reason=enrol')
+  if (state.status === 'challenge') redirect('/admin/security?reason=challenge')
+  if (state.status === 'stale') redirect('/admin/security?reason=stale')
+
   return actor
 }
 

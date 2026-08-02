@@ -2,14 +2,14 @@ import { AttributeDefinitionForm } from '@/components/admin/attribute-definition
 import { EmptyState } from '@/components/ui/states'
 import { NOINDEX } from '@/lib/seo'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 import { listAttributes } from '@/server/dal/taxonomy'
 
 export const metadata = { title: 'Attributes', ...NOINDEX }
 export const dynamic = 'force-dynamic'
 
 export default async function AdminAttributesPage() {
-  await requireAdmin()
+  await requireElevatedAdmin()
   const supabase = await createClient()
 
   const [{ data: categories }, attributes] = await Promise.all([

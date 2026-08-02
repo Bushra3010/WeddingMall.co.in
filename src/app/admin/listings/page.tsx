@@ -3,14 +3,14 @@ import Link from 'next/link'
 import { EmptyState } from '@/components/ui/states'
 import { formatRelative } from '@/lib/dates'
 import { NOINDEX } from '@/lib/seo'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 import { getListingReviewQueue } from '@/server/dal/listings'
 
 export const metadata = { title: 'Listing moderation', ...NOINDEX }
 export const dynamic = 'force-dynamic'
 
 export default async function AdminListingsPage() {
-  await requireAdmin('listing.moderate')
+  await requireElevatedAdmin('listing.moderate')
   const queue = await getListingReviewQueue()
 
   return (

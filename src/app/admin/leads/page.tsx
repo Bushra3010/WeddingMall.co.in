@@ -7,7 +7,7 @@ import { formatRange, money } from '@/lib/money'
 import { NOINDEX } from '@/lib/seo'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 
 export const metadata = { title: 'Leads', ...NOINDEX }
 export const dynamic = 'force-dynamic'
@@ -27,7 +27,7 @@ export default async function AdminLeadsPage({
 }: {
   searchParams: Promise<{ view?: string }>
 }) {
-  await requireAdmin('lead.read')
+  await requireElevatedAdmin('lead.read')
 
   const params = await searchParams
   const view: Filter = FILTERS.some((f) => f.key === params.view) ? (params.view as Filter) : 'all'

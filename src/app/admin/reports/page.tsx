@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 import { formatMoney, money } from '@/lib/money'
 import { NOINDEX } from '@/lib/seo'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 import { getMarketplaceReport } from '@/server/dal/reports'
 
 export const metadata = { title: 'Reports', ...NOINDEX }
@@ -24,7 +24,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
  * yet" are different facts, and only one of them is a problem.
  */
 export default async function AdminReportsPage() {
-  await requireAdmin('analytics.read')
+  await requireElevatedAdmin('analytics.read')
   const report = await getMarketplaceReport()
 
   const responseRate = report.delivered > 0 ? report.answered / report.delivered : null

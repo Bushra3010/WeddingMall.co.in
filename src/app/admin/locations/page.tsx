@@ -3,13 +3,13 @@ import { NewCityForm } from '@/components/admin/taxonomy-forms'
 import { EmptyState } from '@/components/ui/states'
 import { NOINDEX } from '@/lib/seo'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 
 export const metadata = { title: 'Locations', ...NOINDEX }
 export const dynamic = 'force-dynamic'
 
 export default async function AdminLocationsPage() {
-  await requireAdmin()
+  await requireElevatedAdmin()
   const supabase = await createClient()
 
   const [{ data: cities }, { data: states }] = await Promise.all([

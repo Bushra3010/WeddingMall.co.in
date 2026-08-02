@@ -5,7 +5,7 @@ import { formatDateTime } from '@/lib/dates'
 import { NOINDEX } from '@/lib/seo'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 
 export const metadata = { title: 'Audit log', ...NOINDEX }
 export const dynamic = 'force-dynamic'
@@ -33,7 +33,7 @@ export default async function AdminAuditLogPage({
 }) {
   // `admin.manage` rather than a lesser permission: the log records who
   // revealed which customer's details, so reading it is itself privileged.
-  await requireAdmin('admin.manage')
+  await requireElevatedAdmin('admin.manage')
 
   const params = await searchParams
   const action = ACTIONS.some((a) => a.key === params.action) ? params.action! : 'all'

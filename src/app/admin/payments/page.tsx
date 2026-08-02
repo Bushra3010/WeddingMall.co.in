@@ -6,7 +6,7 @@ import { formatMoney, money } from '@/lib/money'
 import { NOINDEX } from '@/lib/seo'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 
 export const metadata = { title: 'Payments', ...NOINDEX }
 export const dynamic = 'force-dynamic'
@@ -19,7 +19,7 @@ const TONE: Record<string, string> = {
 }
 
 export default async function AdminPaymentsPage() {
-  await requireAdmin('billing.manage')
+  await requireElevatedAdmin('billing.manage')
   const supabase = await createClient()
 
   const [{ data: payments }, { data: events }] = await Promise.all([

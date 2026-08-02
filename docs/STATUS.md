@@ -244,6 +244,20 @@ TypeScript caught it: the same invented permission name was rejected in the Serv
 
 Verified signed in: all eight return 200 with the right heading, no stub markers, zero page errors. `/vendor-dashboard/settings` needed a real vendor membership to render — without one it correctly redirects to onboarding.
 
+## Admin MFA (2026-08-02)
+
+Launch blocker 4 closed. TOTP second factor plus a 30-minute privileged session (ADR-036).
+
+Enforcement is staged so it cannot lock out the last administrator: with no factor enrolled every admin route redirects to `/admin/security`, which is reachable at aal1 and carries the enrolment form. That page calls `requireAdmin` and deliberately never `requireElevatedAdmin` — if it required a second factor itself, the only route that can fix a missing or stale factor would be unreachable.
+
+Session age is read from the signed `amr` claim rather than a cookie, so nothing in the browser can extend a privileged session. Removing a factor itself requires aal2, or a stolen aal1 session could strip the protection it cannot satisfy. `getMfaState` fails open on infrastructure error — authorisation is unaffected, it only decides whether a code is asked for.
+
+**A bug that took the page down rather than degrading it:** Supabase returns the enrolment QR as an `image/svg+xml` data URI, which `next/image` rejects outright. The throw crashed the route, so the one page able to enrol a factor rendered a global error. Now a plain `<img>`. Found by driving the flow with a real TOTP generator, not by reading the code.
+
+Verified end to end: wrong code refused, real code elevates, all admin routes open afterwards, and with no factor every route lands on enrolment. Codes are rate limited to 10 per 15 minutes per user.
+
+The test factor was removed afterwards, so the account is back to an un-enrolled state and the owner can set up their own authenticator.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
@@ -269,7 +283,7 @@ Launch blockers, highest first:
 1. **Rotate the four credentials** shared in the build transcript — service-role key first, since it bypasses RLS entirely. Then the anon key, database password, and Vercel token. Update `.env.local` *and* the Vercel environment.
 2. **`script-src 'unsafe-inline'`** (ADR-034). Needs Partial Prerendering to fix without giving back the latency work.
 3. **No SMTP provider.** Blocks sign-up confirmation, every email notification, and E2E journeys 1-3. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` on a real domain; the adapter is written and will pick it up.
-4. **Admin MFA and short privileged sessions** (PRD 10.3) — not started.
+4. ~~Admin MFA and short privileged sessions.~~ Shipped 2026-08-02 (ADR-036). **You must enrol an authenticator at `/admin/security`** — until you do, every other admin route redirects there.
 5. **Legal text still needs counsel** (PRD 14.3). `/privacy` and `/terms` now publish a truthful plain-English description of actual behaviour, clearly labelled as not lawyer-reviewed — this removed the 404s, not the legal requirement.
 
 Then product scope: message attachments, Realtime, and Google OAuth. No placeholder routes remain.

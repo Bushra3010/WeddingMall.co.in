@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { EmptyState } from '@/components/ui/states'
 import { NOINDEX } from '@/lib/seo'
 import { cn } from '@/lib/utils'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 import { getReviewQueue, type VendorStatus } from '@/server/dal/admin'
 
 export const metadata = { title: 'Vendors', ...NOINDEX }
@@ -22,7 +22,7 @@ export default async function AdminVendorsPage({
 }: {
   searchParams: Promise<{ status?: string }>
 }) {
-  await requireAdmin('vendor.read')
+  await requireElevatedAdmin('vendor.read')
   const { status } = await searchParams
   // Narrow the query-string value against the known tabs rather than casting:
   // an unknown status must fall back, not reach the database.

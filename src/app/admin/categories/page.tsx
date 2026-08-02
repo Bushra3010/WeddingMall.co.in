@@ -2,13 +2,13 @@ import { NewCategoryForm } from '@/components/admin/taxonomy-forms'
 import { EmptyState } from '@/components/ui/states'
 import { NOINDEX } from '@/lib/seo'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 
 export const metadata = { title: 'Categories', ...NOINDEX }
 export const dynamic = 'force-dynamic'
 
 export default async function AdminCategoriesPage() {
-  await requireAdmin()
+  await requireElevatedAdmin()
   const supabase = await createClient()
 
   // Includes inactive rows: the taxonomy read policy grants admins the full set.

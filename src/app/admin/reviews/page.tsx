@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/ui/states'
 import { formatRelative } from '@/lib/dates'
 import { NOINDEX } from '@/lib/seo'
 import { cn } from '@/lib/utils'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 import { getReviewModerationQueue, getReviewQueueCounts } from '@/server/dal/reviews'
 
 export const metadata = { title: 'Review moderation', ...NOINDEX }
@@ -26,7 +26,7 @@ export default async function AdminReviewsPage({
 }: {
   searchParams: Promise<{ status?: string }>
 }) {
-  await requireAdmin('review.moderate')
+  await requireElevatedAdmin('review.moderate')
 
   const params = await searchParams
   const status: QueueStatus = TABS.some((tab) => tab.key === params.status)

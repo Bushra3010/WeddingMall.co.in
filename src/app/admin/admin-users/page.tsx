@@ -4,7 +4,7 @@ import { formatRelative } from '@/lib/dates'
 import { NOINDEX } from '@/lib/seo'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 
 export const metadata = { title: 'Administrators', ...NOINDEX }
 export const dynamic = 'force-dynamic'
@@ -20,7 +20,7 @@ const GRANTABLE = [
 ]
 
 export default async function AdminUsersPage() {
-  await requireAdmin('admin.manage')
+  await requireElevatedAdmin('admin.manage')
   const supabase = await createClient()
 
   const [{ data: memberships }, { data: profiles }] = await Promise.all([

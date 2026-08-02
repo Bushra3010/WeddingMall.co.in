@@ -1,13 +1,13 @@
 import { PlatformSettingsForm } from '@/components/admin/platform-settings-form'
 import { NOINDEX } from '@/lib/seo'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 
 export const metadata = { title: 'Settings', ...NOINDEX }
 export const dynamic = 'force-dynamic'
 
 export default async function AdminSettingsPage() {
-  await requireAdmin('admin.manage')
+  await requireElevatedAdmin('admin.manage')
   const supabase = await createClient()
 
   const [{ data: sla }, { data: review }, { data: eligible }] = await Promise.all([

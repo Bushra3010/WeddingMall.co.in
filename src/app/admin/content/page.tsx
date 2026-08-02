@@ -5,7 +5,7 @@ import { formatRelative } from '@/lib/dates'
 import { NOINDEX } from '@/lib/seo'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 
 export const metadata = { title: 'Content', ...NOINDEX }
 export const dynamic = 'force-dynamic'
@@ -15,7 +15,7 @@ export default async function AdminContentPage({
 }: {
   searchParams: Promise<{ slug?: string }>
 }) {
-  await requireAdmin('cms.publish')
+  await requireElevatedAdmin('cms.publish')
 
   const { slug } = await searchParams
   const supabase = await createClient()

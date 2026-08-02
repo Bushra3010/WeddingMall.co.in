@@ -27,6 +27,7 @@ const NAV = [
   { href: '/admin/audit-log', label: 'Audit log' },
   { href: '/admin/settings', label: 'Settings' },
   { href: '/admin/admin-users', label: 'Admin users' },
+  { href: '/admin/security', label: 'Security' },
 ]
 
 /**

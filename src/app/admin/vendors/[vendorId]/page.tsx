@@ -6,7 +6,7 @@ import { DocumentLink } from '@/components/admin/document-link'
 import { NOINDEX } from '@/lib/seo'
 import { can } from '@/lib/permissions'
 import { formatDateTime } from '@/lib/dates'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 import { getAdminVendor, getAuditTrail } from '@/server/dal/admin'
 
 export const metadata = { title: 'Vendor detail', ...NOINDEX }
@@ -17,7 +17,7 @@ export default async function AdminVendorDetailPage({
 }: {
   params: Promise<{ vendorId: string }>
 }) {
-  const actor = await requireAdmin('vendor.read')
+  const actor = await requireElevatedAdmin('vendor.read')
   const { vendorId } = await params
 
   const [vendor, audit] = await Promise.all([getAdminVendor(vendorId), getAuditTrail(vendorId)])

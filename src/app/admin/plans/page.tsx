@@ -4,7 +4,7 @@ import { EmptyState } from '@/components/ui/states'
 import { formatMoney, money } from '@/lib/money'
 import { NOINDEX } from '@/lib/seo'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 
 export const metadata = { title: 'Plans', ...NOINDEX }
 export const dynamic = 'force-dynamic'
@@ -30,7 +30,7 @@ function Value({ value }: { value: unknown }) {
 }
 
 export default async function AdminPlansPage() {
-  await requireAdmin('billing.manage')
+  await requireElevatedAdmin('billing.manage')
   const supabase = await createClient()
 
   const [{ data: plans }, { data: subscriptions }] = await Promise.all([

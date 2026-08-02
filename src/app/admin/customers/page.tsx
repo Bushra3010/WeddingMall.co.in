@@ -3,7 +3,7 @@ import { formatRelative } from '@/lib/dates'
 import { NOINDEX } from '@/lib/seo'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 
 export const metadata = { title: 'Customers', ...NOINDEX }
 export const dynamic = 'force-dynamic'
@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic'
  * would route around that entirely.
  */
 export default async function AdminCustomersPage() {
-  await requireAdmin('user.support')
+  await requireElevatedAdmin('user.support')
   const supabase = await createClient()
 
   const [{ data: profiles }, { data: enquiries }, { data: reviews }, { data: shortlists }] =

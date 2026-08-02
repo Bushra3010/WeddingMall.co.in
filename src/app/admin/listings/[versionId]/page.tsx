@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { ListingDecisionForm } from '@/components/admin/listing-decision-form'
 import { NOINDEX } from '@/lib/seo'
 import { formatDateTime } from '@/lib/dates'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 import { getVersionComparison } from '@/server/dal/listings'
 
 export const metadata = { title: 'Review listing', ...NOINDEX }
@@ -27,7 +27,7 @@ export default async function ReviewListingPage({
 }: {
   params: Promise<{ versionId: string }>
 }) {
-  await requireAdmin('listing.moderate')
+  await requireElevatedAdmin('listing.moderate')
   const { versionId } = await params
   const comparison = await getVersionComparison(versionId)
   if (!comparison) notFound()

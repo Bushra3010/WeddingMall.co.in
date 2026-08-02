@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Building2, Clock, MapPin, Tags } from 'lucide-react'
 
 import { NOINDEX } from '@/lib/seo'
-import { requireAdmin } from '@/server/policies/require'
+import { requireElevatedAdmin } from '@/server/policies/require'
 import { getAdminDashboardCounts } from '@/server/dal/admin'
 
 export const metadata = { title: 'Admin dashboard', ...NOINDEX }
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 /** PRD 6.11 — queues and supply at a glance. Dashboards must tolerate empty
  * datasets (Epic E), so every tile renders at zero without special-casing. */
 export default async function AdminDashboardPage() {
-  await requireAdmin()
+  await requireElevatedAdmin()
   const counts = await getAdminDashboardCounts()
 
   const queues = [
