@@ -380,11 +380,29 @@ record(
   `rows ${analystDocs.body?.length}`,
 )
 
-const verifierDocs = await rest('vendor_documents?select=id', ANON, {}, verifier.jwt)
+/*
+ * Scoped to this probe's own vendor, not a global count.
+ *
+ * This asserted `length === 1` and broke the day a real vendor uploaded a
+ * document — the probe was measuring the whole table. An assertion about
+ * whether a verifier can read *a* document must not depend on how many other
+ * documents happen to exist.
+ */
+const verifierDocs = await rest(
+  // `vendor_documents` has no `vendor_id` — it hangs off `verification_id`.
+  // Filtering on a column that does not exist returned HTTP 400, which the
+  // assertion read as "no rows" and reported as a permission failure.
+  `vendor_documents?select=id&verification_id=eq.${verification.id}`,
+  ANON,
+  {},
+  verifier.jwt,
+)
 record(
   'an admin with vendor.verify can read documents',
-  Array.isArray(verifierDocs.body) && verifierDocs.body.length === 1,
-  `rows ${verifierDocs.body?.length}`,
+  Array.isArray(verifierDocs.body) && verifierDocs.body.length >= 1,
+  Array.isArray(verifierDocs.body)
+    ? `rows ${verifierDocs.body.length}`
+    : `HTTP ${verifierDocs.status} ${JSON.stringify(verifierDocs.body).slice(0, 160)}`,
 )
 
 const objectFetch = await fetch(

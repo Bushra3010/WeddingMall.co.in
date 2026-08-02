@@ -171,8 +171,21 @@ try {
     }),
   })
 
-  // Realtime is asynchronous; give it room without making the probe flaky.
-  await new Promise((resolve) => setTimeout(resolve, 4000))
+  /*
+   * Poll until the participant sees it, rather than sleeping a fixed time.
+   *
+   * A flat 4-second wait failed intermittently under load — and a flaky
+   * security probe is worse than none, because the first instinct on a red run
+   * is to re-run it rather than read it. This waits for the condition and
+   * gives up at 15 seconds, so a real regression still fails.
+   */
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline && !participant.received.includes(body)) {
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  // A moment more, so a wrongly-delivered event has time to arrive too — the
+  // outsider assertion must not pass merely by being read early.
+  await new Promise((resolve) => setTimeout(resolve, 1500))
 
   await participant.stop()
   await stranger.stop()

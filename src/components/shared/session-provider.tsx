@@ -81,12 +81,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // costs nothing for the signed-out majority.
     supabase.auth.getSession().then(({ data }) => void sync(Boolean(data.session)))
 
+    /*
+     * Re-check whenever the tab regains focus or the page is restored.
+     *
+     * Sign-out is a Server Action: it clears the auth cookie and redirects, but
+     * the browser client is never told. Its in-memory session stayed valid, so
+     * `signedIn` remained true and the header kept offering "Sign out" to
+     * somebody who was already signed out. Reading the cookie again on
+     * visibility change catches that, and also catches a sign-out performed in
+     * another tab.
+     */
+    const recheck = () => {
+      if (document.visibilityState !== 'visible') return
+      void supabase.auth.getSession().then(({ data }) => void sync(Boolean(data.session)))
+    }
+    document.addEventListener('visibilitychange', recheck)
+    window.addEventListener('pageshow', recheck)
+
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
       void sync(Boolean(session))
     })
 
     return () => {
       cancelled = true
+      document.removeEventListener('visibilitychange', recheck)
+      window.removeEventListener('pageshow', recheck)
       subscription.subscription.unsubscribe()
     }
   }, [])

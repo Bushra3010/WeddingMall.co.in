@@ -296,6 +296,20 @@ The second version passed a deliberately broken policy. Postgres normalises a st
 
 A check that has never failed is indistinguishable from one that cannot fail, which is the fifth time that shape of problem has appeared here.
 
+## Thread integrity and sign-out (2026-08-02)
+
+**An administrator could speak as a customer.** `messages: participant send` gated inserts on `can_access_enquiry()`, which is true for the customer, for a vendor member, *and* for any admin holding `lead.read`. Right for reading — support needs to see a thread — wrong for writing. Observed in production: a `super_admin` posted two messages into a customer↔vendor thread and the vendor saw them attributed to the customer, because the UI labelled any sender who was not the viewer as the counterparty. Two independent faults compounding into a disclosure.
+
+Migration `0030` adds `is_enquiry_party()` — customer or vendor member only, deliberately excluding admins — and repoints the insert policy at it. Reading is untouched: `can_access_enquiry` keeps its admin branch, so support can still open a thread and simply cannot add to it. Verified: customer and vendor post successfully, `super_admin` gets 403 and nothing lands, admin still reads both messages, an unrelated user can neither read nor write.
+
+**The labelling half is now a tested function.** `senderLabel()` in `features/messaging` replaces the inline `senderName ?? counterpartyName`. The rule is that identity is never inferred from absence: only the known customer may fall back to the counterparty name, and anyone else is shown by their own name or as "Another participant". Six unit tests, including the exact regression and the case where `customerId` is unknown.
+
+**Sign-out was not signing out.** The Server Action cleared the auth cookie and redirected, but the browser Supabase client kept its own session, so the header went on offering "Sign out" to somebody already signed out. The button now calls the client sign-out *and* the Server Action — the client call clears local state immediately, and the action is what actually ends the session, since a client-only sign-out would leave the cookie the server trusts intact. `SessionProvider` also re-reads on `visibilitychange` and `pageshow`, which catches a sign-out performed in another tab.
+
+**A probe was reporting a permission failure that was really a typo.** The scoping fix on `vendor_documents` filtered `vendor_id=eq...`, but that column does not exist — documents hang off `verification_id`. PostgREST returned 400, `body` was an object rather than an array, and the assertion read that as "no rows" and reported it as an admin who could not read documents. The detail line printed `rows undefined`, which is the tell. Fixed to filter through `verification_id`, and the assertion now prints the HTTP status and error body when the response is not an array — a probe that cannot say *why* it failed sends you looking in the wrong place.
+
+Tests: 125 unit (6 new), 169 RLS assertions, 22 E2E. Lint, typecheck, build clean; 12 static routes preserved.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/field'
 import { useLiveMessages } from '@/components/customer/use-live-messages'
 import { sendMessageAction } from '@/features/enquiries/actions'
 import { formatDateTime } from '@/lib/dates'
+import { senderLabel } from '@/features/messaging/sender-label'
 import { cn } from '@/lib/utils'
 import type { MessageRow } from '@/server/dal/enquiries'
 
@@ -21,6 +22,7 @@ export function MessageThread({
   liveEnabled = false,
   messages,
   currentUserId,
+  customerId,
   counterpartyName,
   locked,
 }: {
@@ -30,6 +32,8 @@ export function MessageThread({
   liveEnabled?: boolean
   messages: MessageRow[]
   currentUserId: string
+  /** The enquiry's customer. Anyone else on the thread is not them. */
+  customerId?: string
   counterpartyName: string
   locked: boolean
 }) {
@@ -50,6 +54,17 @@ export function MessageThread({
         <ol className="space-y-3">
           {messages.map((message) => {
             const mine = message.senderUserId === currentUserId
+
+            // Extracted so the rule is unit-tested rather than eyeballed;
+            // see features/messaging/sender-label.ts for why it exists.
+            const label = senderLabel({
+              senderUserId: message.senderUserId,
+              senderName: message.senderName,
+              currentUserId,
+              customerId,
+              counterpartyName,
+            })
+
             return (
               <li key={message.id} className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
                 <div
@@ -64,8 +79,7 @@ export function MessageThread({
                   <p
                     className={cn('mt-1.5 text-[11px]', mine ? 'text-brand-100' : 'text-sand-500')}
                   >
-                    {mine ? 'You' : (message.senderName ?? counterpartyName)} ·{' '}
-                    {formatDateTime(message.createdAt)}
+                    {label} · {formatDateTime(message.createdAt)}
                   </p>
                 </div>
               </li>

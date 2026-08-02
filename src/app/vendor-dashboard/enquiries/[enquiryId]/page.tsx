@@ -131,6 +131,7 @@ export default async function VendorEnquiryPage({
           {enquiry.conversationId ? (
             <MessageThread
               enquiryId={enquiry.id}
+              customerId={enquiry.customerId}
               conversationId={enquiry.conversationId}
               liveEnabled={liveChat}
               messages={messages}
