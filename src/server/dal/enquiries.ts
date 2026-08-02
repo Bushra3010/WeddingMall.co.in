@@ -188,9 +188,68 @@ export interface MessageRow {
   senderName: string | null
   createdAt: string
   readAt: string | null
+  /**
+   * Which side of the thread the sender is on.
+   *
+   * Resolved here rather than in the component, because it needs the vendor's
+   * membership list — and guessing it from "not me, therefore the other party"
+   * is precisely how an administrator's messages were once shown as the
+   * customer's.
+   */
+  senderRole: 'customer' | 'vendor' | 'other'
 }
 
-export async function getMessages(conversationId: string): Promise<MessageRow[]> {
+export interface ThreadParties {
+  customerId: string
+  customerName: string | null
+  vendorId: string
+  vendorName: string
+  vendorMemberIds: string[]
+}
+
+/**
+ * Both parties of a thread, by name.
+ *
+ * Goes through `enquiry_thread_parties` (migration `0031`) rather than reading
+ * `profiles` and `vendor_memberships` directly: neither side can read the
+ * other's rows — `profiles` is own-row-only — so querying them here returned
+ * nulls, which is why the thread fell back to "Customer" and "Vendor".
+ */
+export async function getThreadParties(enquiryId: string): Promise<ThreadParties | null> {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .rpc('enquiry_thread_parties', { p_enquiry_id: enquiryId })
+      .maybeSingle()
+
+    if (error) throw error
+    if (!data) return null
+
+    const row = data as unknown as {
+      customer_id: string
+      customer_name: string | null
+      vendor_id: string
+      vendor_name: string
+      vendor_member_ids: string[] | null
+    }
+
+    return {
+      customerId: row.customer_id,
+      customerName: row.customer_name,
+      vendorId: row.vendor_id,
+      vendorName: row.vendor_name,
+      vendorMemberIds: row.vendor_member_ids ?? [],
+    }
+  } catch (error) {
+    logError('dal.getThreadParties', error, { enquiryId })
+    return null
+  }
+}
+
+export async function getMessages(
+  conversationId: string,
+  parties?: Pick<ThreadParties, 'customerId' | 'vendorMemberIds'>,
+): Promise<MessageRow[]> {
   try {
     const supabase = await createClient()
     const { data, error } = await supabase
@@ -204,6 +263,8 @@ export async function getMessages(conversationId: string): Promise<MessageRow[]>
 
     if (error) throw error
 
+    const vendorSide = new Set(parties?.vendorMemberIds ?? [])
+
     return (data ?? []).map((row) => ({
       id: row.id,
       body: row.body,
@@ -211,6 +272,13 @@ export async function getMessages(conversationId: string): Promise<MessageRow[]>
       senderName: row.profiles?.full_name ?? null,
       createdAt: row.created_at,
       readAt: row.read_at,
+      senderRole: !parties
+        ? ('other' as const)
+        : row.sender_user_id === parties.customerId
+          ? ('customer' as const)
+          : vendorSide.has(row.sender_user_id)
+            ? ('vendor' as const)
+            : ('other' as const),
     }))
   } catch (error) {
     logError('dal.getMessages', error, { conversationId })

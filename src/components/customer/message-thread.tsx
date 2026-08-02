@@ -22,12 +22,11 @@ export function MessageThread({
   liveEnabled = false,
   messages,
   currentUserId,
-  customerId,
-  counterpartyName,
+  customerName,
+  vendorName,
+  viewerRole,
   locked,
   canSend = true,
-  youName,
-  themName,
 }: {
   enquiryId: string
   conversationId?: string | null
@@ -35,9 +34,12 @@ export function MessageThread({
   liveEnabled?: boolean
   messages: MessageRow[]
   currentUserId: string
-  /** The enquiry's customer. Anyone else on the thread is not them. */
-  customerId?: string
-  counterpartyName: string
+  /** The customer's account name. Shown to both sides. */
+  customerName: string | null
+  /** The vendor's registered business name. Shown to both sides. */
+  vendorName: string
+  /** Which side the person reading this is on. */
+  viewerRole: 'customer' | 'vendor'
   locked: boolean
   /**
    * Whether the viewer is one of the two parties. False for an administrator
@@ -46,11 +48,11 @@ export function MessageThread({
    * failure at the end of a message someone took the trouble to type.
    */
   canSend?: boolean
-  /** Who the viewer is, shown in the thread header. */
-  youName?: string
-  /** Who they are talking to. A vendor should see the customer by name. */
-  themName?: string
 }) {
+  // Who the viewer is writing to, by name. Derived from which side they are
+  // on rather than passed in, so the two pages cannot disagree.
+  const counterparty = viewerRole === 'vendor' ? (customerName ?? 'this customer') : vendorName
+
   const [state, action] = useAction(sendMessageAction)
   useLiveMessages(conversationId ?? null, liveEnabled)
 
@@ -61,19 +63,18 @@ export function MessageThread({
       </h2>
 
       {/*
-        Both parties, named. A vendor previously saw only "the customer", so a
-        thread gave no indication of who was on the other end of it.
+        Both parties by their real names, identical on both sides, so either
+        person can see at a glance who the thread is with.
       */}
-      {youName && themName ? (
-        <p className="text-sand-600 -mt-2 text-sm">
-          Between <span className="text-sand-900 font-medium">{youName}</span> and{' '}
-          <span className="text-sand-900 font-medium">{themName}</span>
-        </p>
-      ) : null}
+      <p className="text-sand-600 -mt-2 text-sm">
+        <span className="text-sand-900 font-medium">{customerName ?? 'This customer'}</span>
+        {' and '}
+        <span className="text-sand-900 font-medium">{vendorName}</span>
+      </p>
 
       {messages.length === 0 ? (
         <p className="border-sand-300 text-sand-600 rounded-[var(--radius-card)] border border-dashed bg-white p-6 text-center text-sm">
-          No messages yet. {counterpartyName} will see your enquiry and can reply here.
+          No messages yet. {counterparty} will see your enquiry and can reply here.
         </p>
       ) : (
         <ol className="space-y-3">
@@ -83,11 +84,10 @@ export function MessageThread({
             // Extracted so the rule is unit-tested rather than eyeballed;
             // see features/messaging/sender-label.ts for why it exists.
             const label = senderLabel({
-              senderUserId: message.senderUserId,
               senderName: message.senderName,
-              currentUserId,
-              customerId,
-              counterpartyName,
+              senderRole: message.senderRole,
+              customerName,
+              vendorName,
             })
 
             return (
@@ -136,7 +136,7 @@ export function MessageThread({
             required
             maxLength={5000}
             rows={3}
-            placeholder={`Write to ${counterpartyName}…`}
+            placeholder={`Write to ${counterparty}…`}
             invalid={Boolean(fieldError(state, 'body'))}
           />
           {fieldError(state, 'body') ? (

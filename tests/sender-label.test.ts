@@ -3,54 +3,61 @@ import { describe, expect, it } from 'vitest'
 import { senderLabel } from '@/features/messaging/sender-label'
 
 /**
- * The regression these guard against was a disclosure, not a cosmetic slip: a
- * third party's messages were announced to a vendor as the customer's, and the
- * thread gave no sign of it.
+ * Two requirements meet here.
+ *
+ * The security one: a third party must never be displayed as a party. That was
+ * a real disclosure — an administrator's messages were shown to a vendor as
+ * the customer's, and the thread gave no sign of it.
+ *
+ * The product one: both sides see real names. No "Customer", no "Vendor".
  */
-const CUSTOMER = 'c0000000-0000-4000-8000-000000000001'
-const VENDOR_USER = 'v0000000-0000-4000-8000-000000000002'
-const ADMIN = 'a0000000-0000-4000-8000-000000000003'
-
-const base = {
-  currentUserId: VENDOR_USER,
-  customerId: CUSTOMER,
-  counterpartyName: 'Priya Sharma',
-}
+const base = { customerName: 'Priya Sharma', vendorName: 'Blinksai' }
 
 describe('senderLabel', () => {
-  it('calls your own messages "You"', () => {
-    expect(senderLabel({ ...base, senderUserId: VENDOR_USER, senderName: 'Anything' })).toBe('You')
+  it('shows the vendor’s business name for anyone on the vendor side', () => {
+    expect(senderLabel({ ...base, senderRole: 'vendor', senderName: 'Ravi (staff)' })).toBe(
+      'Blinksai',
+    )
+    // Even with no profile name, the business is still named.
+    expect(senderLabel({ ...base, senderRole: 'vendor', senderName: null })).toBe('Blinksai')
   })
 
-  it('uses the counterparty name for the customer when they have no profile name', () => {
-    expect(senderLabel({ ...base, senderUserId: CUSTOMER, senderName: null })).toBe('Priya Sharma')
-  })
-
-  it('prefers the customer’s own name when they have one', () => {
-    expect(senderLabel({ ...base, senderUserId: CUSTOMER, senderName: 'Priya S.' })).toBe(
+  it('shows the customer’s own account name', () => {
+    expect(senderLabel({ ...base, senderRole: 'customer', senderName: 'Priya S.' })).toBe(
       'Priya S.',
     )
+    expect(senderLabel({ ...base, senderRole: 'customer', senderName: null })).toBe('Priya Sharma')
   })
 
-  // The bug. An unnamed third party must never inherit the customer's identity.
-  it('never labels a third party as the counterparty', () => {
-    expect(senderLabel({ ...base, senderUserId: ADMIN, senderName: null })).toBe(
-      'Another participant',
-    )
-    expect(senderLabel({ ...base, senderUserId: ADMIN, senderName: null })).not.toBe('Priya Sharma')
+  it('never returns a generic party label', () => {
+    const results = [
+      senderLabel({ ...base, senderRole: 'vendor', senderName: null }),
+      senderLabel({ ...base, senderRole: 'customer', senderName: null }),
+    ]
+    for (const label of results) {
+      expect(label).not.toBe('Customer')
+      expect(label).not.toBe('Vendor')
+      expect(label).not.toBe('the customer')
+    }
+  })
+
+  // The disclosure. A non-party must not inherit either side's identity.
+  it('never labels a third party as either party', () => {
+    const label = senderLabel({ ...base, senderRole: 'other', senderName: null })
+    expect(label).toBe('Not a participant')
+    expect(label).not.toBe('Priya Sharma')
+    expect(label).not.toBe('Blinksai')
   })
 
   it('names a third party when they have a name', () => {
-    expect(senderLabel({ ...base, senderUserId: ADMIN, senderName: 'Support Team' })).toBe(
+    expect(senderLabel({ ...base, senderRole: 'other', senderName: 'Support Team' })).toBe(
       'Support Team',
     )
   })
 
-  // Without customerId we cannot prove anyone is the counterparty, so we must
-  // not claim it — this is the state every caller was in before the fix.
-  it('claims nothing when the customer is unknown', () => {
+  it('falls back only when the customer has set no name anywhere', () => {
     expect(
-      senderLabel({ ...base, customerId: undefined, senderUserId: CUSTOMER, senderName: null }),
-    ).toBe('Another participant')
+      senderLabel({ ...base, customerName: null, senderRole: 'customer', senderName: null }),
+    ).toBe('This customer')
   })
 })

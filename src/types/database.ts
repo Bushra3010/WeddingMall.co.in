@@ -3017,6 +3017,10 @@ export interface Database {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
+      enquiry_thread_parties: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
       handle_new_user: {
         Args: Record<string, never>
         Returns: unknown
@@ -3035,6 +3039,10 @@ export interface Database {
       }
       is_admin: {
         Args: Record<string, never>
+        Returns: unknown
+      }
+      is_enquiry_party: {
+        Args: { [key: string]: unknown }
         Returns: unknown
       }
       is_vendor_member: {

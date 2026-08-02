@@ -1,43 +1,54 @@
 /**
  * How a message's sender is named in a thread (PRD 6.7).
  *
- * Extracted from the component so the rule can be tested directly. It is the
- * fix for a real disclosure: the label used to be
- * `senderName ?? counterpartyName`, so any sender without a profile name was
- * announced as the other party. An administrator's messages appeared to a
- * vendor as though the customer had written them, and nothing in the thread
- * revealed otherwise.
+ * ## Real names only
  *
- * The rule is: never infer identity from absence. A sender is called the
- * counterparty only when they demonstrably are one.
+ * Both sides must be able to tell who they are talking to, so this returns the
+ * customer's account name and the vendor's registered business name — never
+ * "Customer", "Vendor", or "the customer". A generic label on a marketplace
+ * thread is worse than useless: the customer already knows they are a
+ * customer, and the vendor needs to know *which* customer.
+ *
+ * ## Why the side is passed in rather than inferred
+ *
+ * `senderRole` is resolved in the DAL, where the vendor's membership list is
+ * available. Inferring it here — "not me, therefore the other party" — is
+ * exactly how an administrator's messages were once displayed to a vendor as
+ * the customer's words. A third party is labelled as itself, never as a party.
  */
-export function senderLabel({
-  senderUserId,
-  senderName,
-  currentUserId,
-  customerId,
-  counterpartyName,
-}: {
-  senderUserId: string
+export interface SenderLabelInput {
   senderName: string | null
-  currentUserId: string
-  /** The enquiry's customer. Undefined when the caller could not supply it. */
-  customerId?: string
-  counterpartyName: string
-}): string {
-  if (senderUserId === currentUserId) return 'You'
+  senderRole: 'customer' | 'vendor' | 'other'
+  /** The customer's account name, when they have set one. */
+  customerName: string | null
+  /** The vendor's registered business name. */
+  vendorName: string
+}
 
-  /*
-   * The known customer. Their own profile name is preferred so a vendor sees
-   * who actually wrote — `counterpartyName` is only the fallback for a
-   * customer who has not set one.
-   */
-  if (customerId && senderUserId === customerId) return senderName ?? counterpartyName
+export function senderLabel({
+  senderName,
+  senderRole,
+  customerName,
+  vendorName,
+}: SenderLabelInput): string {
+  if (senderRole === 'vendor') {
+    /*
+     * The business name, not the staff member's. The customer enquired with a
+     * business; which employee happens to be replying is internal detail, and
+     * showing a stranger's personal name where they expect the business reads
+     * as the wrong person answering.
+     */
+    return vendorName
+  }
 
-  /*
-   * Everyone else is named, or plainly marked as neither party. When
-   * `customerId` is absent we cannot prove the sender is the counterparty, so
-   * we do not claim it — an unnamed stranger is better than a wrong name.
-   */
-  return senderName ?? 'Another participant'
+  if (senderRole === 'customer') {
+    // Their own account name. `senderName` and `customerName` are the same
+    // person; the first is per-message and the second is the enquiry's record,
+    // so either being present is enough.
+    return senderName ?? customerName ?? 'This customer'
+  }
+
+  // Neither party — an administrator, historically. Named if we can, and
+  // otherwise plainly marked as someone who is not in the conversation.
+  return senderName ?? 'Not a participant'
 }

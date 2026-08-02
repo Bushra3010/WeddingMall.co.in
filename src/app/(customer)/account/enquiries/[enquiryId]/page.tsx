@@ -11,7 +11,12 @@ import { formatRange, money } from '@/lib/money'
 import { serverEnv } from '@/lib/env'
 import { NOINDEX } from '@/lib/seo'
 import { getActor } from '@/server/dal/actor'
-import { getEnquiry, getEnquiryTimeline, getMessages } from '@/server/dal/enquiries'
+import {
+  getEnquiry,
+  getEnquiryTimeline,
+  getMessages,
+  getThreadParties,
+} from '@/server/dal/enquiries'
 import { markMessagesRead } from '@/server/services/enquiries'
 
 export const metadata = { title: 'Enquiry', ...NOINDEX }
@@ -42,8 +47,19 @@ export default async function EnquiryDetailPage({
    */
   if (!enquiry || enquiry.customerId !== actor.userId) notFound()
 
+  /*
+   * Both parties by name, via the guarded function — each side is blocked by
+   * RLS from reading the other's profile directly (migration `0031`).
+   */
+  const parties = await getThreadParties(enquiryId)
+
   const [messages, timeline] = await Promise.all([
-    enquiry.conversationId ? getMessages(enquiry.conversationId) : Promise.resolve([]),
+    enquiry.conversationId
+      ? getMessages(enquiry.conversationId, {
+          customerId: parties?.customerId ?? enquiry.customerId,
+          vendorMemberIds: parties?.vendorMemberIds ?? [],
+        })
+      : Promise.resolve([]),
     getEnquiryTimeline(enquiryId),
   ])
 
@@ -125,7 +141,9 @@ export default async function EnquiryDetailPage({
           {enquiry.conversationId ? (
             <MessageThread
               enquiryId={enquiry.id}
-              customerId={enquiry.customerId}
+              customerName={parties?.customerName ?? enquiry.customerName}
+              vendorName={parties?.vendorName ?? enquiry.vendorName}
+              viewerRole="customer"
               // The party check the database makes, mirrored so the composer
               // is not offered to an admin whose write RLS will refuse (0030).
               canSend={actor.userId === enquiry.customerId}
@@ -133,9 +151,6 @@ export default async function EnquiryDetailPage({
               liveEnabled={liveChat}
               messages={messages}
               currentUserId={actor.userId ?? ''}
-              counterpartyName={enquiry.vendorName}
-              youName="You"
-              themName={enquiry.vendorName}
               locked={enquiry.conversationStatus !== 'open'}
             />
           ) : null}

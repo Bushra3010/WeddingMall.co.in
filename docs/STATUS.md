@@ -340,6 +340,24 @@ Fixed by making "mine" explicit — `getCustomerEnquiries`, `getOwnReviews`, `ge
 
 Tests: 125 unit, 169 RLS assertions, 23 E2E (1 new).
 
+## Real names in the chat (2026-08-02)
+
+Requested: show the customer's account name and the vendor's registered business name, never "Customer" or "Vendor".
+
+**Why it was showing generic labels.** Neither side can read the other's row. `profiles: own row read` limits `profiles` to your own row, so the vendor could not resolve the customer's name and the customer could not resolve the replying staff member's. `vendor_memberships` is likewise scoped, so the customer could not even tell a reply came from the vendor's side — it fell through to "not a participant". Both policies are right as general rules; the names simply were not reachable.
+
+Migration `0031` adds `enquiry_thread_parties()`, guarded by `can_access_enquiry` — for a thread you are already party to, it returns both display names and the vendor's member ids. **Names only: no email, no phone.** Contact details stay behind the per-enquiry consent gate and its audit trail (PRD 2.3); being in a conversation is a reason to know what to call someone, not a reason to receive their phone number. Ask about an enquiry you are not party to and it returns nothing.
+
+**A vendor-side sender is shown as the business, not the individual.** The customer enquired with a business; which staff member replies is internal detail, and a stranger's personal name where the business is expected reads as the wrong person answering.
+
+**Sender side is resolved in the DAL**, not guessed in the component. Inferring "not me, therefore the other party" is exactly how an administrator's messages were once displayed as the customer's, so `senderRole` is computed against the real membership list and a third party is labelled as itself.
+
+Verified in a browser as both parties on the same thread: each sees `Priya Sharma and Blinksai` in the header, the customer's message attributed to `Priya Sharma`, and the vendor's to `Blinksai` — with a regex assertion that no generic label appears in either view.
+
+Also gave the one nameless account a name; every profile now has one, and sign-up has always required it.
+
+Tests: 125 unit, 169 RLS assertions, 23 E2E.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

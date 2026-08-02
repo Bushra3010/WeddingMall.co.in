@@ -15,6 +15,7 @@ import { getActor } from '@/server/dal/actor'
 import {
   getCustomerContact,
   getEnquiry,
+  getThreadParties,
   getEnquiryNotes,
   getEnquiryTimeline,
   getMessages,
@@ -45,8 +46,19 @@ export default async function VendorEnquiryPage({
   await markEnquiryViewed(actor, enquiryId)
   await markMessagesRead(actor, enquiryId)
 
+  /*
+   * Both parties by name, via the guarded function — each side is blocked by
+   * RLS from reading the other's profile directly (migration `0031`).
+   */
+  const parties = await getThreadParties(enquiryId)
+
   const [messages, timeline, contact, notes] = await Promise.all([
-    enquiry.conversationId ? getMessages(enquiry.conversationId) : Promise.resolve([]),
+    enquiry.conversationId
+      ? getMessages(enquiry.conversationId, {
+          customerId: parties?.customerId ?? enquiry.customerId,
+          vendorMemberIds: parties?.vendorMemberIds ?? [],
+        })
+      : Promise.resolve([]),
     getEnquiryTimeline(enquiryId),
     // Contact details are released only with the customer's consent, and only
     // to a member who may see lead PII (PRD 2.3, 4.4).
@@ -133,16 +145,14 @@ export default async function VendorEnquiryPage({
           {enquiry.conversationId ? (
             <MessageThread
               enquiryId={enquiry.id}
-              customerId={enquiry.customerId}
+              customerName={parties?.customerName ?? enquiry.customerName}
+              vendorName={parties?.vendorName ?? enquiry.vendorName}
+              viewerRole="vendor"
               canSend={Boolean(actor.vendorRoles[enquiry.vendorId])}
               conversationId={enquiry.conversationId}
               liveEnabled={liveChat}
               messages={messages}
               currentUserId={actor.userId ?? ''}
-              // The vendor should see who they are talking to, by name.
-              counterpartyName={enquiry.customerName ?? 'the customer'}
-              youName={enquiry.vendorName}
-              themName={enquiry.customerName ?? 'Customer'}
               locked={enquiry.conversationStatus !== 'open'}
             />
           ) : null}
