@@ -206,6 +206,25 @@ Verified in a browser: all five public pages return 200 with real content and no
 
 Remaining stubs (8): `/admin/reports`, `/content`, `/blog`, `/customers`, `/leads`, `/settings`, `/admin-users`, and `/vendor-dashboard/settings`.
 
+## Every placeholder replaced (2026-08-02)
+
+Zero routes now render `MilestonePlaceholder`. The last eight: `/admin/leads`, `/customers`, `/reports`, `/content`, `/blog`, `/settings`, `/admin-users`, and `/vendor-dashboard/settings`.
+
+**A latent bug surfaced while building `/admin/settings`** (ADR-036). Migration `0019` guarded `sla_policy` with `has_admin_permission('settings.manage')` — a permission that exists in neither `admin_permissions` nor `lib/permissions/catalogue.ts`. `has_admin_permission` returns false for a code it has never seen, so the policy was deny-all and the response-time threshold was unconfigurable by anyone, including a super-admin. It failed closed, so never a security hole; it was a feature that silently did not work, and a `super_admin` PATCH returned `204` with zero rows matched — the shape of success. Fixed in `0028` and verified both ways: a super-admin can now set it, anon still cannot.
+
+This is the drift CLAUDE.md invariant 3 exists to prevent. TypeScript caught it only because I happened to use the same wrong name in an action; nothing checks the SQL direction. **A parity test between `catalogue.ts` and `admin_permissions` is still missing** — ADR-004's original gap, now with evidence of what it costs.
+
+**Design decisions worth knowing**
+- `/admin/admin-users` cannot grant `super_admin`. A Server Action is a public endpoint, and Epic E requires that role not be creatable through public input, so the only path stays `npm run grant-admin`. The page says so rather than leaving an admin hunting for a missing control. Self-revocation is refused.
+- `/admin/customers` shows activity counts, not contact details. Reading a customer's phone number is a PII reveal that belongs on the enquiry where consent was given and where it is audited — a browsable directory would route around that.
+- `/admin/leads` shows no customer names for the same reason.
+- CMS bodies are a plain textarea, not a rich-text editor: bodies render as structured text, so formatting controls producing HTML the site refuses to render would misrepresent the field.
+- `/admin/settings` does not expose review-eligibility editing. Widening it changes who may review a business, so it goes through a migration where it is reviewable.
+
+Verified signed in as an admin: **19/19 routes return 200 with no stub markers and no page errors**; settings save and persist; the content editor loads an existing page; `super_admin` is absent from the grantable roles; self-revoke is refused.
+
+Admin panel: **20 of 20 routes built.** 119 unit tests, 168 RLS assertions, 22 E2E.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
@@ -214,9 +233,9 @@ Remaining stubs (8): `/admin/reports`, `/content`, `/blog`, `/customers`, `/lead
 4. **Realtime is not wired.** `FEATURE_REALTIME_CHAT` is false; the thread refreshes on navigation.
 5. **Numeric attribute filters are exact-match only** (ADR-018).
 6. **Media is approved wholesale with the listing** — an admin cannot reject one image.
-7. **Eight screens remain stubs** — seven admin (reports, content, blog, customers, leads, settings, admin users) and vendor-dashboard settings.
+7. ~~Screens remaining as stubs.~~ All replaced 2026-08-02. No route renders `MilestonePlaceholder`.
 8. **Google OAuth not configured.** Project has email auth only; PRD 6.4 requires Google.
-9. **Permission-catalogue parity is still unchecked** (ADR-004). The technique now exists — apply ADR-020's approach to `vendor_can()`.
+9. **Permission-catalogue parity is still unchecked** (ADR-004) — and it has now cost something: `0019` shipped a policy naming a permission that does not exist, leaving `sla_policy` writable by nobody until `0028` (ADR-036). Apply ADR-020's drift-check technique to both `admin_permissions` and `vendor_can()`.
 10. ~~Public pages render dynamically.~~ Fixed 2026-08-02 (ADR-030). Remaining dynamic public routes are `/vendors*` (search parameters) and `/vendor/[slug]*` (personalised enquiry state), both legitimately so.
 11. ~~CSP not set.~~ Enforced 2026-08-02. **`script-src` still allows `'unsafe-inline'`** — a launch blocker, not a completed item (ADR-034). A nonce requires reading `headers()` in the root layout, which drops static routes from 12 to 2 and undoes ADR-030's 6x TTFB win; and with `strict-dynamic` in force a prerendered page has no nonce on its bootstrap and renders blank. Resolve with Partial Prerendering, which lets a dynamic hole carry a nonce while the shell stays static.
 
@@ -234,7 +253,7 @@ Launch blockers, highest first:
 4. **Admin MFA and short privileged sessions** (PRD 10.3) — not started.
 5. **Legal text still needs counsel** (PRD 14.3). `/privacy` and `/terms` now publish a truthful plain-English description of actual behaviour, clearly labelled as not lawyer-reviewed — this removed the 404s, not the legal requirement.
 
-Then product scope: the seven admin screens still on `MilestonePlaceholder`, message attachments, Realtime, and Google OAuth.
+Then product scope: message attachments, Realtime, and Google OAuth. No placeholder routes remain.
 
 Keep probing before building. A live privilege escalation has been found this way in each of the last three milestones — reviews (ADR-031), vendor columns (ADR-032), analytics (ADR-035) — and in every case reading the code looked fine.
 

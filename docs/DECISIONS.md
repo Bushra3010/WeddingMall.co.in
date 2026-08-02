@@ -565,3 +565,19 @@ The same artefact appeared in the membership probe: a self-escalation PATCH retu
 This is the fourth time in this project that a green assertion turned out to be measuring nothing (ADR-013, ADR-021, ADR-031). The failure mode is always the same shape: the check and the thing being checked are not actually connected.
 
 **What it was hiding:** `analytics_events: anyone insert` granted INSERT to `anon` with no `WITH CHECK`. Anyone with the publishable key — which ships in the browser — could write forged `vendor_profile_view` rows naming any vendor. Those rows feed `rebuild_vendor_metrics()`, so a competitor could inflate a rival's numbers, or a vendor could inflate their own and dispute the invoice. Closed in `0024`; the beacon now goes through `record_vendor_profile_view()`, which pins the event name and de-duplicates by session.
+
+---
+
+## ADR-036 — A policy naming a permission that does not exist is a locked door
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+Migration `0019` guarded the SLA settings with `has_admin_permission('settings.manage')`. That permission is in neither `admin_permissions` nor `lib/permissions/catalogue.ts`. The function returns false for a code it has never heard of, so the policy was deny-all: the response-time threshold PRD 6.6 requires to be configurable could not be changed by anyone, including a super-admin.
+
+It fails closed, so it was never a security hole. It was worse in a quieter way — a feature that silently did not work. A `super_admin` PATCH returned `204` with zero rows matched, which is indistinguishable from success unless you re-read the row. Nothing in the test suite did.
+
+**Found by accident.** TypeScript rejected the same invented permission name when I used it in a Server Action, which prompted checking the SQL side. Had I picked a real permission for the action and left the migration alone, the policy would still be locked.
+
+**Decision:** `0028` re-declares the policy against `admin.manage`, which exists and already gates administrator management. Verified in both directions — a super-admin can now set the value, and anon still cannot.
+
+**The real finding is the missing check.** CLAUDE.md invariant 3 says the permission catalogue is mirrored in SQL and that changing one means changing the other. Nothing enforces it. ADR-004 flagged this and ADR-020 built the technique — compiling the real TypeScript source and comparing it against the database, which is how the enquiry transition map is kept honest. It was never applied to permissions. This is the first demonstrated cost, and it will not be the last: the failure mode is a policy that looks strict and admits nobody, which no amount of reading the SQL reveals.
