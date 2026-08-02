@@ -36,7 +36,9 @@ export default async function VendorEnquiryPage({
   const liveChat = serverEnv().FEATURE_REALTIME_CHAT
 
   const enquiry = await getEnquiry(enquiryId)
-  if (!enquiry) notFound()
+  // As on the customer page: readable is not the same as yours. A customer or
+  // an admin reaching this URL must not get the vendor's view of the lead.
+  if (!enquiry || !actor.vendorRoles[enquiry.vendorId]) notFound()
 
   // Opening a delivered enquiry moves it to "viewed" — the customer sees this
   // on their timeline, which is the point of the status.
@@ -137,7 +139,10 @@ export default async function VendorEnquiryPage({
               liveEnabled={liveChat}
               messages={messages}
               currentUserId={actor.userId ?? ''}
-              counterpartyName="the customer"
+              // The vendor should see who they are talking to, by name.
+              counterpartyName={enquiry.customerName ?? 'the customer'}
+              youName={enquiry.vendorName}
+              themName={enquiry.customerName ?? 'Customer'}
               locked={enquiry.conversationStatus !== 'open'}
             />
           ) : null}

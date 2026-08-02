@@ -688,3 +688,23 @@ Nothing about the mechanism changed: the challenge, the signed `amr` session age
 Deleting it would have been the wrong shape of response. The feature was not wrong — the default was. A flag keeps the decision reversible by one environment variable and keeps the tested code path alive, rather than requiring it be rebuilt from the commit history later.
 
 **What this costs, stated once:** the admin panel can reveal customer contact details, and it is now protected by a password alone. PRD 10.3 asks for admin MFA, so this stays on the launch list as an open consideration rather than a completed item — recorded, not quietly dropped.
+
+---
+
+## ADR-037 — RLS is a ceiling, not a filter
+
+**Date:** 2026-08-02 · **Status:** accepted
+
+Reported from production: "when I send a message to a vendor, the message is also visible to other users."
+
+Probed first. The database was not leaking. Two customers of the same vendor, and one customer across two vendors, each read exactly their own rows over PostgREST — six assertions, all clean. Cross-tenant isolation was intact the whole time.
+
+**The leak was in the page.** `getCustomerEnquiries()` had no ownership filter and relied on RLS. But `enquiries: participant read` admits a row if you are the customer **or a member of the vendor** or an admin with `lead.read`. So `/account/enquiries` — a page that means "enquiries you sent" — listed, for a vendor member, every enquiry sent *to* their business as though they had sent it. The reporter held both a customer account and a vendor membership, so their own account page showed them their business's inbox.
+
+Reproduced: a vendor member's query returned 3 enquiries, 0 of them theirs. An admin's returned the same 3.
+
+**Decision:** a query whose meaning is "mine" states it. `getCustomerEnquiries`, `getOwnReviews`, and `getReviewableEnquiries` now filter on `customer_id` explicitly, and both enquiry detail pages 404 unless the viewer is the party that page is written for. RLS still backs all of it — the point is that the policy answers "may this row be read at all", which is a different question from "is this row yours".
+
+The same shape exists wherever a policy has an `or` in it. `reviews: own read` and `shortlists` were checked; the review reads had it, shortlists did not.
+
+**The test had to be at the page level.** An RLS probe passes throughout — it was passing throughout. `tests/e2e/conversation-privacy.spec.ts` signs in as a vendor member and asserts the customer page neither lists nor opens someone else's enquiry. Verified by reverting the fix: the test fails with `Expected 404, Received 200`, and passes with it. A regression test that was never seen to fail is a guess.

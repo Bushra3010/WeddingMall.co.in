@@ -15,9 +15,17 @@ type ThreadMessage = { created_at: string; read_at: string | null; sender_user_i
 /**
  * Enquiry, shortlist, and notification reads.
  *
- * All use the session client, so RLS decides visibility — a customer sees only
- * their own rows and a vendor member only their vendor's, without these
- * queries filtering by user themselves.
+ * All use the session client, so RLS is the security boundary.
+ *
+ * **RLS is a ceiling, not a filter.** `enquiries: participant read` admits a
+ * row if you are the customer *or* a member of the vendor *or* an admin with
+ * `lead.read`. A query that means "mine" therefore has to say so: relying on
+ * the policy alone made `/account/enquiries` show a vendor member the
+ * enquiries sent *to* their business as though they had sent them, and showed
+ * an admin everybody's. Reported as "my messages are visible to other users".
+ *
+ * So every customer-facing read below filters on `customer_id` explicitly, and
+ * every vendor-facing one on `vendor_id`. The policy still backs them up.
  */
 
 export interface EnquiryListRow {
@@ -37,6 +45,13 @@ export interface EnquiryListRow {
 export async function getCustomerEnquiries(): Promise<EnquiryListRow[]> {
   try {
     const supabase = await createClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return []
+
     const { data, error } = await supabase
       .from('enquiries')
       .select(
@@ -45,14 +60,12 @@ export async function getCustomerEnquiries(): Promise<EnquiryListRow[]> {
          categories(name),
          conversations(messages(created_at, read_at, sender_user_id))`,
       )
+      // Explicitly the caller's own. See the note at the top of this file.
+      .eq('customer_id', user.id)
       .order('created_at', { ascending: false })
       .limit(100)
 
     if (error) throw error
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
 
     return (data ?? []).map((row) => {
       const conversation = Array.isArray(row.conversations)
@@ -99,6 +112,8 @@ export interface EnquiryDetail {
   contactConsent: boolean
   preferredContactMode: string | null
   customerId: string
+  /** Display name of the customer, for showing both parties in the thread. */
+  customerName: string | null
   vendorId: string
   vendorName: string
   vendorSlug: string
@@ -121,6 +136,7 @@ export async function getEnquiry(enquiryId: string): Promise<EnquiryDetail | nul
          budget_min_minor, budget_max_minor, currency, message, contact_consent,
          preferred_contact_mode, customer_id, vendor_id,
          quote_amount_minor, lost_reason,
+         profiles!enquiries_customer_id_fkey(full_name),
          vendors(display_name, slug), categories(name), cities(name),
          conversations(id, status)`,
       )
@@ -148,6 +164,7 @@ export async function getEnquiry(enquiryId: string): Promise<EnquiryDetail | nul
       contactConsent: data.contact_consent,
       preferredContactMode: data.preferred_contact_mode,
       customerId: data.customer_id,
+      customerName: data.profiles?.full_name ?? null,
       vendorId: data.vendor_id,
       vendorName: data.vendors?.display_name ?? 'Unknown business',
       vendorSlug: data.vendors?.slug ?? '',

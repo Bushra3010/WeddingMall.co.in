@@ -26,6 +26,8 @@ export function MessageThread({
   counterpartyName,
   locked,
   canSend = true,
+  youName,
+  themName,
 }: {
   enquiryId: string
   conversationId?: string | null
@@ -44,6 +46,10 @@ export function MessageThread({
    * failure at the end of a message someone took the trouble to type.
    */
   canSend?: boolean
+  /** Who the viewer is, shown in the thread header. */
+  youName?: string
+  /** Who they are talking to. A vendor should see the customer by name. */
+  themName?: string
 }) {
   const [state, action] = useAction(sendMessageAction)
   useLiveMessages(conversationId ?? null, liveEnabled)
@@ -53,6 +59,17 @@ export function MessageThread({
       <h2 id="thread-heading" className="font-display text-sand-900 text-lg">
         Conversation
       </h2>
+
+      {/*
+        Both parties, named. A vendor previously saw only "the customer", so a
+        thread gave no indication of who was on the other end of it.
+      */}
+      {youName && themName ? (
+        <p className="text-sand-600 -mt-2 text-sm">
+          Between <span className="text-sand-900 font-medium">{youName}</span> and{' '}
+          <span className="text-sand-900 font-medium">{themName}</span>
+        </p>
+      ) : null}
 
       {messages.length === 0 ? (
         <p className="border-sand-300 text-sand-600 rounded-[var(--radius-card)] border border-dashed bg-white p-6 text-center text-sm">

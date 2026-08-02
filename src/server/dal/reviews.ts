@@ -9,6 +9,10 @@ import { logError } from '@/lib/observability/logger'
  *
  * The public read path lives in `dal/vendors.ts` and must stay there — it uses
  * the cookie-free client so vendor profiles remain cacheable (ADR-030).
+ *
+ * As in `dal/enquiries.ts`: `reviews: own read` also admits vendor members and
+ * moderators, so a query meaning "reviews I wrote" filters on `customer_id`
+ * rather than trusting the policy to mean that.
  */
 
 export interface EligibleEnquiry {
@@ -31,9 +35,14 @@ export async function getReviewableEnquiries(): Promise<EligibleEnquiry[]> {
   try {
     const supabase = await createClient()
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return []
+
     const [{ data: eligible }, { data: reviewed }] = await Promise.all([
       supabase.from('review_eligible_statuses').select('status'),
-      supabase.from('reviews').select('enquiry_id'),
+      supabase.from('reviews').select('enquiry_id').eq('customer_id', user.id),
     ])
 
     const statuses = (eligible ?? []).map((row) => row.status)
@@ -44,6 +53,7 @@ export async function getReviewableEnquiries(): Promise<EligibleEnquiry[]> {
     const { data, error } = await supabase
       .from('enquiries')
       .select('id, status, event_date, vendor_id, vendors(display_name, slug)')
+      .eq('customer_id', user.id)
       .in('status', statuses)
       .order('created_at', { ascending: false })
 
@@ -83,11 +93,18 @@ export interface OwnReview {
 export async function getOwnReviews(): Promise<OwnReview[]> {
   try {
     const supabase = await createClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return []
+
     const { data, error } = await supabase
       .from('reviews')
       .select(
         'id, overall_rating, title, body, event_date, status, moderation_reason, created_at, edited_at, vendors(display_name, slug), review_revisions(id)',
       )
+      .eq('customer_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) throw error

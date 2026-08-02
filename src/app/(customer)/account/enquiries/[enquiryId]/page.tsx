@@ -32,9 +32,15 @@ export default async function EnquiryDetailPage({
   const liveChat = serverEnv().FEATURE_REALTIME_CHAT
 
   const enquiry = await getEnquiry(enquiryId)
-  // RLS already restricts this read to participants, so a miss is either
-  // "gone" or "not yours" — both are a 404 from here.
-  if (!enquiry) notFound()
+  /*
+   * "Participants" is broader than "the customer": RLS also admits vendor
+   * members and admins with `lead.read`. So a row coming back does not mean it
+   * is the viewer's, and without the ownership check a vendor opening a
+   * customer URL got the *customer's* view of an enquiry sent to their own
+   * business. That is what "my messages are visible to other users" turned out
+   * to be.
+   */
+  if (!enquiry || enquiry.customerId !== actor.userId) notFound()
 
   const [messages, timeline] = await Promise.all([
     enquiry.conversationId ? getMessages(enquiry.conversationId) : Promise.resolve([]),
@@ -128,6 +134,8 @@ export default async function EnquiryDetailPage({
               messages={messages}
               currentUserId={actor.userId ?? ''}
               counterpartyName={enquiry.vendorName}
+              youName="You"
+              themName={enquiry.vendorName}
               locked={enquiry.conversationStatus !== 'open'}
             />
           ) : null}

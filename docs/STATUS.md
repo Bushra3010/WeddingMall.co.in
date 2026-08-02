@@ -326,6 +326,20 @@ The fix could not be a blanket replacement: our own triggers `raise exception �
 
 Tests: 125 unit, 169 RLS assertions, 22 E2E.
 
+## Reported: "messages visible to other users" (2026-08-02)
+
+**The database was never leaking.** Probed first: two customers of one vendor, and one customer across two vendors, each read exactly their own rows — six assertions, clean. Cross-tenant isolation held throughout.
+
+**The page was.** `getCustomerEnquiries()` had no ownership filter and trusted RLS, but `enquiries: participant read` admits the customer **or a member of the vendor** or an admin. So `/account/enquiries` listed, for a vendor member, every enquiry sent *to* their business as though they had sent it. The reporter holds both a customer account and a Blinksai membership, so their own account page showed them their inbox. Reproduced: a vendor member's query returned 3 enquiries, 0 of them theirs; an admin's returned the same 3 (ADR-037).
+
+Fixed by making "mine" explicit — `getCustomerEnquiries`, `getOwnReviews`, `getReviewableEnquiries` filter on `customer_id`, and both enquiry detail pages 404 unless the viewer is the party that page is for. RLS still backs it; the policy answers "may this be read at all", not "is this yours".
+
+**Chat naming, as asked.** The thread now shows both parties ("Between X and Y"), and a vendor sees the customer by name rather than the literal string "the customer" — `getEnquiry` exposes `customerName`, and `senderLabel` prefers a sender's own profile name.
+
+**The regression test is at the page level, and was seen to fail.** An RLS probe passes throughout — it was passing throughout. `tests/e2e/conversation-privacy.spec.ts` signs in as a vendor member and asserts the customer page neither lists nor opens another person's enquiry; reverting the fix produces `Expected 404, Received 200`.
+
+Tests: 125 unit, 169 RLS assertions, 23 E2E (1 new).
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

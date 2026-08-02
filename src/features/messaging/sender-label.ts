@@ -27,7 +27,11 @@ export function senderLabel({
 }): string {
   if (senderUserId === currentUserId) return 'You'
 
-  // Only the known customer may fall back to the counterparty name.
+  /*
+   * The known customer. Their own profile name is preferred so a vendor sees
+   * who actually wrote — `counterpartyName` is only the fallback for a
+   * customer who has not set one.
+   */
   if (customerId && senderUserId === customerId) return senderName ?? counterpartyName
 
   /*
