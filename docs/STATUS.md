@@ -372,6 +372,14 @@ The E2E test for the header city selector was deleted rather than weakened — a
 
 Tests: 125 unit, 22 E2E, lint/typecheck/build clean.
 
+## Logo on the remaining headers (2026-08-04)
+
+The owner screenshotted `/auth/sign-in` and `/auth/sign-up` still showing the plain-text wordmark. Four surfaces draw the brand outside `SiteHeader` and each needed the change: `app/(auth)/layout.tsx`, `app/admin/layout.tsx`, `app/vendor-dashboard/layout.tsx` (the auth pages share one layout).
+
+The filter is not the same on all of them. The admin bar is `sand-950`, so the logo takes the footer's `brightness-0 invert`; the auth panel (`sand-100`) and the vendor bar (white) keep the artwork's own maroon and gold. Copying the header's conditional filter everywhere would have wiped the mark off the two light bars — each was screenshotted at 420px to confirm.
+
+Tests: 125 unit, 16 E2E passed / 10 skipped (the skips need SMTP), lint/typecheck/build clean.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
