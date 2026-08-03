@@ -7,6 +7,7 @@ import { assertPermission, can } from '@/lib/permissions'
 import { createClient } from '@/lib/supabase/server'
 import { getActor } from '@/server/dal/actor'
 import { categoryFormSchema, cityFormSchema } from '@/features/vendors/schema'
+import { describeDeleteCityError } from '@/features/taxonomy/delete-errors'
 
 /**
  * Taxonomy management (PRD 6.11).
@@ -134,6 +135,47 @@ export async function saveCityAction(
       )
     }
     return { id: data.id }
+  })
+
+  if (result.ok) {
+    revalidatePath('/admin/locations')
+    revalidatePath('/cities')
+    revalidatePath('/')
+  }
+  return result
+}
+
+/**
+ * Delete a city (PRD 6.11).
+ *
+ * The check lives in `delete_city()` (migration 0032), not here. Seven tables
+ * reference a city and two of them used to cascade, so deleting one that is in
+ * use silently removed vendors' coverage. Doing the count in TypeScript would
+ * leave a window between counting and deleting; the function takes `for update`
+ * on the row first, which an FK insert cannot cross.
+ *
+ * That means the message a refused delete shows is written in SQL. It is safe
+ * to surface: it names counts and the city, never a row belonging to anyone.
+ */
+export async function deleteCityAction(
+  _prev: unknown,
+  form: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  const result = await runAction('taxonomy.deleteCity', async () => {
+    await assertTaxonomyPermission()
+
+    const id = str(form, 'id')
+    if (!id) throw new ServiceError('validation_error', 'Missing city.')
+
+    const supabase = await createClient()
+    const { error } = await supabase.rpc('delete_city', { p_id: id })
+
+    if (error) {
+      const failure = describeDeleteCityError(error)
+      throw new ServiceError(failure.code, failure.message)
+    }
+
+    return { id }
   })
 
   if (result.ok) {

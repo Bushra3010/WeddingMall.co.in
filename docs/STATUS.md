@@ -380,6 +380,22 @@ The filter is not the same on all of them. The admin bar is `sand-950`, so the l
 
 Tests: 125 unit, 16 E2E passed / 10 skipped (the skips need SMTP), lint/typecheck/build clean.
 
+## Editing and deleting a city (2026-08-04)
+
+The admin Locations table listed cities with no way to change or remove one, so test rows like "Blinksai" and "blin" were stuck there. Both are now on each row: `src/components/admin/city-rows.tsx`, `features/taxonomy/actions.ts`, migrations `0032`/`0033`, probe `scripts/rls-taxonomy-probe.mjs`.
+
+Edit needed no new server code — `saveCityAction` has always taken an `id` and updated; nothing ever sent one.
+
+**Delete was not safe to add as written.** Seven tables reference `cities` and two of them cascaded: `areas.city_id` and `vendor_service_areas.city_id`. A delete on a city in use would have removed vendors' coverage rows and nulled `vendors.primary_city_id` — dropping them out of search silently, with nothing recorded. Mumbai has three of each today. The only reason it had never fired is that no delete button existed. So `0032` makes those two FKs (and `cities.state_id`) RESTRICT, and `delete_city()` counts all seven references behind a `for update` on the city row, which an FK insert's `for key share` cannot cross. The constraint is the guarantee; the function supplies the message: *"Mumbai is still in use (3 vendors based there, 3 vendors covering it, 2 enquiries). Hide it instead."*
+
+**A unit test caught a leak before it shipped.** `0032` raised its refusal as `foreign_key_violation`, and the action decided whether a message was safe to show from the code alone — but Postgres raises 23503 itself, with text naming the constraint and child table. `0033` moves to `PT409`/`PT404`/`PT403`, which Postgres never raises, so the discrimination is exact rather than a guess at message text. Same class of bug as the raw RLS message that reached a customer's screen earlier; the fix is the same shape as `lib/db-errors`.
+
+**Scope.** Cities only. States keep their existing Hide/Show toggle — the 36 are seeded and fixed, so a delete there is a footgun, not a feature. Categories and Attributes have the same missing controls and are untouched.
+
+Tests: 130 unit (5 new), 16 E2E / 10 skipped, 178 RLS probe assertions across 9 probes (7 new), lint/typecheck/build clean.
+
+Note: `npm run db:apply` reapplies from `0001` and is not idempotent, so it cannot apply a single new migration; `0032` and `0033` were applied individually. The realtime probe flaked once on a websocket race and passed on rerun — unrelated to this change.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

@@ -2993,6 +2993,10 @@ export interface Database {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
+      delete_city: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
       enforce_enquiry_transition: {
         Args: Record<string, never>
         Returns: unknown

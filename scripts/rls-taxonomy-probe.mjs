@@ -1,0 +1,205 @@
+/**
+ * Deleting a city: who may, and what it refuses to take with it (PRD 6.11).
+ *
+ * Seven tables reference `cities`, and until migration 0032 two of them
+ * cascaded — so deleting a city in use silently removed vendors' service areas
+ * and nulled their primary city. The admin page had no delete button, which is
+ * the only reason that never fired.
+ *
+ * Every assertion runs over PostgREST with a real JWT, so it exercises the path
+ * the browser takes rather than the service role's blanket bypass. A refusal is
+ * always confirmed by reading the target table afterwards, never by the status
+ * code the write returned: `Prefer: return=representation` has twice made a
+ * successful write look like a refusal in this repo's probes (ADR-021).
+ */
+const URL_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+const SVC = process.env.SUPABASE_SECRET_KEY
+
+if (!URL_BASE || !ANON || !SVC) {
+  console.error('Missing Supabase env. Run with --env-file=.env.local')
+  process.exit(1)
+}
+
+const results = []
+const record = (name, pass, detail = '') => {
+  results.push({ name, pass })
+  console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`)
+}
+
+async function rest(path, key, init = {}, jwt = null) {
+  const res = await fetch(`${URL_BASE}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${jwt ?? key}`,
+      'Content-Type': 'application/json',
+      ...(init.headers || {}),
+    },
+  })
+  const text = await res.text()
+  let body = null
+  try {
+    body = text ? JSON.parse(text) : null
+  } catch {
+    body = text
+  }
+  return { status: res.status, body }
+}
+
+const deleteCity = (id, key, jwt) =>
+  rest('rpc/delete_city', key, { method: 'POST', body: JSON.stringify({ p_id: id }) }, jwt)
+
+/** Does this city still exist? Read as the service role, so RLS cannot make a
+ *  surviving row look deleted. */
+async function cityExists(id) {
+  const { body } = await rest(`cities?select=id&id=eq.${id}`, SVC)
+  return Array.isArray(body) && body.length === 1
+}
+
+async function createUser(tag) {
+  const email = `taxonomy-${tag}-${Date.now()}@example.test`
+  const password = 'ProbePassword123!'
+  const user = await (
+    await fetch(`${URL_BASE}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: { apikey: SVC, Authorization: `Bearer ${SVC}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, email_confirm: true }),
+    })
+  ).json()
+  const token = await (
+    await fetch(`${URL_BASE}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: ANON, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+  ).json()
+  return { id: user.id, jwt: token.access_token }
+}
+
+async function makeAdmin(userId, roleCode) {
+  const role = (await rest(`admin_roles?select=id&code=eq.${roleCode}`, SVC)).body[0]
+  await rest('admin_memberships', SVC, {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, role_id: role.id, status: 'active' }),
+  })
+}
+
+const cleanup = []
+
+try {
+  const stranger = await createUser('stranger')
+  cleanup.push(() =>
+    fetch(`${URL_BASE}/auth/v1/admin/users/${stranger.id}`, {
+      method: 'DELETE',
+      headers: { apikey: SVC, Authorization: `Bearer ${SVC}` },
+    }),
+  )
+  const admin = await createUser('admin')
+  await makeAdmin(admin.id, 'super_admin')
+  cleanup.push(() =>
+    fetch(`${URL_BASE}/auth/v1/admin/users/${admin.id}`, {
+      method: 'DELETE',
+      headers: { apikey: SVC, Authorization: `Bearer ${SVC}` },
+    }),
+  )
+
+  const state = (await rest('states?select=id,name&limit=1', SVC)).body[0]
+
+  /** A disposable city, so nothing the marketplace depends on is at risk. */
+  async function makeCity(tag) {
+    const { body } = await rest('cities?select=id', SVC, {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        state_id: state.id,
+        name: `Probe ${tag}`,
+        slug: `probe-${tag}-${Date.now()}`,
+        active: false,
+      }),
+    })
+    const id = body[0].id
+    cleanup.push(() => rest(`cities?id=eq.${id}`, SVC, { method: 'DELETE' }))
+    return id
+  }
+
+  // -------------------------------------------------------------------------
+  // 1. Who may call it at all
+  // -------------------------------------------------------------------------
+  const anonTarget = await makeCity('anon')
+  await deleteCity(anonTarget, ANON)
+  record('an anonymous caller cannot delete a city', await cityExists(anonTarget))
+
+  const strangerTarget = await makeCity('stranger')
+  await deleteCity(strangerTarget, ANON, stranger.jwt)
+  record(
+    'a signed-in non-admin cannot delete a city',
+    await cityExists(strangerTarget),
+    'RLS on cities, not the grant',
+  )
+
+  // -------------------------------------------------------------------------
+  // 2. An admin can — but only when nothing points at it
+  // -------------------------------------------------------------------------
+  const unused = await makeCity('unused')
+  const okRes = await deleteCity(unused, ANON, admin.jwt)
+  record(
+    'an admin deletes an unused city',
+    !(await cityExists(unused)),
+    `HTTP ${okRes.status}`,
+  )
+
+  // A vendor covering the city is the case that used to cascade away silently.
+  const vendor = (await rest('vendors?select=id&limit=1', SVC)).body[0]
+  const inUse = await makeCity('inuse')
+  const area = await rest('vendor_service_areas?select=id', SVC, {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ vendor_id: vendor.id, city_id: inUse, travel_available: false }),
+  })
+  const areaId = area.body?.[0]?.id
+  cleanup.push(() => rest(`vendor_service_areas?id=eq.${areaId}`, SVC, { method: 'DELETE' }))
+
+  const refused = await deleteCity(inUse, ANON, admin.jwt)
+  record(
+    'a city with a vendor covering it is refused',
+    await cityExists(inUse),
+    `HTTP ${refused.status}`,
+  )
+
+  // The refusal is only worth anything if the coverage row is still there —
+  // this is the exact row the old CASCADE would have taken.
+  const survived = await rest(`vendor_service_areas?select=id&id=eq.${areaId}`, SVC)
+  record(
+    "the vendor's service area survived the refusal",
+    Array.isArray(survived.body) && survived.body.length === 1,
+  )
+
+  record(
+    'the refusal says what is in the way',
+    typeof refused.body?.message === 'string' && /still in use/.test(refused.body.message),
+    refused.body?.message ?? JSON.stringify(refused.body),
+  )
+
+  // -------------------------------------------------------------------------
+  // 3. The constraint holds even without the function
+  // -------------------------------------------------------------------------
+  const direct = await rest(`cities?id=eq.${inUse}`, SVC, { method: 'DELETE' })
+  record(
+    'even the service role cannot cascade it away directly',
+    await cityExists(inUse),
+    `HTTP ${direct.status} — the FK is RESTRICT now, so this is enforced below RLS`,
+  )
+} finally {
+  for (const undo of cleanup.reverse()) {
+    try {
+      await undo()
+    } catch {
+      /* best effort */
+    }
+  }
+}
+
+const failed = results.filter((r) => !r.pass).length
+console.log(`\n${results.length - failed} passed, ${failed} failed`)
+process.exit(failed ? 1 : 0)

@@ -163,7 +163,7 @@ export function NewCityForm({ states }: { states: { id: string; name: string }[]
 
       <Field
         label="Slug"
-        hint="Used in the URL. Cannot be changed after saving."
+        hint="Used in the URL. Editable later — a rename leaves a 301 behind."
         error={fieldError(state, 'slug')}
         required
       >

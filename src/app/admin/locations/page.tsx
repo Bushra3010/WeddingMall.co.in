@@ -1,3 +1,4 @@
+import { CityRow } from '@/components/admin/city-rows'
 import { StateToggle } from '@/components/admin/state-toggle'
 import { NewCityForm } from '@/components/admin/taxonomy-forms'
 import { EmptyState } from '@/components/ui/states'
@@ -20,6 +21,9 @@ export default async function AdminLocationsPage() {
       .order('name'),
     supabase.from('states').select('id, name, slug, active').order('name'),
   ])
+
+  // Computed once and shared by every row's editor rather than per row.
+  const activeStates = (states ?? []).filter((row) => row.active)
 
   // Cities per state, so an admin can see which states are worth activating
   // and which would show up empty.
@@ -60,22 +64,14 @@ export default async function AdminLocationsPage() {
                     <th scope="col" className="px-4 py-3 font-medium">
                       Visible
                     </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-sand-200 divide-y bg-white">
                   {(cities ?? []).map((city) => (
-                    <tr key={city.id}>
-                      <td className="text-sand-900 px-4 py-3 font-medium">{city.name}</td>
-                      <td className="text-sand-700 px-4 py-3">{city.states?.name ?? '—'}</td>
-                      <td className="text-sand-600 px-4 py-3 font-mono text-xs">{city.slug}</td>
-                      <td className="px-4 py-3">
-                        {city.active ? (
-                          <span className="text-[var(--color-success)]">yes</span>
-                        ) : (
-                          <span className="text-sand-500">hidden</span>
-                        )}
-                      </td>
-                    </tr>
+                    <CityRow key={city.id} city={city} states={activeStates} />
                   ))}
                 </tbody>
               </table>
@@ -83,7 +79,7 @@ export default async function AdminLocationsPage() {
           )}
         </div>
 
-        <NewCityForm states={(states ?? []).filter((row) => row.active)} />
+        <NewCityForm states={activeStates} />
       </div>
 
       <section aria-labelledby="admin-states" className="space-y-3">
