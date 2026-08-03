@@ -1,6 +1,5 @@
-import Link from 'next/link'
-
 import { BottomNav } from '@/components/public/bottom-nav'
+import { DashboardNav } from '@/components/shared/dashboard-nav'
 import { SiteHeader } from '@/components/public/site-header'
 import { signOut } from '@/features/auth/actions'
 import { getActor } from '@/server/dal/actor'
@@ -28,22 +27,11 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   return (
     <div className="flex min-h-dvh flex-col">
       <SiteHeader signedIn={Boolean(actor.userId)} signOutAction={signOut} />
-      <div className="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[14rem_1fr]">
-        <nav aria-label="Account" className="lg:sticky lg:top-24 lg:self-start">
-          <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-            {NAV.map((item) => (
-              <li key={item.href} className="shrink-0">
-                <Link
-                  href={item.href}
-                  className="text-sand-700 hover:bg-sand-100 block rounded-lg px-3 py-2 text-sm whitespace-nowrap"
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <main id="main">{children}</main>
+      <div className="mx-auto grid w-full max-w-7xl flex-1 content-start gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[14rem_1fr] lg:content-normal">
+        <DashboardNav items={NAV} label="Account" rootHref="/account" sticky="lg:top-24" />
+        <main id="main" className="min-w-0">
+          {children}
+        </main>
       </div>
       {/*
         The account area gets the same bar as the public site. "Shortlist"

@@ -422,6 +422,22 @@ Tests: 132 unit (7 new for the shared error mapper), 16 E2E / 10 skipped, 192 RL
 
 **One thing I broke and repaired.** While driving the UI I clicked delete on a real category, "CAR", rather than a throwaway row, and it was removed. Restored from a screenshot taken minutes earlier: name, slug `car`, sort order 0, visible. Its `parent_id` was not recoverable — the row rendered as a sub-category and nothing recorded which parent — so it is back as top-level and needs reassigning. Destructive flows must be driven against rows the probe created, not live ones.
 
+## Both workspaces on a phone (2026-08-04)
+
+Reported as "vendor dashboard in mobile view does not look good", with a screenshot of the header covering only part of the screen. It affected both workspaces and every route under them.
+
+**Cause.** The section nav is a grid item, and a grid item's default `min-width: auto` refuses to shrink below its content. Fourteen vendor links forced the column to 1221px and the document to 1237px; the customer's eight forced 760px. The browser then zoomed the page out to fit, so the header — correctly 390px — covered a third of a 1237px page. The `overflow-x-auto` already on the list never engaged, because its containing block was already wider than the screen.
+
+**Fix.** `min-w-0` on the nav, which is what finally lets the overflow rule work. Both layouts had the same duplicated markup, so it became one `components/shared/dashboard-nav.tsx`, which also fixes something neither had: **the current section was never marked**. On a strip that scrolls past its own edge that leaves nothing to orient by, so the active link now carries `aria-current`, is styled, and is scrolled into view on arrival. Two smaller things: the mobile grid rows were stretching to fill `flex-1` and left ~400px of blank space above the heading (`content-start lg:content-normal`), and the overview stat cards were full-width blocks stacked three deep (`grid-cols-3` from the narrowest width).
+
+Desktop is unchanged — still a 15rem vertical sidebar — except that it now highlights the current section too.
+
+**Why it shipped.** The homepage has had a "does not scroll sideways" assertion since the mobile work. These two routes had none. `tests/e2e/dashboard-mobile.spec.ts` adds three, and they were verified to fail without the fix (`innerWidth` 778 rather than 390) — an assertion that has never failed measures nothing.
+
+Tests: 132 unit, 19 E2E passing (3 new), 192 RLS probe assertions, lint/typecheck/build clean.
+
+**Worth knowing: the E2E suite skips more than it needs to.** `playwright.config.ts` does not load `.env.local` into the test process, so anything needing Supabase credentials skips. Run with the file sourced and it is 25 passed / 4 skipped rather than 16 / 13 — the extra nine pass, they were simply never running. The earlier note that ten skips "need SMTP" was wrong; only the sign-up-form test does. A one-line config change would fix it, left alone here because it changes CI behaviour and was not part of this request.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

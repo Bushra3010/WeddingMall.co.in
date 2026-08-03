@@ -62,7 +62,7 @@ export default async function VendorDashboardPage() {
         <div className="space-y-6">
           {/* Enquiry metrics arrive with the CRM in Milestone 5; showing zeroes
               now would imply the pipeline exists. */}
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
             {[
               { label: 'Packages', value: vendor.packageCount },
               { label: 'Photos', value: vendor.mediaCount },
@@ -70,10 +70,10 @@ export default async function VendorDashboardPage() {
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-4"
+                className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-3 sm:p-4"
               >
-                <p className="text-sand-900 text-2xl font-semibold">{stat.value}</p>
-                <p className="text-sand-600 text-sm">{stat.label}</p>
+                <p className="text-sand-900 text-xl font-semibold sm:text-2xl">{stat.value}</p>
+                <p className="text-sand-600 text-xs sm:text-sm">{stat.label}</p>
               </div>
             ))}
           </div>

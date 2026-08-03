@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
+import { DashboardNav } from '@/components/shared/dashboard-nav'
 import { SignOutButton } from '@/components/shared/sign-out-button'
 import { requireUser } from '@/server/policies/require'
 import { site } from '@/lib/site'
@@ -57,22 +58,9 @@ export default async function VendorDashboardLayout({ children }: { children: Re
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-[100rem] flex-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[15rem_1fr]">
-        <nav aria-label="Vendor dashboard" className="lg:sticky lg:top-6 lg:self-start">
-          <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-            {NAV.map((item) => (
-              <li key={item.href} className="shrink-0">
-                <Link
-                  href={item.href}
-                  className="text-sand-700 block rounded-lg px-3 py-2 text-sm whitespace-nowrap hover:bg-white"
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <main id="main" className="rounded-[var(--radius-card)] bg-white p-6">
+      <div className="mx-auto grid w-full max-w-[100rem] flex-1 content-start gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[15rem_1fr] lg:content-normal">
+        <DashboardNav items={NAV} label="Vendor dashboard" rootHref="/vendor-dashboard" />
+        <main id="main" className="min-w-0 rounded-[var(--radius-card)] bg-white p-4 sm:p-6">
           {children}
         </main>
       </div>

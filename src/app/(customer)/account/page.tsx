@@ -48,16 +48,21 @@ export default async function AccountPage() {
         </p>
       </header>
 
-      <ul className="grid gap-4 sm:grid-cols-3">
+      {/* Three across even on the narrowest phone: each card is a number
+          and a two-word label, so stacking them full-width spent most of the
+          first screen on three figures. */}
+      <ul className="grid grid-cols-3 gap-3 sm:gap-4">
         {cards.map((card) => (
           <li key={card.href}>
             <Link
               href={card.href}
-              className="border-sand-200 hover:border-brand-300 block rounded-[var(--radius-card)] border bg-white p-5"
+              className="border-sand-200 hover:border-brand-300 block h-full rounded-[var(--radius-card)] border bg-white p-3 sm:p-5"
             >
               <card.icon aria-hidden="true" className="text-brand-600 size-5" />
-              <p className="text-sand-900 mt-3 text-2xl font-semibold">{card.value}</p>
-              <p className="text-sand-600 text-sm">{card.label}</p>
+              <p className="text-sand-900 mt-2 text-xl font-semibold sm:mt-3 sm:text-2xl">
+                {card.value}
+              </p>
+              <p className="text-sand-600 text-xs sm:text-sm">{card.label}</p>
             </Link>
           </li>
         ))}
