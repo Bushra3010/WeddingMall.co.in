@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 
 import { SignOutButton } from '@/components/shared/sign-out-button'
@@ -37,8 +38,15 @@ export default async function VendorDashboardLayout({ children }: { children: Re
     <div className="bg-sand-100 flex min-h-dvh flex-col">
       <header className="border-sand-200 border-b bg-white">
         <div className="mx-auto flex h-14 max-w-[100rem] items-center gap-3 px-4 sm:px-6">
-          <Link href="/" className="font-display text-brand-800 text-lg font-semibold">
-            {site.name}
+          {/* White bar, so the artwork needs no inversion here. */}
+          <Link href="/" aria-label={`${site.name} — home`} className="inline-flex">
+            <Image
+              src="/logo-wordmark.png"
+              alt={site.name}
+              width={390}
+              height={93}
+              className="h-6 w-auto"
+            />
           </Link>
           <span className="bg-brand-50 text-brand-700 rounded-full px-2 py-0.5 text-xs font-medium">
             Vendor

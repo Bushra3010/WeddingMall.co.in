@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 
 import { SignOutButton } from '@/components/shared/sign-out-button'
@@ -42,8 +43,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="bg-sand-950 text-sand-100 flex min-h-dvh flex-col">
       <header className="border-sand-800 border-b">
         <div className="mx-auto flex h-14 max-w-[100rem] items-center gap-3 px-4 sm:px-6">
-          <Link href="/" className="font-display text-lg font-semibold text-white">
-            {site.name}
+          {/* Dark bar, so the logo takes the same flat-white treatment as the
+              footer and the header over the hero. */}
+          <Link href="/" aria-label={`${site.name} — home`} className="inline-flex">
+            <Image
+              src="/logo-wordmark.png"
+              alt={site.name}
+              width={390}
+              height={93}
+              className="h-6 w-auto brightness-0 invert"
+            />
           </Link>
           <span className="bg-sand-800 text-accent-300 rounded-full px-2 py-0.5 text-xs font-medium">
             Admin
