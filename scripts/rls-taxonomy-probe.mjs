@@ -1,5 +1,6 @@
 /**
- * Deleting a city: who may, and what it refuses to take with it (PRD 6.11).
+ * Deleting from the admin catalogue: who may, and what each delete refuses to
+ * take with it (PRD 6.11, 9.5).
  *
  * Seven tables reference `cities`, and until migration 0032 two of them
  * cascaded — so deleting a city in use silently removed vendors' service areas
@@ -47,8 +48,17 @@ async function rest(path, key, init = {}, jwt = null) {
   return { status: res.status, body }
 }
 
-const deleteCity = (id, key, jwt) =>
-  rest('rpc/delete_city', key, { method: 'POST', body: JSON.stringify({ p_id: id }) }, jwt)
+const rpc = (fn, id, key, jwt) =>
+  rest(`rpc/${fn}`, key, { method: 'POST', body: JSON.stringify({ p_id: id }) }, jwt)
+
+const deleteCity = (id, key, jwt) => rpc('delete_city', id, key, jwt)
+
+/** Does a row still exist? Read as the service role, so RLS cannot make a
+ *  surviving row look deleted. */
+async function stillThere(table, id) {
+  const { body } = await rest(`${table}?select=id&id=eq.${id}`, SVC)
+  return Array.isArray(body) && body.length === 1
+}
 
 /** Does this city still exist? Read as the service role, so RLS cannot make a
  *  surviving row look deleted. */
@@ -190,6 +200,127 @@ try {
     await cityExists(inUse),
     `HTTP ${direct.status} — the FK is RESTRICT now, so this is enforced below RLS`,
   )
+  // -------------------------------------------------------------------------
+  // 4. Categories — the cascade runs two tables deep
+  // -------------------------------------------------------------------------
+  const { body: catBody } = await rest('categories?select=id', SVC, {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ name: 'Probe Category', slug: `probe-cat-${Date.now()}`, active: false }),
+  })
+  const catId = catBody[0].id
+  cleanup.push(() => rest(`categories?id=eq.${catId}`, SVC, { method: 'DELETE' }))
+
+  const okCat = await rpc('delete_category', catId, ANON, admin.jwt)
+  record('an admin deletes an unused category', !(await stillThere('categories', catId)), `HTTP ${okCat.status}`)
+
+  // One with an attribute hanging off it: `category_attributes` cascades from
+  // `categories`, and `vendor_attribute_values` cascades from that.
+  const { body: cat2Body } = await rest('categories?select=id', SVC, {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ name: 'Probe Category 2', slug: `probe-cat2-${Date.now()}`, active: false }),
+  })
+  const cat2 = cat2Body[0].id
+  cleanup.push(() => rest(`categories?id=eq.${cat2}`, SVC, { method: 'DELETE' }))
+  const { body: attrBody } = await rest('category_attributes?select=id', SVC, {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      category_id: cat2, code: 'probe_attr', label: 'Probe attribute',
+      input_type: 'text', data_type: 'string',
+    }),
+  })
+  const attrId = attrBody[0].id
+  cleanup.push(() => rest(`category_attributes?id=eq.${attrId}`, SVC, { method: 'DELETE' }))
+
+  const refusedCat = await rpc('delete_category', cat2, ANON, admin.jwt)
+  record('a category with an attribute is refused', await stillThere('categories', cat2), `HTTP ${refusedCat.status}`)
+  record('its attribute survived the refusal', await stillThere('category_attributes', attrId))
+
+  // -------------------------------------------------------------------------
+  // 5. Attributes — deletes, and reports what went with it
+  // -------------------------------------------------------------------------
+  const answered = await rest('vendor_attribute_values?select=vendor_id', SVC, {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ vendor_id: vendor.id, category_attribute_id: attrId, value_json: 'probe' }),
+  })
+  record('an answer was created to delete alongside', answered.status === 201, `HTTP ${answered.status}`)
+
+  const delAttr = await rpc('delete_attribute', attrId, ANON, admin.jwt)
+  record('an attribute is deleted', !(await stillThere('category_attributes', attrId)), `HTTP ${delAttr.status}`)
+  record(
+    'it reports how many vendor answers went with it',
+    delAttr.body === 1 || delAttr.body === '1',
+    `returned ${JSON.stringify(delAttr.body)}`,
+  )
+  const orphans = await rest(`vendor_attribute_values?select=vendor_id&category_attribute_id=eq.${attrId}`, SVC)
+  record('the answers are actually gone, not orphaned', Array.isArray(orphans.body) && orphans.body.length === 0)
+
+  // -------------------------------------------------------------------------
+  // 6. Content pages — the five that back public routes are protected
+  // -------------------------------------------------------------------------
+  const systemPage = (await rest('pages?select=id,slug,title&slug=eq.privacy', SVC)).body[0]
+  if (systemPage) {
+    const refusedPage = await rpc('delete_page', systemPage.id, ANON, admin.jwt)
+    record('a system page cannot be deleted', await stillThere('pages', systemPage.id), `HTTP ${refusedPage.status}`)
+  } else {
+    record('a system page cannot be deleted', false, 'no /privacy page seeded')
+  }
+
+  const { body: pageBody } = await rest('pages?select=id', SVC, {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ slug: `probe-page-${Date.now()}`, title: 'Probe page', status: 'draft' }),
+  })
+  const pageId = pageBody[0].id
+  cleanup.push(() => rest(`pages?id=eq.${pageId}`, SVC, { method: 'DELETE' }))
+  const okPage = await rpc('delete_page', pageId, ANON, admin.jwt)
+  record('an ordinary page is deleted', !(await stillThere('pages', pageId)), `HTTP ${okPage.status}`)
+
+  // -------------------------------------------------------------------------
+  // 7. Plans — refused while anything bills against them
+  // -------------------------------------------------------------------------
+  const { body: planBody } = await rest('plans?select=id', SVC, {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      code: `probe-plan-${Date.now()}`, name: 'Probe plan',
+      billing_interval: 'monthly', amount_minor: 0, active: false,
+    }),
+  })
+  const planId = planBody[0].id
+  cleanup.push(() => rest(`plans?id=eq.${planId}`, SVC, { method: 'DELETE' }))
+
+  const inUsePlan = (await rest('plans?select=id&limit=1', SVC)).body[0]
+  const vendorOnPlan = await rest(`vendors?id=eq.${vendor.id}`, SVC, {
+    method: 'PATCH',
+    body: JSON.stringify({ plan_id: inUsePlan.id }),
+  })
+  cleanup.push(() => rest(`vendors?id=eq.${vendor.id}`, SVC, { method: 'PATCH', body: JSON.stringify({ plan_id: null }) }))
+  record('a vendor was put on a plan to block its delete', vendorOnPlan.status < 300, `HTTP ${vendorOnPlan.status}`)
+
+  const refusedPlan = await rpc('delete_plan', inUsePlan.id, ANON, admin.jwt)
+  record('a plan in use is refused', await stillThere('plans', inUsePlan.id), `HTTP ${refusedPlan.status}`)
+
+  const okPlan = await rpc('delete_plan', planId, ANON, admin.jwt)
+  record('an unused plan is deleted', !(await stillThere('plans', planId)), `HTTP ${okPlan.status}`)
+
+  // -------------------------------------------------------------------------
+  // 8. None of this is reachable without the right role
+  // -------------------------------------------------------------------------
+  const { body: guardBody } = await rest('categories?select=id', SVC, {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ name: 'Probe guard', slug: `probe-guard-${Date.now()}`, active: false }),
+  })
+  const guardId = guardBody[0].id
+  cleanup.push(() => rest(`categories?id=eq.${guardId}`, SVC, { method: 'DELETE' }))
+  await rpc('delete_category', guardId, ANON, stranger.jwt)
+  record('a signed-in non-admin cannot delete a category', await stillThere('categories', guardId))
+  await rpc('delete_category', guardId, ANON)
+  record('an anonymous caller cannot delete a category', await stillThere('categories', guardId))
 } finally {
   for (const undo of cleanup.reverse()) {
     try {

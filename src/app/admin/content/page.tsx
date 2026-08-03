@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { PageForm } from '@/components/admin/content-forms'
 import { formatRelative } from '@/lib/dates'
 import { NOINDEX } from '@/lib/seo'
+import { DeleteRowButton } from '@/components/admin/delete-row-button'
+import { deletePageAction } from '@/features/cms/content-actions'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 import { requireElevatedAdmin } from '@/server/policies/require'
@@ -22,7 +24,7 @@ export default async function AdminContentPage({
 
   const { data: pages } = await supabase
     .from('pages')
-    .select('id, slug, title, status, body, seo_description, updated_at')
+    .select('id, slug, title, status, body, seo_description, updated_at, is_system')
     .order('slug')
 
   const editing = slug ? (pages ?? []).find((p) => p.slug === slug) : undefined
@@ -54,7 +56,7 @@ export default async function AdminContentPage({
                   Updated
                 </th>
                 <th scope="col" className="px-4 py-3 text-right font-medium">
-                  <span className="sr-only">Edit</span>
+                  <span className="sr-only">Actions</span>
                 </th>
               </tr>
             </thead>
@@ -77,12 +79,30 @@ export default async function AdminContentPage({
                     {formatRelative(page.updated_at)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/admin/content?slug=${page.slug}`}
-                      className="text-brand-700 text-sm hover:underline"
-                    >
-                      Edit
-                    </Link>
+                    <div className="flex items-center justify-end gap-3">
+                      <Link
+                        href={`/admin/content?slug=${page.slug}`}
+                        className="text-brand-700 text-sm hover:underline"
+                      >
+                        Edit<span className="sr-only"> {page.title}</span>
+                      </Link>
+                      {/*
+                        Five slugs back fixed public routes (/privacy, /terms,
+                        /about, /contact, /help). `delete_page()` refuses them,
+                        so the button is not offered rather than offered and
+                        rejected — a control that always fails is worse than no
+                        control.
+                      */}
+                      {page.is_system ? (
+                        <span className="text-sand-400 text-xs">System page</span>
+                      ) : (
+                        <DeleteRowButton
+                          id={page.id}
+                          label={page.title}
+                          action={deletePageAction}
+                        />
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

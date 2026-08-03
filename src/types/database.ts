@@ -1115,6 +1115,7 @@ export interface Database {
           updated_by: string | null
           created_at: string
           updated_at: string
+          is_system: boolean
         }
         Insert: {
           id?: string
@@ -1131,6 +1132,7 @@ export interface Database {
           updated_by?: string | null
           created_at?: string
           updated_at?: string
+          is_system?: boolean
         }
         Update: {
           id?: string
@@ -1147,6 +1149,7 @@ export interface Database {
           updated_by?: string | null
           created_at?: string
           updated_at?: string
+          is_system?: boolean
         }
       Relationships: [
         {
@@ -2993,7 +2996,27 @@ export interface Database {
         Args: { [key: string]: unknown }
         Returns: unknown
       }
+      delete_attribute: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      delete_category: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
       delete_city: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      delete_page: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      delete_plan: {
+        Args: { [key: string]: unknown }
+        Returns: unknown
+      }
+      delete_post: {
         Args: { [key: string]: unknown }
         Returns: unknown
       }

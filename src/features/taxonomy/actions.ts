@@ -7,7 +7,7 @@ import { assertPermission, can } from '@/lib/permissions'
 import { createClient } from '@/lib/supabase/server'
 import { getActor } from '@/server/dal/actor'
 import { categoryFormSchema, cityFormSchema } from '@/features/vendors/schema'
-import { describeDeleteCityError } from '@/features/taxonomy/delete-errors'
+import { describeDeleteError } from '@/features/admin/delete-errors'
 
 /**
  * Taxonomy management (PRD 6.11).
@@ -171,7 +171,7 @@ export async function deleteCityAction(
     const { error } = await supabase.rpc('delete_city', { p_id: id })
 
     if (error) {
-      const failure = describeDeleteCityError(error)
+      const failure = describeDeleteError(error, 'We could not delete that city.')
       throw new ServiceError(failure.code, failure.message)
     }
 
@@ -181,6 +181,41 @@ export async function deleteCityAction(
   if (result.ok) {
     revalidatePath('/admin/locations')
     revalidatePath('/cities')
+    revalidatePath('/')
+  }
+  return result
+}
+
+/**
+ * Delete a category (PRD 6.11).
+ *
+ * Guarded by `delete_category()` (migration 0034) for the same reason as
+ * cities, only worse: `category_attributes` cascades from a category and
+ * `vendor_attribute_values` cascades from that, so one unguarded delete would
+ * remove every vendor's answers for the category two hops down.
+ */
+export async function deleteCategoryAction(
+  _prev: unknown,
+  form: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  const result = await runAction('taxonomy.deleteCategory', async () => {
+    await assertTaxonomyPermission()
+
+    const id = str(form, 'id')
+    if (!id) throw new ServiceError('validation_error', 'Missing category.')
+
+    const supabase = await createClient()
+    const { error } = await supabase.rpc('delete_category', { p_id: id })
+    if (error) {
+      const failure = describeDeleteError(error, 'We could not delete that category.')
+      throw new ServiceError(failure.code, failure.message)
+    }
+    return { id }
+  })
+
+  if (result.ok) {
+    revalidatePath('/admin/categories')
+    revalidatePath('/categories')
     revalidatePath('/')
   }
   return result

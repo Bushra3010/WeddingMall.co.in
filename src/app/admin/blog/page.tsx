@@ -4,6 +4,8 @@ import { PostForm } from '@/components/admin/content-forms'
 import { EmptyState } from '@/components/ui/states'
 import { formatRelative } from '@/lib/dates'
 import { NOINDEX } from '@/lib/seo'
+import { DeleteRowButton } from '@/components/admin/delete-row-button'
+import { deletePostAction } from '@/features/cms/content-actions'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 import { requireElevatedAdmin } from '@/server/policies/require'
@@ -63,7 +65,7 @@ export default async function AdminBlogPage({
                       Updated
                     </th>
                     <th scope="col" className="px-4 py-3 text-right font-medium">
-                      <span className="sr-only">Edit</span>
+                      <span className="sr-only">Actions</span>
                     </th>
                   </tr>
                 </thead>
@@ -91,12 +93,19 @@ export default async function AdminBlogPage({
                         {formatRelative(post.updated_at)}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Link
-                          href={`/admin/blog?slug=${post.slug}`}
-                          className="text-brand-700 text-sm hover:underline"
-                        >
-                          Edit
-                        </Link>
+                        <div className="flex items-center justify-end gap-3">
+                          <Link
+                            href={`/admin/blog?slug=${post.slug}`}
+                            className="text-brand-700 text-sm hover:underline"
+                          >
+                            Edit<span className="sr-only"> {post.title}</span>
+                          </Link>
+                          <DeleteRowButton
+                            id={post.id}
+                            label={post.title}
+                            action={deletePostAction}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ))}

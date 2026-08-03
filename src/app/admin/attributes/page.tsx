@@ -1,4 +1,5 @@
 import { AttributeDefinitionForm } from '@/components/admin/attribute-definition-form'
+import { AttributeRow } from '@/components/admin/attribute-rows'
 import { EmptyState } from '@/components/ui/states'
 import { NOINDEX } from '@/lib/seo'
 import { createClient } from '@/lib/supabase/server'
@@ -12,12 +13,23 @@ export default async function AdminAttributesPage() {
   await requireElevatedAdmin()
   const supabase = await createClient()
 
-  const [{ data: categories }, attributes] = await Promise.all([
+  const [{ data: categories }, attributes, { data: answers }] = await Promise.all([
     supabase.from('categories').select('id, name').order('sort_order').order('name'),
     listAttributes(),
+    // Deleting an attribute removes the answers with it, so the count is
+    // rendered next to the button rather than discovered afterwards.
+    supabase.from('vendor_attribute_values').select('category_attribute_id'),
   ])
 
   const byCategory = new Map((categories ?? []).map((c) => [c.id, c.name]))
+
+  const answerCounts = new Map<string, number>()
+  for (const row of answers ?? []) {
+    answerCounts.set(
+      row.category_attribute_id,
+      (answerCounts.get(row.category_attribute_id) ?? 0) + 1,
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -54,27 +66,20 @@ export default async function AdminAttributesPage() {
                     <th scope="col" className="px-4 py-3 font-medium">
                       Filter
                     </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-sand-200 divide-y bg-white">
                   {attributes.map((attribute) => (
-                    <tr key={attribute.id}>
-                      <td className="text-sand-700 px-4 py-3">
-                        {byCategory.get(attribute.categoryId) ?? '—'}
-                      </td>
-                      <td className="text-sand-900 px-4 py-3 font-medium">{attribute.label}</td>
-                      <td className="text-sand-600 px-4 py-3 font-mono text-xs">
-                        {attribute.code}
-                      </td>
-                      <td className="text-sand-700 px-4 py-3">{attribute.inputType}</td>
-                      <td className="px-4 py-3">
-                        {attribute.filterable ? (
-                          <span className="text-[var(--color-success)]">yes</span>
-                        ) : (
-                          <span className="text-sand-500">no</span>
-                        )}
-                      </td>
-                    </tr>
+                    <AttributeRow
+                      key={attribute.id}
+                      attribute={attribute}
+                      categories={categories ?? []}
+                      categoryName={byCategory.get(attribute.categoryId) ?? '—'}
+                      answerCount={answerCounts.get(attribute.id) ?? 0}
+                    />
                   ))}
                 </tbody>
               </table>

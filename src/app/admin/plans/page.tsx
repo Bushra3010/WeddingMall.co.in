@@ -1,7 +1,5 @@
-import { Check, Minus } from 'lucide-react'
-
+import { NewPlanForm, PlanRow } from '@/components/admin/plan-form'
 import { EmptyState } from '@/components/ui/states'
-import { formatMoney, money } from '@/lib/money'
 import { NOINDEX } from '@/lib/seo'
 import { createClient } from '@/lib/supabase/server'
 import { requireElevatedAdmin } from '@/server/policies/require'
@@ -20,15 +18,6 @@ const ENTITLEMENTS = [
   ['export', 'Export'],
 ] as const
 
-function Value({ value }: { value: unknown }) {
-  if (value === true)
-    return <Check aria-label="Included" className="size-4 text-[var(--color-success)]" />
-  if (value === false) return <Minus aria-label="Not included" className="text-sand-400 size-4" />
-  // `null` means unlimited in the entitlements JSON, not missing.
-  if (value === null) return <span>Unlimited</span>
-  return <span>{String(value ?? '—')}</span>
-}
-
 export default async function AdminPlansPage() {
   await requireElevatedAdmin('billing.manage')
   const supabase = await createClient()
@@ -36,7 +25,9 @@ export default async function AdminPlansPage() {
   const [{ data: plans }, { data: subscriptions }] = await Promise.all([
     supabase
       .from('plans')
-      .select('id, code, name, amount_minor, currency, billing_interval, entitlements_json, active')
+      .select(
+        'id, code, name, amount_minor, currency, billing_interval, trial_days, sort_order, entitlements_json, active',
+      )
       .order('sort_order'),
     supabase.from('subscriptions').select('plan_id, status'),
   ])
@@ -55,13 +46,13 @@ export default async function AdminPlansPage() {
         <h1 className="font-display text-sand-900 text-2xl">Plans</h1>
         <p className="text-sand-600 mt-1 max-w-prose text-sm">
           Entitlements are enforced in SQL, not here — `vendor_may_be_featured()` reads the live
-          subscription, so a plan change takes effect for every vendor on it immediately. Editing
-          prices and entitlements is not yet exposed; use a migration so the change is reviewable.
+          subscription, so a plan change takes effect for every vendor on it immediately. The
+          subscriber count is shown before you edit for that reason.
         </p>
       </header>
 
       {(plans ?? []).length === 0 ? (
-        <EmptyState title="No plans" description="Seed them with a migration." />
+        <EmptyState title="No plans" description="Add the first one to get started." />
       ) : (
         <div className="border-sand-200 overflow-x-auto rounded-[var(--radius-card)] border">
           <table className="w-full min-w-[46rem] text-sm">
@@ -82,39 +73,26 @@ export default async function AdminPlansPage() {
                     {label}
                   </th>
                 ))}
+                <th scope="col" className="px-4 py-3 text-right font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-sand-200 divide-y bg-white">
-              {(plans ?? []).map((plan) => {
-                const ent = (plan.entitlements_json ?? {}) as Record<string, unknown>
-                return (
-                  <tr key={plan.id}>
-                    <td className="text-sand-900 px-4 py-3 font-medium">
-                      {plan.name}
-                      {!plan.active ? (
-                        <span className="text-sand-500 ml-2 text-xs">(inactive)</span>
-                      ) : null}
-                      <span className="text-sand-400 block font-mono text-xs">{plan.code}</span>
-                    </td>
-                    <td className="text-sand-700 px-4 py-3 whitespace-nowrap">
-                      {plan.amount_minor === 0
-                        ? 'Free'
-                        : formatMoney(money(plan.amount_minor, plan.currency))}
-                      <span className="text-sand-400 block text-xs">{plan.billing_interval}</span>
-                    </td>
-                    <td className="text-sand-700 px-4 py-3">{counts.get(plan.id) ?? 0}</td>
-                    {ENTITLEMENTS.map(([key]) => (
-                      <td key={key} className="text-sand-700 px-3 py-3">
-                        <Value value={ent[key]} />
-                      </td>
-                    ))}
-                  </tr>
-                )
-              })}
+              {(plans ?? []).map((plan) => (
+                <PlanRow
+                  key={plan.id}
+                  plan={plan}
+                  subscribers={counts.get(plan.id) ?? 0}
+                  columns={ENTITLEMENTS}
+                />
+              ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <NewPlanForm />
     </div>
   )
 }

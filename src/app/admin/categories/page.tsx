@@ -1,3 +1,4 @@
+import { CategoryRow } from '@/components/admin/category-rows'
 import { NewCategoryForm } from '@/components/admin/taxonomy-forms'
 import { EmptyState } from '@/components/ui/states'
 import { NOINDEX } from '@/lib/seo'
@@ -14,7 +15,7 @@ export default async function AdminCategoriesPage() {
   // Includes inactive rows: the taxonomy read policy grants admins the full set.
   const { data } = await supabase
     .from('categories')
-    .select('id, name, slug, active, sort_order, parent_id')
+    .select('id, name, slug, description, active, sort_order, parent_id')
     .order('sort_order')
     .order('name')
 
@@ -52,25 +53,14 @@ export default async function AdminCategoriesPage() {
                     <th scope="col" className="px-4 py-3 font-medium">
                       Visible
                     </th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-sand-200 divide-y bg-white">
                   {categories.map((category) => (
-                    <tr key={category.id}>
-                      <td className="text-sand-900 px-4 py-3 font-medium">
-                        {category.parent_id ? <span className="text-sand-400">— </span> : null}
-                        {category.name}
-                      </td>
-                      <td className="text-sand-600 px-4 py-3 font-mono text-xs">{category.slug}</td>
-                      <td className="text-sand-700 px-4 py-3">{category.sort_order}</td>
-                      <td className="px-4 py-3">
-                        {category.active ? (
-                          <span className="text-[var(--color-success)]">yes</span>
-                        ) : (
-                          <span className="text-sand-500">hidden</span>
-                        )}
-                      </td>
-                    </tr>
+                    <CategoryRow key={category.id} category={category} parents={parents} />
                   ))}
                 </tbody>
               </table>

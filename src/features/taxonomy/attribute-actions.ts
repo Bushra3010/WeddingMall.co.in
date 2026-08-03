@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getActor } from '@/server/dal/actor'
 import { attributeDefinitionSchema, linesToList } from '@/features/listings/schema'
 import type { Json } from '@/types/database'
+import { describeDeleteError } from '@/features/admin/delete-errors'
 
 /**
  * Category attributes (PRD 6.2 — "Category-specific filters must be
@@ -95,6 +96,50 @@ export async function saveAttributeAction(
       )
     }
     return { id: data.id }
+  })
+
+  if (result.ok) {
+    revalidatePath('/admin/attributes')
+    revalidatePath('/vendors')
+  }
+  return result
+}
+
+/**
+ * Delete an attribute definition (PRD 6.2).
+ *
+ * Unlike the other deletes this one proceeds rather than refusing, and returns
+ * how many vendor answers went with it. A question that no longer exists cannot
+ * have meaningful answers, and there is no way to hide an attribute — refusing
+ * while any vendor had filled it in would make it permanently undeletable. The
+ * admin screen shows that count next to the button, so the consequence is known
+ * before the click rather than discovered after it.
+ */
+export async function deleteAttributeAction(
+  _prev: unknown,
+  form: FormData,
+): Promise<ActionResult<{ id: string; answersRemoved: number }>> {
+  const result = await runAction('taxonomy.deleteAttribute', async () => {
+    // The same gate `saveAttributeAction` uses. Whoever may create an
+    // attribute may remove one; splitting them would leave a role able to add
+    // rows it could never clean up.
+    const actor = await getActor()
+    if (!can(actor, 'admin.manage') && !can(actor, 'cms.publish')) {
+      assertPermission(actor, 'admin.manage')
+    }
+
+    const id = str(form, 'id')
+    if (!id) throw new ServiceError('validation_error', 'Missing attribute.')
+
+    const supabase = await createClient()
+    const { data, error } = await supabase.rpc('delete_attribute', { p_id: id })
+    if (error) {
+      const failure = describeDeleteError(error, 'We could not delete that attribute.')
+      throw new ServiceError(failure.code, failure.message)
+    }
+    // The type generator emits `Returns: unknown` for every function, so the
+    // shape is narrowed here rather than asserted (ADR-010).
+    return { id, answersRemoved: typeof data === 'number' ? data : 0 }
   })
 
   if (result.ok) {

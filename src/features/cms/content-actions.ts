@@ -7,6 +7,7 @@ import { runAction, ServiceError, type ActionResult } from '@/lib/action-result'
 import { createClient } from '@/lib/supabase/server'
 import { can } from '@/lib/permissions'
 import { getActor } from '@/server/dal/actor'
+import { describeDeleteError } from '@/features/admin/delete-errors'
 
 /** CMS writes (PRD 6.11, 9.5). */
 
@@ -148,4 +149,55 @@ export async function savePostAction(
     revalidatePath(`/blog/${result.data.slug}`)
   }
   return result
+}
+
+/**
+ * Delete a page or a post (PRD 9.5).
+ *
+ * Nothing has a foreign key to either table, so the only thing worth guarding
+ * is the five public routes that render a `pages` row by slug — /privacy,
+ * /terms, /about, /contact and /help. Those rows carry `is_system` (migration
+ * 0034) and `delete_page()` refuses them, because deleting one leaves a live
+ * route with nothing behind it.
+ */
+async function deleteContent(
+  form: FormData,
+  kind: 'page' | 'post',
+): Promise<ActionResult<{ id: string }>> {
+  const result = await runAction(`cms.delete${kind === 'page' ? 'Page' : 'Post'}`, async () => {
+    await assertCms()
+
+    const id = String(form.get('id') ?? '').trim()
+    if (!id) throw new ServiceError('validation_error', `Missing ${kind}.`)
+
+    const supabase = await createClient()
+    const { error } = await supabase.rpc(kind === 'page' ? 'delete_page' : 'delete_post', {
+      p_id: id,
+    })
+    if (error) {
+      const failure = describeDeleteError(error, `We could not delete that ${kind}.`)
+      throw new ServiceError(failure.code, failure.message)
+    }
+    return { id }
+  })
+
+  if (result.ok) {
+    revalidatePath(kind === 'page' ? '/admin/content' : '/admin/blog')
+    revalidatePath(kind === 'page' ? '/' : '/blog')
+  }
+  return result
+}
+
+export async function deletePageAction(
+  _prev: unknown,
+  form: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  return deleteContent(form, 'page')
+}
+
+export async function deletePostAction(
+  _prev: unknown,
+  form: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  return deleteContent(form, 'post')
 }

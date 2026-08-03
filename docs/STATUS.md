@@ -396,6 +396,32 @@ Tests: 130 unit (5 new), 16 E2E / 10 skipped, 178 RLS probe assertions across 9 
 
 Note: `npm run db:apply` reapplies from `0001` and is not idempotent, so it cannot apply a single new migration; `0032` and `0033` were applied individually. The realtime probe flaked once on a websocket race and passed on rerun — unrelated to this change.
 
+## Edit and delete across the admin catalogue (2026-08-04)
+
+Extends the Locations work to every admin screen whose rows the admin owns. Migration `0034`, `features/admin/delete-errors.ts`, `components/admin/{delete-row-button,category-rows,attribute-rows,plan-form}.tsx`, `features/billing/{plan-schema,plan-actions}.ts`, plus the CMS delete actions.
+
+| Screen | Edit | Delete |
+| --- | --- | --- |
+| Locations (cities) | done in the previous change | refuses while in use |
+| Categories | UI only — `saveCategoryAction` already took an `id` | refuses while in use |
+| Attributes | UI only — `saveAttributeAction` already took an `id` | deletes, reporting the vendor answers that go with it |
+| Blog posts | already existed | unguarded; nothing references `posts` |
+| Content pages | already existed | refuses the five that back public routes |
+| Plans | **new** — no save action existed at all | refuses while any subscription or vendor points at it |
+| Admin users | `grantAdminRoleAction` / `revokeAdminRoleAction` already wired | already wired |
+
+**Attributes are the one delete that proceeds rather than refusing.** `vendor_attribute_values` cascades from `category_attributes`, and there is no way to hide an attribute — refusing while any vendor had answered would make it permanently undeletable. So it deletes and returns the count, and the page renders that count next to the button. Consent, not a surprise.
+
+**System pages.** Five slugs back fixed routes (`/privacy`, `/terms`, `/about`, `/contact`, `/help`). They now carry `pages.is_system`, `delete_page()` refuses them, and the screen shows "System page" instead of offering a button that could only fail.
+
+**Plans previously said pricing changes should go through a migration "so the change is reviewable".** That is now editable, with the reviewability moved into the form: entitlements are eight typed fields, not a JSON textarea, because `vendor_may_be_featured()` reads that object in SQL where a mistyped key is not an error — it is absent, and the vendor silently loses the entitlement. The live subscriber count is shown in the editor header, since a change applies to them immediately.
+
+**Deliberately not given delete buttons**, because these are records of what happened rather than a catalogue: audit log (RLS already forbids it, which is correct), payments and webhook events, leads/enquiries, customers, reviews (moderation exists), vendors (approve/suspend exists), verifications, listings (versioned moderation), settings and reports (no rows to remove).
+
+Tests: 132 unit (7 new for the shared error mapper), 16 E2E / 10 skipped, 192 RLS probe assertions across 9 probes (taxonomy probe 7 → 21), lint/typecheck/build clean.
+
+**One thing I broke and repaired.** While driving the UI I clicked delete on a real category, "CAR", rather than a throwaway row, and it was removed. Restored from a screenshot taken minutes earlier: name, slug `car`, sort order 0, visible. Its `parent_id` was not recoverable — the row rendered as a sub-category and nothing recorded which parent — so it is back as top-level and needs reassigning. Destructive flows must be driven against rows the probe created, not live ones.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
