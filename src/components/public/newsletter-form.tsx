@@ -33,7 +33,21 @@ export function NewsletterForm() {
           required
           placeholder="you@example.com"
           aria-invalid={Boolean(fieldError(state, 'email')) || undefined}
-          className="h-11 flex-1 rounded-full border border-white/20 bg-white/10 px-4 text-sm text-white placeholder:text-white/50 focus:bg-white/15"
+          /*
+            Every colour here is white at some alpha over a near-black maroon,
+            so each one picks up the background's warmth: at 50% the
+            placeholder composited to a muddy brown-grey, and at 10% the field
+            was within a few points of the footer itself and did not read as an
+            input at all. Raised until the field looks like a field and the
+            hint looks like text rather than a smudge — 4.85:1 already cleared
+            AA, so this is about looking deliberate, not about passing.
+
+            The focus outline is overridden to white rather than removed: the
+            global `:focus-visible` rule in globals.css draws it in brand-500,
+            which is a maroon that all but disappears on this near-black maroon
+            panel.
+          */
+          className="h-11 flex-1 rounded-full border border-white/30 bg-white/15 px-4 text-sm text-white placeholder:text-white/70 focus:border-white/50 focus:bg-white/20 focus-visible:outline-white"
         />
         <SubmitButton className="rounded-full" pendingLabel="Signing up…">
           <Mail aria-hidden="true" />

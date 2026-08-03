@@ -438,6 +438,18 @@ Tests: 132 unit, 19 E2E passing (3 new), 192 RLS probe assertions, lint/typechec
 
 **Worth knowing: the E2E suite skips more than it needs to.** `playwright.config.ts` does not load `.env.local` into the test process, so anything needing Supabase credentials skips. Run with the file sourced and it is 25 passed / 4 skipped rather than 16 / 13 — the extra nine pass, they were simply never running. The earlier note that ten skips "need SMTP" was wrong; only the sign-up-form test does. A one-line config change would fix it, left alone here because it changes CI behaviour and was not part of this request.
 
+## Newsletter field legibility (2026-08-04)
+
+Reported as "email placeholder is not looking good" on the footer signup.
+
+Every colour in that footer is white at some alpha over a near-black maroon, so each one picks up the background's warmth. The placeholder at `white/50` composited to rgb(159,142,141) — a muddy brown-grey — and the field at `white/10` came out rgb(72,41,40) against a rgb(40,3,2) footer, close enough that it did not read as an input at all. Raised to `white/70` on `white/15` with a `white/30` border: 4.85:1 → 7.18:1, and the field now looks like a field.
+
+**The measurement is the point.** The reported version measured **4.85:1 — it passed WCAG AA** and still looked wrong. So the regression test asserts 7:1, not 4.5: an AA floor here would pass the exact bug it exists to catch. Both new tests in `public-discovery.spec.ts` were verified to fail against the old styling.
+
+**A mistake caught on the way.** The first attempt added `focus:outline-none` with only a border-colour change to replace it. Tailwind's `focus:` utility outranks the bare `:focus-visible` rule in `globals.css`, so that would have removed the focus indicator outright. The outline is now overridden to white rather than suppressed — the global rule draws it in `brand-500`, a maroon that all but disappears on this panel — and a second test asserts it stays visible.
+
+Tests: 132 unit, 27 E2E passing (2 new, both run unauthenticated so they hold in CI), lint/typecheck/build clean.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
