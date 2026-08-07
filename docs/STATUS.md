@@ -516,6 +516,25 @@ Also fixed: `android:usesCleartextTraffic="false"` was hardcoded in the manifest
 
 Tests: 138 unit (6 new), lint/typecheck/build clean.
 
+## iOS platform (2026-08-04)
+
+Added to the same project with `npx cap add ios`. Bundle id `com.weddingmall.app`, name `WEDDING MALL`, deployment target iOS 15. Full guide in `docs/MOBILE.md`.
+
+**The thing worth catching, and it was nearly shipped broken.** `appendUserAgent` was declared under `android` in `capacitor.config.ts`. Android worked, so the admin-block requirement looked met — but iOS would have shipped without the marker and quietly served the admin workspace inside the app. Nothing would have failed; it simply would not have done what was asked, on one platform. The marker now sits at the **root** of the config, and `tests/native-detection.test.ts` (6 cases) plus `tests/e2e/pwa.spec.ts` assert both platforms.
+
+**Two more that would only have appeared later:**
+
+- **The generated Podfile does not install.** It pins `platform :ios, '14.0'` while every Capacitor 8 pod declares `deployment_target = '15.0'`, so `pod install` fails on a fresh `cap add ios`. Podfile and all four `IPHONEOS_DEPLOYMENT_TARGET` entries raised to 15.0. Same class of template defect as the Android `colors.xml` and AGP problems.
+- **Swipe-back does not exist by default.** iOS has no hardware back button and `WKWebView` ships with `allowsBackForwardNavigationGestures` off; Capacitor neither enables it nor exposes an option. `MainViewController.swift` subclasses `CAPBridgeViewController` to turn it on, registered in the Xcode target via the `xcodeproj` gem rather than by hand-editing the pbxproj.
+
+**File upload needs four Info.plist keys.** iOS terminates the process when the WKWebView picker requests an undeclared permission — a missing `NSCameraUsageDescription` is a crash on the vendor's portfolio screen, not a declined prompt.
+
+**Honest limit: the iOS project has never been compiled.** This machine has only the Command Line Tools; Xcode is a Mac App Store install needing the owner's Apple ID, so there is no `xcodebuild` and no `simctl`. Configuration, scaffolding and `pod install` are done and verified; the first real build is not. That is a materially weaker guarantee than Android, which was built and driven on an emulator, and `docs/MOBILE.md` says so rather than implying parity.
+
+Getting CocoaPods running at all took a detour: the system Ruby is 2.6 and modern CocoaPods requires 3.1+, so the dependency chain was resolved by pinning (`ffi` 1.16.3, `securerandom` 0.3.2, `drb` 2.0.6, `i18n` 1.14.8, `zeitwerk` 2.6.18, `activesupport` 6.1.7.10, `concurrent-ruby` 1.3.4 — the last because 1.3.5 dropped an implicit `logger` require activesupport 6.1 depends on). The documented recommendation for the owner is `brew install ruby` instead.
+
+Tests: 144 unit (12 new), 8 E2E in `pwa.spec.ts` covering both platforms, lint/typecheck/build clean.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

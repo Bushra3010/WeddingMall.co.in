@@ -1,0 +1,32 @@
+require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
+
+# Capacitor 8 and every one of its plugins declare `ios.deployment_target = '15.0'`,
+# but the generated template pins 14.0 — so `pod install` fails on a fresh
+# `cap add ios` with "required a higher minimum deployment target". Raised to
+# match the pods. Keep this in step with IPHONEOS_DEPLOYMENT_TARGET in the
+# Xcode project or the two disagree and the build breaks in a less obvious way.
+platform :ios, '15.0'
+use_frameworks!
+
+# workaround to avoid Xcode caching of Pods that requires
+# Product -> Clean Build Folder after new Cordova plugins installed
+# Requires CocoaPods 1.6 or newer
+install! 'cocoapods', :disable_input_output_paths => true
+
+def capacitor_pods
+  pod 'Capacitor', :path => '../../node_modules/@capacitor/ios'
+  pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
+  pod 'CapacitorApp', :path => '../../node_modules/@capacitor/app'
+  pod 'CapacitorBrowser', :path => '../../node_modules/@capacitor/browser'
+  pod 'CapacitorSplashScreen', :path => '../../node_modules/@capacitor/splash-screen'
+  pod 'CapacitorStatusBar', :path => '../../node_modules/@capacitor/status-bar'
+end
+
+target 'App' do
+  capacitor_pods
+  # Add your Pods here
+end
+
+post_install do |installer|
+  assertDeploymentTarget(installer)
+end

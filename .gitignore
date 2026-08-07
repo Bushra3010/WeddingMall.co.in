@@ -76,3 +76,23 @@ android/captures/
 *.jks
 *.keystore
 android/keystore.properties
+
+# --- Capacitor / iOS -------------------------------------------------------
+# The ios/ project IS committed: Info.plist, icons, splash, the storyboard and
+# the Xcode project are what make a build reproducible. Only build output,
+# machine-specific state, and anything that can sign a release is excluded.
+ios/App/build/
+ios/App/Pods/
+ios/App/App/public/
+ios/App/DerivedData/
+ios/App/output/
+*.xcuserstate
+xcuserdata/
+*.ipa
+*.dSYM.zip
+
+# Signing material. A provisioning profile or a .p12 in git is an app someone
+# else can publish as you.
+*.mobileprovision
+*.p12
+*.certSigningRequest

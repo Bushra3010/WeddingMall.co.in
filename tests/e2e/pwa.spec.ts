@@ -71,34 +71,46 @@ test('the offline fallback renders on its own', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'You are offline' })).toBeVisible()
 })
 
-test.describe('inside the Android app', () => {
-  test.use({ userAgent: `Mozilla/5.0 (Linux; Android 14) ${NATIVE_UA_MARKER}` })
+/*
+ * Both platforms, because the marker was once declared under `android` only in
+ * `capacitor.config.ts` — Android passed, and iOS would have shipped serving
+ * the admin workspace inside the app.
+ */
+const APP_USER_AGENTS = {
+  Android: `Mozilla/5.0 (Linux; Android 14; Pixel 6) AppleWebKit/537.36 Chrome/124.0.0.0 Mobile Safari/537.36 ${NATIVE_UA_MARKER}`,
+  iOS: `Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 ${NATIVE_UA_MARKER}`,
+} as const
 
-  test('an admin route redirects to the web-only notice', async ({ page }) => {
-    await page.goto('/admin')
+for (const [platform, userAgent] of Object.entries(APP_USER_AGENTS)) {
+  test.describe(`inside the ${platform} app`, () => {
+    test.use({ userAgent })
 
-    await expect(page).toHaveURL(/\/app\/web-only$/)
-    await expect(page.getByRole('heading', { name: 'Admin is on the web' })).toBeVisible()
+    test('an admin route redirects to the web-only notice', async ({ page }) => {
+      await page.goto('/admin')
+
+      await expect(page).toHaveURL(/\/app\/web-only$/)
+      await expect(page.getByRole('heading', { name: 'Admin is on the web' })).toBeVisible()
+    })
+
+    test('customer and vendor routes are still reachable', async ({ page }) => {
+      /*
+       * The other half of the assertion above. A rule that blocked everything
+       * would pass "admin is blocked" while making the app useless, which is
+       * the failure mode a one-sided test invites.
+       *
+       * Signed out, both redirect to sign-in — the point is that they reach
+       * the auth flow rather than the web-only notice.
+       */
+      for (const route of ['/account', '/vendor-dashboard']) {
+        await page.goto(route)
+        await expect(page).toHaveURL(/\/auth\/sign-in/)
+      }
+
+      await page.goto('/vendors')
+      await expect(page).toHaveURL(/\/vendors$/)
+    })
   })
-
-  test('customer and vendor routes are still reachable', async ({ page }) => {
-    /*
-     * The other half of the assertion above. A rule that blocked everything
-     * would pass "admin is blocked" while making the app useless, which is the
-     * failure mode a one-sided test invites.
-     *
-     * Signed out, both redirect to sign-in — the point is that they reach the
-     * auth flow rather than the web-only notice.
-     */
-    for (const route of ['/account', '/vendor-dashboard']) {
-      await page.goto(route)
-      await expect(page).toHaveURL(/\/auth\/sign-in/)
-    }
-
-    await page.goto('/vendors')
-    await expect(page).toHaveURL(/\/vendors$/)
-  })
-})
+}
 
 test('a browser reaches admin normally', async ({ page }) => {
   // Confirms the block is scoped to the app user agent and has not quietly

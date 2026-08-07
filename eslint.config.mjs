@@ -20,6 +20,9 @@ const eslintConfig = defineConfig([
      * the repo root, not to any directory.
      */
     'android/**',
+    // Same reason: the iOS project vendors Capacitor's `native-bridge.js` under
+    // App/public, and CocoaPods output is not ours to lint.
+    'ios/**',
   ]),
 ])
 

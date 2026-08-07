@@ -1,7 +1,8 @@
 # WEDDING MALL — PWA and Android app
 
-The same codebase serves three things: the website, an installable PWA, and an
-Android app. There is no second project and no separate mobile build of the UI.
+The same codebase serves four things: the website, an installable PWA, an
+Android app and an iOS app. There is no second project and no separate mobile
+build of the UI.
 
 ---
 
@@ -56,13 +57,20 @@ is not where that code lives.
 | Public browsing, search, vendor profiles | yes | |
 | Customer login and `/account/*` | yes | |
 | Vendor login and `/vendor-dashboard/*` | yes | includes photo/document upload |
-| `/admin/*` | **no** | redirects to `/app/web-only` |
+| `/admin/*` | **no** | redirects to `/app/web-only`, on both platforms |
 
 ### How the admin block works — and what it is not
 
 Capacitor appends `WeddingMallApp` to the WebView user agent
-(`capacitor.config.ts` → `android.appendUserAgent`). `src/proxy.ts` reads it and
-redirects `/admin` to a notice page.
+(`capacitor.config.ts` → root-level `appendUserAgent`). `src/proxy.ts` reads it
+and redirects `/admin` to a notice page.
+
+The marker sits at the **root** of the config, not under `android`, and that
+placement is load-bearing. It started per-platform, which meant the iOS build
+would have shipped without it and quietly served the admin workspace inside the
+app — the requirement unmet on one platform with nothing failing to show it.
+`tests/native-detection.test.ts` and `tests/e2e/pwa.spec.ts` now assert both
+platforms.
 
 **This is product scope, not a security boundary.** A user agent is a request
 header: anyone can send it and anyone can remove it. Admin authorisation is
@@ -334,6 +342,176 @@ export PATH="$PATH:$ANDROID_HOME/platform-tools"
 Add those to `~/.zshrc` to build from a fresh shell. `android/local.properties`
 holds `sdk.dir` and is untracked, because it is an absolute path specific to
 this machine.
+
+---
+
+# iOS
+
+Added with `npx cap add ios`. Bundle identifier `com.weddingmall.app`, display
+name `WEDDING MALL`, deployment target iOS 15.
+
+Everything above about the architecture applies unchanged: the WebView loads the
+deployed origin, so the same "a web change ships by deploying, a native change
+ships by rebuilding" rule holds. The service worker, the manifest, the admin
+block and the external-link handling are all shared code.
+
+## What is iOS-specific
+
+**Swipe-back** (`ios/App/App/MainViewController.swift`). iOS has no hardware
+back button, so the left-edge swipe is the only native way back — and
+`WKWebView` ships with it disabled. Capacitor neither enables it nor exposes an
+option for it, so a `CAPBridgeViewController` subclass sets
+`allowsBackForwardNavigationGestures = true`. Without this the app has no back
+affordance at all beyond whatever the page draws.
+
+**File upload permissions** (`ios/App/App/Info.plist`). `NSCameraUsageDescription`,
+`NSPhotoLibraryUsageDescription`, `NSPhotoLibraryAddUsageDescription` and
+`NSMicrophoneUsageDescription`. iOS does not merely deny an undeclared
+permission — it **terminates the process** the moment the picker asks for it, so
+a missing key is a crash on the vendor's portfolio screen, not a declined
+prompt. The strings are shown verbatim to the user and App Review rejects vague
+ones.
+
+**External links** open in `SFSafariViewController` — the same `@capacitor/browser`
+call the Android build uses, which maps to the native in-app Safari sheet.
+
+**App icon** is flattened onto the cream ground with no alpha channel: the App
+Store rejects an icon containing transparency at upload.
+
+**`limitsNavigationsToAppBoundDomains` is off** deliberately. Turning it on
+restricts the WebView to domains listed in `WKAppBoundDomains`, which would
+break Supabase auth and storage — both are separate origins this app talks to.
+
+## Requirements
+
+- **Xcode 15 or newer**, from the Mac App Store (~15 GB). The command-line tools
+  alone are not enough — `xcodebuild` and `simctl` both come from the full app.
+- **CocoaPods**. The system Ruby on macOS is 2.6, which modern CocoaPods no
+  longer supports. The cleanest fix is a current Ruby:
+
+```bash
+brew install ruby && gem install cocoapods
+```
+
+## Commands
+
+### 1. Build the web app and sync
+
+```bash
+npm run build && npx cap sync ios
+```
+
+### 2. Open in Xcode
+
+```bash
+npx cap open ios
+```
+
+That opens `ios/App/App.xcworkspace`. Open the **workspace**, never
+`App.xcodeproj` — the project alone has no pods and will not link.
+
+### 3. Signing with your Apple ID
+
+In Xcode: select the **App** target → **Signing & Capabilities**.
+
+1. Tick **Automatically manage signing**
+2. **Team** → *Add an Account…* and sign in with your Apple ID
+3. Xcode provisions a free development certificate
+
+A free Apple ID can install on your own devices, but the build expires after
+7 days and cannot be distributed. TestFlight and the App Store need the paid
+Apple Developer Program ($99/year).
+
+If Xcode reports the bundle identifier is unavailable, someone has already
+registered `com.weddingmall.app`; change it in **Signing & Capabilities** and
+keep `capacitor.config.ts` in step.
+
+### 4. Run on the simulator
+
+```bash
+npx cap run ios
+```
+
+Or press ▶ in Xcode with a simulator selected.
+
+### 5. Run on a real device
+
+1. Connect the iPhone by cable and trust the Mac
+2. Select it in Xcode's device menu, press ▶
+3. First run only, on the phone: **Settings → General → VPN & Device Management
+   → Developer App → Trust**
+
+### 6. Generate an IPA
+
+Archive the app:
+
+```bash
+xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath build/App.xcarchive archive
+```
+
+Then export. Create `build/ExportOptions.plist`:
+
+```bash
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>method</key><string>app-store-connect</string>
+  <key>teamID</key><string>YOUR_TEAM_ID</string>
+  <key>uploadSymbols</key><true/>
+</dict>
+</plist>
+```
+
+```bash
+xcodebuild -exportArchive -archivePath build/App.xcarchive -exportOptionsPlist build/ExportOptions.plist -exportPath build/ipa
+```
+
+Output: `build/ipa/App.ipa`. Use `method` of `development` or `ad-hoc` for a
+build you want to install directly rather than upload.
+
+The GUI route is equivalent and easier the first time: **Product → Archive**,
+then **Distribute App** in the Organizer.
+
+### 7. Upload to App Store Connect
+
+Create the app record first at appstoreconnect.apple.com with bundle ID
+`com.weddingmall.app`, then:
+
+```bash
+xcrun altool --upload-app -f build/ipa/App.ipa -t ios --apiKey YOUR_KEY_ID --apiIssuer YOUR_ISSUER_ID
+```
+
+An API key from App Store Connect → Users and Access → Integrations avoids
+putting your Apple ID password on a command line. Xcode's Organizer
+**Distribute App** does the same thing through the GUI.
+
+### Bumping the version for each upload
+
+App Store Connect rejects a build number it has already seen:
+
+```bash
+cd ios/App && agvtool next-version -all
+```
+
+## Not verified on this machine
+
+**The iOS project has never been built.** This machine has only the Command Line
+Tools — no Xcode, so no `xcodebuild` and no `simctl`, and Xcode cannot be
+installed without the Mac App Store and your Apple ID. Everything here is
+configuration and scaffolding: the project, Info.plist, icons, splash,
+storyboard wiring and the Swift subclass are all in place and `pod install`
+completes, but the first real compile is where a Swift or signing problem would
+surface.
+
+That is a weaker guarantee than Android got, where the toolchain was installed,
+the APK built, and the app driven on an emulator. Treat the first `npx cap open
+ios` as the real test.
+
+One template defect was already found and fixed without building: the generated
+`Podfile` pins `platform :ios, '14.0'` while every Capacitor 8 pod requires
+15.0, so `pod install` fails on a fresh `cap add ios`. The Podfile and all four
+`IPHONEOS_DEPLOYMENT_TARGET` entries in the Xcode project are now 15.0.
 
 ---
 

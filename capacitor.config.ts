@@ -74,16 +74,49 @@ const config: CapacitorConfig = {
     allowNavigation: ['www.weddingmall.co.in', 'weddingmall.co.in', '*.supabase.co'],
   },
 
+  /*
+   * Root level, not per-platform, and that placement is the point.
+   *
+   * `lib/native.ts` reads this marker server-side to keep /admin out of the
+   * app. It started under `android` only, which meant the iOS build would have
+   * shipped without it and quietly served the admin workspace inside the app —
+   * the requirement silently unmet on one platform. Declaring it once applies
+   * it everywhere and removes the chance of that drift.
+   *
+   * Still routing, not authorisation. See `lib/native.ts`.
+   */
+  appendUserAgent: 'WeddingMallApp',
+
   android: {
-    /*
-     * Read server-side by `lib/native.ts` to keep /admin out of the app. It is
-     * a routing signal, not authorisation — see that file.
-     */
-    appendUserAgent: 'WeddingMallApp',
     // Text should follow the app's own scale, not the system font size, or the
     // layouts that were just fixed for 390px reflow unpredictably.
     useLegacyBridge: false,
     backgroundColor: '#460c07',
+  },
+
+  ios: {
+    /*
+     * `always` keeps the WebView clear of the notch and the home indicator.
+     * Without it the site's own `env(safe-area-inset-*)` handling fights the
+     * container and content ends up under the status bar.
+     */
+    contentInset: 'always',
+    backgroundColor: '#460c07',
+    /*
+     * Long-pressing a link on iOS otherwise opens a native preview card for a
+     * page the WebView is about to load anyway — confusing inside an app, and
+     * it bypasses the external-link handling in `NativeShell`.
+     */
+    allowsLinkPreview: false,
+    // The site is responsive; letting iOS request desktop pages would undo the
+    // mobile layout work.
+    preferredContentMode: 'mobile',
+    /*
+     * Deliberately false. Turning it on would restrict the WebView to the
+     * domains listed in `WKAppBoundDomains`, which breaks Supabase auth and
+     * storage — both are separate origins this app legitimately talks to.
+     */
+    limitsNavigationsToAppBoundDomains: false,
   },
 
   plugins: {
