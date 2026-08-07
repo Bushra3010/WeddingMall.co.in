@@ -539,6 +539,20 @@ Getting CocoaPods running at all took a detour: the system Ruby is 2.6 and moder
 
 Tests: 144 unit (12 new), 8 E2E in `pwa.spec.ts` covering both platforms, lint/typecheck/build clean.
 
+## Android targetSdk 36 (2026-08-04)
+
+Google Play requires API 36 for new apps and updates from **31 August 2026**, three weeks out. `targetSdkVersion` was 35; it is now 36, and `compileSdk` was already there.
+
+The reason it had been left is that API 36 makes edge-to-edge layout mandatory, which changes how the WebView sits under the status bar — so it was checked on an emulator rather than flipped and hoped over. Measured against the API 35 screenshot pixel by pixel: **the header starts at exactly the same row (y=130) under both**, the top status-bar strip is unchanged, the bottom tab bar still clears the gesture bar, and navigation and back behave identically. `StatusBar.overlaysWebView: false` is what handles it.
+
+Debug APK, unsigned release APK and AAB all rebuild clean.
+
+## Xcode remains blocked, and why
+
+Installing Xcode requires signing in to an Apple ID — the Mac App Store and developer.apple.com both gate it, the latter with a 302 to an auth wall. That is the owner's credential, so it is not something to automate. There is no Xcode, no `.xip` installer and no iPhoneOS SDK on this machine; the Command Line Tools carry macOS SDKs only, and `xcodebuild`, `actool` and `ibtool` are all Xcode-only stubs.
+
+The iOS project is fully configured and passes `npm run verify:ios` (14 structural checks), but it has never been compiled and that will not change without about two minutes of the owner's hands.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

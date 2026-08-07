@@ -533,15 +533,14 @@ One template defect was already found and fixed this way: the generated
 
 ---
 
-## Open: Play Store target API deadline
+## Play Store target API level
 
-`targetSdkVersion` is **35**. From **31 August 2026** Google Play requires new
-apps and updates to target **API 36**. `compileSdk` is already 36, so the change
-is one line in `android/variables.gradle`.
+`targetSdkVersion` is **36**, which meets Google Play's requirement for new apps
+and updates from 31 August 2026. `compileSdk` is 36 and `minSdk` is 23.
 
-It was left at 35 deliberately: API 36 makes edge-to-edge layout mandatory,
-which changes how the WebView sits under the status bar and the gesture bar.
-`StatusBar.overlaysWebView: false` in `capacitor.config.ts` should handle it,
-but "should" is not "does" — that needs checking on a real device or emulator,
-which has not been done. Bumping it blind three weeks before a deadline is how
-you ship an app whose header sits under the clock.
+API 36 makes edge-to-edge layout mandatory, so this was checked on an emulator
+rather than assumed: the header still starts at the same pixel row it did under
+API 35 (y=130 on a 1080×2400 Pixel 6), the bottom tab bar still clears the
+gesture bar, and navigation and the back button behave identically.
+`StatusBar.overlaysWebView: false` in `capacitor.config.ts` is what keeps the
+WebView out from under the status bar.
