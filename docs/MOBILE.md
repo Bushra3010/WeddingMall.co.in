@@ -165,7 +165,9 @@ keytool -genkey -v -keystore weddingmall-release.jks -alias weddingmall -keyalg 
 
 ### One-time: tell Gradle about it
 
-Create `android/keystore.properties` (untracked):
+The signing config is **already wired** in `android/app/build.gradle` — it reads
+`android/keystore.properties` if that file exists and builds unsigned if it does
+not, so a fresh clone and CI still work. You only need to create the file:
 
 ```bash
 storeFile=/absolute/path/to/weddingmall-release.jks
@@ -174,39 +176,8 @@ keyAlias=weddingmall
 keyPassword=YOUR_KEY_PASSWORD
 ```
 
-Then add the signing config to `android/app/build.gradle` — inside `android {}`,
-above `buildTypes`:
-
-```bash
-def keystorePropertiesFile = rootProject.file("keystore.properties")
-def keystoreProperties = new Properties()
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-}
-
-signingConfigs {
-    release {
-        if (keystorePropertiesFile.exists()) {
-            storeFile file(keystoreProperties['storeFile'])
-            storePassword keystoreProperties['storePassword']
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
-        }
-    }
-}
-```
-
-and point the release build type at it:
-
-```bash
-buildTypes {
-    release {
-        signingConfig signingConfigs.release
-        minifyEnabled false
-        proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-    }
-}
-```
+It is untracked. Verified with a throwaway keystore, which produced a correctly
+signed `app-release.apk`; the key was deleted straight after.
 
 ### Build the signed APK
 
@@ -234,13 +205,14 @@ npm run verify && npx cap sync android && cd android && ./gradlew clean bundleRe
 
 ## Requirements for the machine that builds the APK
 
-Not installed on the machine this was set up on, so the Gradle build has not
-been run here — see the caveat at the bottom.
+Already installed here (see "Toolchain installed here" below). This section is
+for setting up a second machine.
 
-- **JDK 21** (Android Gradle Plugin 8.7+ requires 17 or later; 21 is the current
-  default in Android Studio)
-- **Android Studio** (Ladybug or newer) with the Android SDK, Platform-Tools and
-  a Build-Tools release installed
+- **JDK 21** (Android Gradle Plugin 8.10 requires 17 or later; 21 is what this
+  project was built and verified with)
+- **Android SDK 36** with Platform-Tools and Build-Tools 35.0.0+. Android Studio
+  is optional — the command-line tools are enough to build, and are what was
+  used here.
 - `ANDROID_HOME` set, e.g. `export ANDROID_HOME=$HOME/Library/Android/sdk`
 
 ```bash
@@ -289,15 +261,70 @@ the local keystore's — they differ.
 
 ---
 
-## Not verified on this machine
+## Build status: verified
 
-The Android project is scaffolded, configured, synced, and its resources are
-generated and checked in. **`./gradlew assembleRelease` has not been run**,
-because this machine has no JDK, no Android SDK and no Android Studio. The
-manifest, Gradle config, icons and splash are all in place and `npx cap sync
-android` completes clean, but the first Gradle build on a properly equipped
-machine is where a missing SDK component or a version mismatch would surface.
+`./gradlew assembleDebug`, `assembleRelease` and `bundleRelease` all succeed on
+this machine, against JDK 21.0.12 (Temurin) and Android SDK 36.
 
-One thing already fixed that would have failed that build: the generated
-template referenced `@color/colorPrimary` and `@color/colorPrimaryDark` without
-defining them anywhere. `android/app/src/main/res/values/colors.xml` now does.
+| Artifact | Size |
+| --- | --- |
+| `app/build/outputs/apk/debug/app-debug.apk` | 4.5 MB |
+| `app/build/outputs/apk/release/app-release-unsigned.apk` | 3.2 MB |
+| `app/build/outputs/bundle/release/app-release.aab` | 3.1 MB |
+
+Checked inside the APK rather than trusting the exit code: package
+`com.weddingmall.app`, label `WEDDING MALL`, the launcher icon is the
+WeddingMall mark (not the template robot), splash present at every density, the
+four upload permissions, and `server.url` / `appendUserAgent` baked into
+`assets/capacitor.config.json`.
+
+The release signing config was tested with a throwaway keystore, which produced
+a correctly signed `app-release.apk`; the key was deleted immediately after. So
+the Gradle wiring is proven — you supply the real keystore and it works.
+
+### Three things the first build exposed
+
+The generated Capacitor template does not build as shipped. All three are fixed
+and committed:
+
+1. **`colors.xml` did not exist.** `styles.xml` referenced `@color/colorPrimary`
+   and `@color/colorPrimaryDark`, which fails resource linking.
+2. **AGP 8.7.2 was too old.** `androidx.browser:browser:1.9.0`, pulled in by
+   `@capacitor/browser`, requires AGP 8.9.1+ and is compiled against API 36.
+   Now AGP 8.10.1 with `compileSdkVersion = 36`.
+3. **Duplicate Kotlin stdlib classes.** Something in the Cordova compatibility
+   chain pins `kotlin-stdlib-jdk8:1.6.21` while `kotlin-stdlib` resolves to
+   1.8.22 — and Kotlin 1.8 merged the jdk7/jdk8 content into the main artifact,
+   so both jars carry the same classes. `android/app/build.gradle` now aligns
+   every `kotlin-stdlib*` artifact on one version, which is Kotlin's own remedy
+   (at 1.8+ the `-jdk7`/`-jdk8` modules are empty and just delegate).
+
+### Toolchain installed here
+
+Home directory only — nothing was written to a system path and no password was
+needed.
+
+```bash
+export JAVA_HOME="$HOME/Library/Java/jdk-21.0.12+8/Contents/Home"
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+export PATH="$PATH:$ANDROID_HOME/platform-tools"
+```
+
+Add those to `~/.zshrc` to build from a fresh shell. `android/local.properties`
+holds `sdk.dir` and is untracked, because it is an absolute path specific to
+this machine.
+
+---
+
+## Open: Play Store target API deadline
+
+`targetSdkVersion` is **35**. From **31 August 2026** Google Play requires new
+apps and updates to target **API 36**. `compileSdk` is already 36, so the change
+is one line in `android/variables.gradle`.
+
+It was left at 35 deliberately: API 36 makes edge-to-edge layout mandatory,
+which changes how the WebView sits under the status bar and the gesture bar.
+`StatusBar.overlaysWebView: false` in `capacitor.config.ts` should handle it,
+but "should" is not "does" — that needs checking on a real device or emulator,
+which has not been done. Bumping it blind three weeks before a deadline is how
+you ship an app whose header sits under the clock.

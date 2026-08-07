@@ -12,6 +12,14 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
+    /*
+     * Gradle build output. It contains a copy of Capacitor's `native-bridge.js`,
+     * which is a vendored file we neither wrote nor can fix — linting it turned
+     * a clean run into 34 warnings the moment the Android project was first
+     * built. `build/**` above does not catch it: that pattern is relative to
+     * the repo root, not to any directory.
+     */
+    'android/**',
   ]),
 ])
 

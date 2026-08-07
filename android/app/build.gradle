@@ -1,5 +1,24 @@
 apply plugin: 'com.android.application'
 
+/*
+ * Release signing.
+ *
+ * The keystore and its passwords live in `android/keystore.properties`, which
+ * is untracked (see the repo .gitignore). Nothing secret is in this file or in
+ * git, and the build degrades rather than breaks: with no properties file the
+ * release variant still compiles, it just comes out unsigned — which is what
+ * CI and a fresh clone get.
+ *
+ * Create the keystore with the command in docs/MOBILE.md. Android has no key
+ * rotation for an app already on the Play Store, so losing this file means
+ * losing the ability to update that listing.
+ */
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace "com.weddingmall.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -16,8 +35,33 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // Only attached when the keystore exists; otherwise the release
+            // variant builds unsigned rather than failing the whole build on a
+            // machine that has no signing material.
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+            /*
+             * R8 is deliberately off. Capacitor resolves plugins by reflection
+             * from the names in `capacitor.plugins.json`, so shrinking without
+             * a tested keep-rule set produces an APK that builds, installs, and
+             * then fails at runtime the first time a plugin is called — the
+             * worst possible place to find out. Turning it on is worth doing,
+             * on a device, as its own change.
+             */
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -27,6 +71,30 @@ android {
 repositories {
     flatDir{
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+/*
+ * Align every Kotlin stdlib artifact on one version.
+ *
+ * Something in the Cordova compatibility chain pulls `kotlin-stdlib-jdk8:1.6.21`,
+ * while `kotlin-stdlib` itself resolves forward to 1.8.22. Kotlin 1.8 merged the
+ * jdk7/jdk8 content *into* the main stdlib, so the two jars then ship the same
+ * classes and `checkDebugDuplicateClasses` fails the build.
+ *
+ * Forcing the `-jdk7`/`-jdk8` artifacts up to the same version is Kotlin's own
+ * remedy: at 1.8+ they are empty modules that only delegate to `kotlin-stdlib`,
+ * so this removes the duplicates rather than picking a winner between them.
+ * `exclude` would also silence the error, but by dropping a jar that older
+ * transitive callers may still expect to resolve.
+ */
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == 'org.jetbrains.kotlin'
+                && details.requested.name.startsWith('kotlin-stdlib')) {
+            details.useVersion '1.8.22'
+            details.because 'kotlin-stdlib 1.8+ absorbed the jdk7/jdk8 artifacts; mixing versions duplicates classes'
+        }
     }
 }
 

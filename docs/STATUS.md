@@ -465,9 +465,31 @@ Files: `app/manifest.ts`, `public/sw.js`, `components/pwa/{service-worker,native
 Two things worth knowing:
 
 - **`@capacitor/assets` was installed and then removed.** It is a run-once icon generator that pulled in 1 critical and 8 high advisories via `@trapezedev/project`. Icons are generated with `sharp`, already a dependency. Net vulnerabilities added by this change: **zero** — the 4 remaining are pre-existing (`next`, `postcss`, `sharp`, and `js-yaml` via eslint).
-- **The Gradle build has not been run.** This machine has no JDK, Android SDK or Android Studio, so `npx cap sync android` completing clean is as far as verification goes. One defect that would have failed that build is already fixed: the generated template referenced `@color/colorPrimary` and `@color/colorPrimaryDark` without defining them.
+- **The Gradle build now runs.** See the section below.
 
 Tests: 132 unit, 33 E2E passing (6 new in `pwa.spec.ts`, all unauthenticated so they run in CI), lint/typecheck/build clean.
+
+## The APK actually builds (2026-08-04)
+
+JDK 21 (Temurin) and Android SDK 36 installed into the home directory — no sudo, no system paths, no Android Studio. `assembleDebug`, `assembleRelease` and `bundleRelease` all succeed: 4.5 MB debug APK, 3.2 MB unsigned release APK, 3.1 MB AAB.
+
+**The generated Capacitor template does not build as shipped.** Three defects, all fixed:
+
+1. **`colors.xml` did not exist** while `styles.xml` referenced `@color/colorPrimary` and `@color/colorPrimaryDark` — fails resource linking. (Caught before the first build.)
+2. **AGP 8.7.2 was too old.** `androidx.browser:browser:1.9.0`, pulled in by `@capacitor/browser`, requires AGP 8.9.1+ and is compiled against API 36. Now AGP 8.10.1, `compileSdkVersion = 36`.
+3. **Duplicate Kotlin stdlib classes.** The Cordova compatibility chain pins `kotlin-stdlib-jdk8:1.6.21` while `kotlin-stdlib` resolves to 1.8.22, and Kotlin 1.8 merged the jdk7/jdk8 content into the main artifact — so both jars ship the same classes. `android/app/build.gradle` aligns every `kotlin-stdlib*` artifact on one version, which is Kotlin's own remedy rather than excluding a jar other callers may still resolve.
+
+**Verified by opening the APK, not by reading the exit code.** Package `com.weddingmall.app`, label `WEDDING MALL`, launcher icon is the WeddingMall mark rather than the template robot, splash at every density, the four upload permissions, and `server.url`/`appendUserAgent` baked into `assets/capacitor.config.json`.
+
+Release signing is wired in `build.gradle` reading an untracked `keystore.properties`, and degrades to an unsigned build when absent so CI and fresh clones still work. Tested with a throwaway keystore that produced a correctly signed APK; the key was deleted immediately. **No production signing material was created** — that is the owner's to generate, and a key that has appeared in a transcript should never sign a listing.
+
+R8 is deliberately off: Capacitor resolves plugins reflectively from `capacitor.plugins.json`, so shrinking without a tested keep-rule set yields an APK that builds, installs, and fails the first time a plugin is called.
+
+**One thing the build broke and I fixed:** `android/` build output contains a vendored copy of Capacitor's `native-bridge.js`, which took `npm run lint` from clean to 34 warnings. `eslint.config.mjs` now ignores `android/**` — the inherited `build/**` pattern is root-relative and does not reach it.
+
+**Outstanding, with a date on it: `targetSdkVersion` is 35, and Google Play requires API 36 for new apps and updates from 31 August 2026.** `compileSdk` is already 36 so it is a one-line change, left undone deliberately: API 36 makes edge-to-edge layout mandatory, which changes how the WebView sits under the status bar. `StatusBar.overlaysWebView: false` should cover it, but that needs checking on a device or emulator, which has not been done.
+
+Tests: 132 unit, 33 E2E, lint/typecheck/build clean.
 
 ## Blocked / outstanding
 
