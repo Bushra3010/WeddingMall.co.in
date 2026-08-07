@@ -491,6 +491,31 @@ R8 is deliberately off: Capacitor resolves plugins reflectively from `capacitor.
 
 Tests: 132 unit, 33 E2E, lint/typecheck/build clean.
 
+## The app opened to the browser instead of itself (2026-08-04)
+
+Reported straight after the first APK: it launched and immediately handed off to Chrome.
+
+**Cause, and it was my error.** `weddingmall.co.in` 308-redirects to `www.weddingmall.co.in`. Capacitor compares every navigation against `server.hostname`, so the redirect looked like a jump to a foreign site and the WebView handed it to the system browser before rendering anything. I had already been caught by that same redirect earlier in this project and still configured the apex.
+
+Fixed by pointing at the canonical host and listing both spellings — plus Supabase, so an auth or storage response cannot bounce someone out mid-flow:
+
+```
+url: 'https://www.weddingmall.co.in'
+allowNavigation: ['www.weddingmall.co.in', 'weddingmall.co.in', '*.supabase.co']
+```
+
+The same assumption was wrong in `NativeShell`, which used strict origin equality to decide whether a link was external — so any link written without the `www` would also have opened the browser. Extracted to `lib/same-site.ts` and given 6 unit tests, because this cost a broken build.
+
+**Verified on an emulator this time, not just by reasoning.** Installed the Android emulator and a Pixel 6 / API 35 image, and drove the app: it launches into the site, in-app navigation works (Home → Explore → `/vendors`, 9 vendors, tab marked active), and the process stays foreground rather than punting to Chrome.
+
+**A second bug the device run found.** The back button exited the app from `/vendors` instead of returning Home, because I had special-cased the top-level tabs as exit points. Android's rule is simpler and is now what the code does: pop history if there is any, exit only when there is none.
+
+**The thing that made debugging confusing, now documented.** The APK loads the deployed site, so the app's JavaScript comes from production — a local JS change does not appear no matter how many times the APK is rebuilt. That is the auto-update property working as intended, but it means native changes and web changes ship by completely different routes. `docs/MOBILE.md` now says so near the top.
+
+Also fixed: `android:usesCleartextTraffic="false"` was hardcoded in the manifest and collided with the `true` Capacitor injects for local-dev mode, failing the manifest merge. Removed — Android already defaults it to false for targetSdk 28+, so it was buying nothing.
+
+Tests: 138 unit (6 new), lint/typecheck/build clean.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

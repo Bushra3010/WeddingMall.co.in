@@ -34,7 +34,16 @@ import type { CapacitorConfig } from '@capacitor/cli'
  *   CAP_SERVER_URL=http://192.168.1.20:3000 CAP_ALLOW_CLEARTEXT=true npx cap sync android
  */
 
-const serverUrl = process.env.CAP_SERVER_URL ?? 'https://weddingmall.co.in'
+/*
+ * The canonical host, with the `www`, and that matters more than it looks.
+ *
+ * `weddingmall.co.in` 308-redirects to `www.weddingmall.co.in`. Capacitor
+ * compares every navigation against `server.hostname` and hands anything that
+ * does not match to the system browser — so pointing the app at the apex made
+ * it redirect straight out to Chrome on launch, before rendering a thing.
+ * Always configure the URL the server actually settles on, not the one you type.
+ */
+const serverUrl = process.env.CAP_SERVER_URL ?? 'https://www.weddingmall.co.in'
 const allowCleartext = process.env.CAP_ALLOW_CLEARTEXT === 'true'
 
 const config: CapacitorConfig = {
@@ -55,6 +64,14 @@ const config: CapacitorConfig = {
     hostname: new URL(serverUrl).host,
     androidScheme: 'https',
     cleartext: allowCleartext,
+    /*
+     * Hosts that stay inside the WebView. The apex is listed because links
+     * written without the `www` still resolve here after the redirect, and
+     * Supabase because auth and storage responses must not bounce a user out
+     * to the browser mid-flow. Anything not on this list opens externally,
+     * which is the behaviour we want for a vendor's own site.
+     */
+    allowNavigation: ['www.weddingmall.co.in', 'weddingmall.co.in', '*.supabase.co'],
   },
 
   android: {

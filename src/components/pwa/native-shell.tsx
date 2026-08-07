@@ -1,7 +1,9 @@
 'use client'
 
-import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+
+import { isSameSite } from '@/lib/same-site'
 
 /**
  * The behaviours an Android WebView does not get for free.
@@ -14,17 +16,6 @@ import { useEffect, useRef } from 'react'
  */
 export function NativeShell() {
   const router = useRouter()
-  const pathname = usePathname()
-
-  // The back handler is registered once but needs the current path. A ref
-  // avoids tearing the listener down and rebuilding it on every navigation;
-  // it is written in an effect rather than during render, because a render can
-  // be discarded and would leave the ref describing a page nobody is on.
-  const pathnameRef = useRef(pathname)
-  useEffect(() => {
-    pathnameRef.current = pathname
-  }, [pathname])
-
   useEffect(() => {
     let disposed = false
     const cleanups: Array<() => void> = []
@@ -47,25 +38,22 @@ export function NativeShell() {
       /*
        * Android's hardware back button.
        *
-       * Without a handler it closes the app from anywhere, including three
-       * levels into an enquiry thread. `canGoBack` comes from the WebView's own
-       * history, so it follows the same stack the on-screen back arrow does.
+       * Pop the WebView's history if there is any; exit only when there is
+       * none. `canGoBack` is the WebView's own history, so this follows the
+       * same stack the on-screen back arrow does.
        *
-       * Exiting is deliberately limited to the top-level tabs. Anywhere else,
-       * back means back; only from a root does it mean leave — which is what
-       * Android users expect and what stops an accidental exit mid-enquiry.
+       * An earlier version also treated the top-level tabs as exit points,
+       * which was wrong and showed up the first time it ran on a device: going
+       * Home -> Explore and pressing back closed the app instead of returning
+       * Home, because `/vendors` was in that list. History is the only thing
+       * that knows whether there is somewhere to go back to.
        */
-      const ROOTS = new Set(['/', '/vendors', '/account', '/vendor-dashboard'])
       const backHandle = await App.addListener('backButton', ({ canGoBack }) => {
-        if (canGoBack && !ROOTS.has(pathnameRef.current)) {
+        if (canGoBack) {
           router.back()
           return
         }
-        if (ROOTS.has(pathnameRef.current)) {
-          void App.exitApp()
-          return
-        }
-        router.back()
+        void App.exitApp()
       })
       cleanups.push(() => void backHandle.remove())
 
@@ -96,7 +84,7 @@ export function NativeShell() {
         } catch {
           return
         }
-        if (target.origin === window.location.origin) return
+        if (isSameSite(target, new URL(window.location.href))) return
 
         event.preventDefault()
         void Browser.open({ url: target.href, presentationStyle: 'popover' })
@@ -112,7 +100,7 @@ export function NativeShell() {
       const urlHandle = await App.addListener('appUrlOpen', ({ url }) => {
         try {
           const parsed = new URL(url)
-          if (parsed.origin === window.location.origin) {
+          if (isSameSite(parsed, new URL(window.location.href))) {
             router.push(parsed.pathname + parsed.search)
           } else {
             void Browser.open({ url })

@@ -34,6 +34,19 @@ handling, external-link handling, deep links and native file picker are for. If
 Play review pushes back, the answer is more native capability (push
 notifications are the obvious next one), not a bundled export.
 
+### What this means day to day
+
+**A UI or content change does not need a new APK.** The app's HTML, CSS and
+JavaScript come from the deployed site, so a fix is live in the app as soon as
+Vercel finishes deploying — including changes to `NativeShell` itself.
+
+A new APK is only needed when something *native* changes: `capacitor.config.ts`,
+the Android manifest, icons, splash, or a Capacitor plugin.
+
+This is easy to trip over while debugging. A JS change made locally will not
+appear in the app no matter how many times you rebuild the APK, because the APK
+is not where that code lives.
+
 ---
 
 ## What is in the app, and what is not
@@ -136,17 +149,25 @@ npx cap run android
 
 ### Pointing the app at a local dev server
 
-`localhost` on a phone means the phone. Use the machine's LAN address:
+`localhost` on a phone means the phone. Use the machine's LAN address for a real
+device, or `10.0.2.2` for the standard Android emulator (its alias for the
+host's loopback):
 
 ```bash
 CAP_SERVER_URL=http://192.168.1.20:3000 CAP_ALLOW_CLEARTEXT=true npx cap sync android
 ```
 
-Undo it before building a release:
+Undo it before building a release — the value is baked into the APK:
 
 ```bash
 npx cap sync android
 ```
+
+Note: the emulator route (`10.0.2.2`) did not come up in testing here — the
+WebView sat on the splash with no network error logged, and it was not worth
+chasing further because it is a convenience path, not the shipping one. The LAN
+address on a real device is the better-trodden route. Everything else in this
+document was verified against the production URL.
 
 ---
 
