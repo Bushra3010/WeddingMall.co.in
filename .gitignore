@@ -96,3 +96,11 @@ xcuserdata/
 *.mobileprovision
 *.p12
 *.certSigningRequest
+
+# Throwaway scripts. Several one-off migration/probe runners were written at the
+# repo root during setup because node resolves `pg` and `sharp` from here; one
+# (`_ap.mjs`) reached a commit. Anything underscore-prefixed at the root is
+# scratch and should never be tracked.
+/_*.mjs
+/_*.js
+/_*.ts
