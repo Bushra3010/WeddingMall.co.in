@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { isNativeApp, isWebOnlyPath, WEB_ONLY_NOTICE_PATH } from '@/lib/native'
 import { buildCsp, newNonce } from '@/lib/security/csp'
 import { updateSession } from '@/lib/supabase/middleware'
 
@@ -35,6 +36,27 @@ export async function proxy(request: NextRequest) {
 
   if (nonce) request.headers.set('content-security-policy', csp)
   response.headers.set('content-security-policy', csp)
+
+  /*
+   * The mobile app carries the customer and vendor flows only, so an admin
+   * link followed inside it lands on an explanation rather than a workspace
+   * built for a wide table.
+   *
+   * Routing, not authorisation. The marker is a user-agent string and is
+   * trivially removable; `requireAdmin`, `assertPermission` and RLS are what
+   * actually decide who may read or write an admin row, and none of them are
+   * touched by this. See `lib/native.ts`.
+   */
+  if (isWebOnlyPath(pathname) && isNativeApp(request.headers.get('user-agent'))) {
+    const url = request.nextUrl.clone()
+    url.pathname = WEB_ONLY_NOTICE_PATH
+    url.search = ''
+    const notice = NextResponse.redirect(url)
+    for (const cookie of response.cookies.getAll()) notice.cookies.set(cookie)
+    notice.headers.set('X-Robots-Tag', 'noindex, nofollow')
+    notice.headers.set('content-security-policy', csp)
+    return notice
+  }
 
   const needsAuth = PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),

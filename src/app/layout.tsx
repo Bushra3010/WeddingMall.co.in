@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { Cormorant_Garamond, Inter } from 'next/font/google'
 
+import { NativeShell } from '@/components/pwa/native-shell'
+import { ServiceWorkerRegistration } from '@/components/pwa/service-worker'
 import { SessionProvider } from '@/components/shared/session-provider'
 import { env } from '@/lib/env'
 import { site } from '@/lib/site'
@@ -31,13 +33,19 @@ export const metadata: Metadata = {
   description: site.description,
   applicationName: site.name,
   formatDetection: { telephone: false },
+  // The manifest covers Android and desktop; iOS still reads these.
+  appleWebApp: { capable: true, title: 'WEDDING MALL', statusBarStyle: 'black-translucent' },
 }
 
 export const viewport: Viewport = {
-  // Matches brand-900; tints browser chrome on mobile.
+  // Matches brand-900 and the manifest's `theme_color`; tints browser chrome
+  // and the Android status bar. A mismatch shows as a colour flash on launch.
   themeColor: '#460c07',
   width: 'device-width',
   initialScale: 1,
+  // Standalone windows extend under the notch and the gesture bar; the layouts
+  // read `env(safe-area-inset-*)` from here.
+  viewportFit: 'cover',
 }
 
 /*
@@ -60,6 +68,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           tree here does not stop any route from being statically rendered.
         */}
         <SessionProvider>{children}</SessionProvider>
+        {/*
+          Both render null and hold no server data, so neither opts a route out
+          of static rendering. NativeShell no-ops entirely in a browser — it
+          checks `isNativePlatform()` before importing a single plugin.
+        */}
+        <ServiceWorkerRegistration />
+        <NativeShell />
       </body>
     </html>
   )

@@ -55,3 +55,24 @@ coverage/
 # supabase
 supabase/.temp/
 supabase/.branches/
+
+# --- Capacitor / Android ---------------------------------------------------
+# The android/ project itself IS committed: it holds the manifest, icons,
+# splash and Gradle config that make the APK reproducible. Only build output
+# and machine-specific or secret files are excluded.
+android/build/
+android/app/build/
+android/.gradle/
+android/.idea/
+android/local.properties
+android/app/release/
+android/captures/
+*.apk
+*.aab
+
+# Signing material. A committed keystore lets anyone publish an update that
+# Android will accept as genuine, and the key cannot be rotated once an app is
+# live — losing control of it means losing the listing.
+*.jks
+*.keystore
+android/keystore.properties

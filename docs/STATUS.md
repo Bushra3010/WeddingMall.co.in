@@ -450,6 +450,25 @@ Every colour in that footer is white at some alpha over a near-black maroon, so 
 
 Tests: 132 unit, 27 E2E passing (2 new, both run unauthenticated so they hold in CI), lint/typecheck/build clean.
 
+## PWA and Android app (2026-08-04)
+
+Same project, extended — no second codebase. Full detail in `docs/MOBILE.md`.
+
+**The decision everything else follows from.** Capacitor normally bundles a static export. This app has 17 `'use server'` modules and 52 `force-dynamic` routes, and `output: 'export'` refuses to build a project containing a single Server Action — so bundling would mean deleting the mutation layer and moving authorisation into the client. The WebView loads the deployed origin instead. That keeps Server Components, Server Actions and RLS untouched, and it is also what makes the auto-update requirement true by construction: there is no bundled copy to go stale, and no store review between a fix and its users. The cost is that the app needs a connection, and a shell this thin has to earn its Play Store listing under the "minimum functionality" policy.
+
+**Caching is deliberately minimal.** Only `/_next/static/**` (content-hashed, so it invalidates itself) and `/offline`. No HTML at all — every route renders per request, and a cache is not partitioned by session, so caching `/account` risks serving one person's page to the next. Verified against a production build: 21 static entries, `/offline`, zero HTML, and repeat navigations still issue document requests.
+
+**Admin stays on the web.** Capacitor appends `WeddingMallApp` to the user agent; `src/proxy.ts` redirects `/admin` to `/app/web-only`. Recorded plainly in `lib/native.ts` and the docs: **this is product scope, not a security boundary.** A user agent is a request header. `requireAdmin`, `assertPermission` and RLS are unchanged and remain the actual gate.
+
+Files: `app/manifest.ts`, `public/sw.js`, `components/pwa/{service-worker,native-shell}.tsx`, `app/offline/`, `app/app/web-only/`, `lib/native.ts`, `capacitor.config.ts`, `android/`, `docs/MOBILE.md`. Icons and splash generated from the existing logo with `sharp`.
+
+Two things worth knowing:
+
+- **`@capacitor/assets` was installed and then removed.** It is a run-once icon generator that pulled in 1 critical and 8 high advisories via `@trapezedev/project`. Icons are generated with `sharp`, already a dependency. Net vulnerabilities added by this change: **zero** — the 4 remaining are pre-existing (`next`, `postcss`, `sharp`, and `js-yaml` via eslint).
+- **The Gradle build has not been run.** This machine has no JDK, Android SDK or Android Studio, so `npx cap sync android` completing clean is as far as verification goes. One defect that would have failed that build is already fixed: the generated template referenced `@color/colorPrimary` and `@color/colorPrimaryDark` without defining them.
+
+Tests: 132 unit, 33 E2E passing (6 new in `pwa.spec.ts`, all unauthenticated so they run in CI), lint/typecheck/build clean.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

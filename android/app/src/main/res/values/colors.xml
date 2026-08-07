@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Referenced by styles.xml. The generated template referenced these without
+  defining them, which fails the resource-linking step of the Gradle build.
+
+  Values are the web brand tokens: brand-700 for primary, brand-900 for the
+  status bar (matching `themeColor` in the root layout and `theme_color` in the
+  manifest, so launching the app shows no colour change), and the blush accent.
+-->
+<resources>
+    <color name="colorPrimary">#7F1C15</color>
+    <color name="colorPrimaryDark">#460C07</color>
+    <color name="colorAccent">#C9A227</color>
+</resources>
