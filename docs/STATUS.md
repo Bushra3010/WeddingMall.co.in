@@ -529,7 +529,11 @@ Added to the same project with `npx cap add ios`. Bundle id `com.weddingmall.app
 
 **File upload needs four Info.plist keys.** iOS terminates the process when the WKWebView picker requests an undeclared permission — a missing `NSCameraUsageDescription` is a crash on the vendor's portfolio screen, not a declined prompt.
 
-**Honest limit: the iOS project has never been compiled.** This machine has only the Command Line Tools; Xcode is a Mac App Store install needing the owner's Apple ID, so there is no `xcodebuild` and no `simctl`. Configuration, scaffolding and `pod install` are done and verified; the first real build is not. That is a materially weaker guarantee than Android, which was built and driven on an emulator, and `docs/MOBILE.md` says so rather than implying parity.
+**Honest limit: the iOS project has never been compiled.** Xcode cannot be installed without an Apple ID sign-in — the Mac App Store and developer.apple.com both gate it — and that is the owner's credential, not something to automate. `xcodebuild`, `actool` and `ibtool` are all Xcode-only stubs in the Command Line Tools.
+
+So the gap was closed as far as it can be: `npm run verify:ios` (`scripts/validate-ios.rb`) runs **14 structural checks** without Xcode — project opens, no dangling file references, the Swift file is in Compile Sources, bundle id and deployment target consistent across configurations, storyboard names a class that exists, asset catalogs reference images that exist, icon is 1024×1024 with no alpha (an App Store rejection that otherwise lands *after* the archive is built), Podfile and lock agree. `swiftc -parse` passes on the one hand-written Swift file.
+
+That is still weaker than Android, which was built and driven on an emulator. The first `npx cap open ios` remains the real test.
 
 Getting CocoaPods running at all took a detour: the system Ruby is 2.6 and modern CocoaPods requires 3.1+, so the dependency chain was resolved by pinning (`ffi` 1.16.3, `securerandom` 0.3.2, `drb` 2.0.6, `i18n` 1.14.8, `zeitwerk` 2.6.18, `activesupport` 6.1.7.10, `concurrent-ruby` 1.3.4 — the last because 1.3.5 dropped an implicit `logger` require activesupport 6.1 depends on). The documented recommendation for the owner is `brew install ruby` instead.
 

@@ -494,24 +494,42 @@ App Store Connect rejects a build number it has already seen:
 cd ios/App && agvtool next-version -all
 ```
 
-## Not verified on this machine
+## What is and is not verified on this machine
 
-**The iOS project has never been built.** This machine has only the Command Line
-Tools — no Xcode, so no `xcodebuild` and no `simctl`, and Xcode cannot be
-installed without the Mac App Store and your Apple ID. Everything here is
-configuration and scaffolding: the project, Info.plist, icons, splash,
-storyboard wiring and the Swift subclass are all in place and `pod install`
-completes, but the first real compile is where a Swift or signing problem would
-surface.
+**Not built.** This machine has only the Command Line Tools. `xcodebuild`,
+`actool` and `ibtool` are all stubs that require the full Xcode, and Xcode
+cannot be installed without signing in to an Apple ID — on the Mac App Store or
+on developer.apple.com, which 302s to an auth wall. That is a credential
+decision for the owner, not something to automate.
 
-That is a weaker guarantee than Android got, where the toolchain was installed,
-the APK built, and the app driven on an emulator. Treat the first `npx cap open
-ios` as the real test.
+So the first `npx cap open ios` is the real test, and a Swift or signing problem
+would surface there.
 
-One template defect was already found and fixed without building: the generated
+**Verified, without Xcode:**
+
+```bash
+npm run verify:ios
+```
+
+14 structural checks — the project opens and has an App target, no file
+reference dangles, `MainViewController.swift` is in Compile Sources, bundle id
+and deployment target agree across every configuration, the storyboard names a
+class the project actually compiles, both asset catalogs reference images that
+exist, the app icon is 1024×1024 with no alpha (the App Store rejects
+transparency at upload, after the archive is built), and the Podfile and lock
+agree.
+
+`swiftc -parse ios/App/App/MainViewController.swift` also passes, so the one
+hand-written Swift file is syntactically valid.
+
+These are not a substitute for compiling. They are the difference between
+finding a dangling reference in five seconds and finding it after a 15 GB
+install.
+
+One template defect was already found and fixed this way: the generated
 `Podfile` pins `platform :ios, '14.0'` while every Capacitor 8 pod requires
 15.0, so `pod install` fails on a fresh `cap add ios`. The Podfile and all four
-`IPHONEOS_DEPLOYMENT_TARGET` entries in the Xcode project are now 15.0.
+`IPHONEOS_DEPLOYMENT_TARGET` entries are now 15.0.
 
 ---
 

@@ -20,6 +20,7 @@
     "db:apply": "node --env-file=.env.local scripts/apply-migrations.mjs",
     "db:seed": "node --env-file=.env.local scripts/apply-migrations.mjs --seed-only",
     "check:permissions": "node --env-file=.env.local scripts/permission-parity.mjs",
+    "verify:ios": "ruby scripts/validate-ios.rb",
     "db:rls": "node --env-file=.env.local scripts/rls-probe.mjs && node --env-file=.env.local scripts/rls-tenant-probe.mjs && node --env-file=.env.local scripts/rls-onboarding-probe.mjs && node --env-file=.env.local scripts/rls-listing-probe.mjs && node --env-file=.env.local scripts/rls-enquiry-probe.mjs && node --env-file=.env.local scripts/rls-review-probe.mjs && node --env-file=.env.local scripts/rls-billing-probe.mjs && node --env-file=.env.local scripts/rls-realtime-probe.mjs && node --env-file=.env.local scripts/rls-taxonomy-probe.mjs",
     "grant-admin": "node --env-file=.env.local scripts/grant-admin.mjs",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo-vendors.mjs"
