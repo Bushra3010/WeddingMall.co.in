@@ -517,17 +517,32 @@ Two template defects were fixed to get there:
 2. **`colors.xml`-equivalent gaps** — see the Android section; the iOS template
    was cleaner, but the deployment-target mismatch is the same class of problem.
 
-### Still unverified on a device
+### Verified on the simulator
 
-- **Swipe-back.** `MainViewController` enables
-  `allowsBackForwardNavigationGestures`, and it compiles and links, but the
-  gesture itself has not been performed.
+Driven on an iPhone 17 (iOS 26.5):
+
+- **Launches and loads the live site**, notch and home indicator respected.
+- **Splash screen** renders — the flat-white mark on brand maroon, matching
+  Android.
+- **In-app navigation works**, including the auth redirect for a signed-out tap
+  on Shortlist.
+- **Swipe-back works.** A left-edge swipe returned from the sign-in page to the
+  homepage, which is `MainViewController` doing the one job it exists for.
+- **The user-agent marker is really sent.** Pointed at a local echo server, the
+  WebView reported:
+  `Mozilla/5.0 (iPhone; …) Mobile/15E148 WeddingMallApp`.
+  That was the last unproven link in the admin block: the server-side redirect
+  is covered by `tests/e2e/pwa.spec.ts` for an iOS-shaped agent, and this
+  confirms the app actually sends it.
+
+### Still unverified
+
 - **Vendor file upload.** The four `Info.plist` usage strings are present and
-  the app launches, but the picker has not been opened. This is the one that
-  *crashes* rather than degrades if a key is wrong, so try it early.
-- **The admin block on a real handset.** It is proven server-side for an
-  iOS-shaped user agent (`tests/e2e/pwa.spec.ts`) and the marker is confirmed
-  in the synced iOS config, but it has not been exercised through the app.
+  validated, but reaching the picker needs a signed-in vendor account, which the
+  test account is not. This is the one that *crashes* rather than degrades if a
+  key is wrong, so open Portfolio → upload early on a real account.
+- **Anything requiring a signed build**: running on a physical iPhone, archiving,
+  and App Store upload all need an Apple ID attached in Xcode.
 
 ### Also verified without Xcode
 

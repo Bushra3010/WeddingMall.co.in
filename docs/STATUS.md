@@ -561,11 +561,15 @@ Xcode arrived on the machine, so the gap flagged as "never compiled" is closed.
 
 Getting there needed the iOS platform itself: Xcode ships the SDK but not the simulator runtime, and without it there are no build destinations at all. `xcodebuild -downloadPlatform iOS` pulled the 8.52 GB runtime with no Apple ID required.
 
-**Still untested on a device**, and worth doing in this order because the first one crashes rather than degrades:
+**Driven on an iPhone 17 simulator**, once `sudo xcode-select -s` was run to unstick the simulator tooling:
 
-1. **Vendor file upload** — the four `Info.plist` usage strings are present, but iOS terminates the process on a missing one, so the picker needs opening.
-2. **Swipe-back** — `MainViewController` enables it and links, but the gesture has not been performed.
-3. **The admin block through the app** — proven server-side for an iOS user agent and the marker is in the synced config, but not exercised on the handset.
+- launches and loads the live site, notch and home indicator respected
+- the splash screen renders — flat-white mark on brand maroon, matching Android
+- in-app navigation works, including the signed-out auth redirect
+- **swipe-back works** — a left-edge swipe returned from sign-in to the homepage, which is the single job `MainViewController` exists for
+- **the user-agent marker is really sent.** Pointed at a local echo server, the WebView reported `Mozilla/5.0 (iPhone; …) Mobile/15E148 WeddingMallApp`. That was the last unproven link in the admin block — the server-side redirect was already covered by `tests/e2e/pwa.spec.ts`, and this confirms the app sends what that test assumes.
+
+**Still unverified:** vendor file upload, because reaching the picker needs a signed-in vendor account and the test account is not one. It is the one that crashes rather than degrades if an `Info.plist` key is wrong, so it is worth doing first on a real account. Everything needing a signed build — physical device, archive, App Store — needs an Apple ID attached in Xcode.
 
 The simulator-control tooling reports Xcode "not selected" even though `xcode-select -p` correctly returns `/Applications/Xcode.app/Contents/Developer` and `simctl` works from the shell — a stale check from before Xcode existed, which is why those three are still outstanding rather than done.
 
