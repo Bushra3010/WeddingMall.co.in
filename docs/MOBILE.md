@@ -494,42 +494,53 @@ App Store Connect rejects a build number it has already seen:
 cd ios/App && agvtool next-version -all
 ```
 
-## What is and is not verified on this machine
+## Build status: verified
 
-**Not built.** This machine has only the Command Line Tools. `xcodebuild`,
-`actool` and `ibtool` are all stubs that require the full Xcode, and Xcode
-cannot be installed without signing in to an Apple ID — on the Mac App Store or
-on developer.apple.com, which 302s to an auth wall. That is a credential
-decision for the owner, not something to automate.
+Xcode 26.6 with the iOS 26.5 SDK and simulator runtime. The project **builds**
+and **runs**:
 
-So the first `npx cap open ios` is the real test, and a Swift or signing problem
-would surface there.
+```bash
+xcodebuild -workspace ios/App/App.xcworkspace -scheme App -sdk iphonesimulator build
+```
 
-**Verified, without Xcode:**
+`** BUILD SUCCEEDED **`, and the app installs and launches on an iPhone 17
+simulator: it loads the live site, renders correctly with the notch and home
+indicator respected (`contentInset: 'always'` doing its job), and the process
+stays alive rather than crashing.
+
+Two template defects were fixed to get there:
+
+1. **The generated Podfile does not install.** It pins `platform :ios, '14.0'`
+   while every Capacitor 8 pod requires 15.0, so `pod install` fails on a fresh
+   `cap add ios`. The Podfile and all four `IPHONEOS_DEPLOYMENT_TARGET` entries
+   are now 15.0.
+2. **`colors.xml`-equivalent gaps** — see the Android section; the iOS template
+   was cleaner, but the deployment-target mismatch is the same class of problem.
+
+### Still unverified on a device
+
+- **Swipe-back.** `MainViewController` enables
+  `allowsBackForwardNavigationGestures`, and it compiles and links, but the
+  gesture itself has not been performed.
+- **Vendor file upload.** The four `Info.plist` usage strings are present and
+  the app launches, but the picker has not been opened. This is the one that
+  *crashes* rather than degrades if a key is wrong, so try it early.
+- **The admin block on a real handset.** It is proven server-side for an
+  iOS-shaped user agent (`tests/e2e/pwa.spec.ts`) and the marker is confirmed
+  in the synced iOS config, but it has not been exercised through the app.
+
+### Also verified without Xcode
 
 ```bash
 npm run verify:ios
 ```
 
-14 structural checks — the project opens and has an App target, no file
-reference dangles, `MainViewController.swift` is in Compile Sources, bundle id
-and deployment target agree across every configuration, the storyboard names a
-class the project actually compiles, both asset catalogs reference images that
-exist, the app icon is 1024×1024 with no alpha (the App Store rejects
-transparency at upload, after the archive is built), and the Podfile and lock
+14 structural checks that run anywhere — project opens, no dangling file
+references, the Swift file is in Compile Sources, bundle id and deployment
+target consistent, storyboard names a class that exists, asset catalogs
+reference real images, the icon is 1024x1024 with no alpha (an App Store
+rejection that otherwise lands after the archive is built), Podfile and lock
 agree.
-
-`swiftc -parse ios/App/App/MainViewController.swift` also passes, so the one
-hand-written Swift file is syntactically valid.
-
-These are not a substitute for compiling. They are the difference between
-finding a dangling reference in five seconds and finding it after a 15 GB
-install.
-
-One template defect was already found and fixed this way: the generated
-`Podfile` pins `platform :ios, '14.0'` while every Capacitor 8 pod requires
-15.0, so `pod install` fails on a fresh `cap add ios`. The Podfile and all four
-`IPHONEOS_DEPLOYMENT_TARGET` entries are now 15.0.
 
 ---
 

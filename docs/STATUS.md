@@ -553,6 +553,22 @@ Installing Xcode requires signing in to an Apple ID — the Mac App Store and de
 
 The iOS project is fully configured and passes `npm run verify:ios` (14 structural checks), but it has never been compiled and that will not change without about two minutes of the owner's hands.
 
+## The iOS app builds and runs (2026-08-11)
+
+Xcode arrived on the machine, so the gap flagged as "never compiled" is closed.
+
+`xcodebuild -workspace ios/App/App.xcworkspace -scheme App -sdk iphonesimulator build` returns **BUILD SUCCEEDED**, and the app installs and launches on an iPhone 17 simulator: it loads the live site, renders correctly with the notch and home indicator respected, and the process stays alive. `MainViewController.swift` — the one hand-written Swift file, added to the target with the `xcodeproj` gem — compiles and links.
+
+Getting there needed the iOS platform itself: Xcode ships the SDK but not the simulator runtime, and without it there are no build destinations at all. `xcodebuild -downloadPlatform iOS` pulled the 8.52 GB runtime with no Apple ID required.
+
+**Still untested on a device**, and worth doing in this order because the first one crashes rather than degrades:
+
+1. **Vendor file upload** — the four `Info.plist` usage strings are present, but iOS terminates the process on a missing one, so the picker needs opening.
+2. **Swipe-back** — `MainViewController` enables it and links, but the gesture has not been performed.
+3. **The admin block through the app** — proven server-side for an iOS user agent and the marker is in the synced config, but not exercised on the handset.
+
+The simulator-control tooling reports Xcode "not selected" even though `xcode-select -p` correctly returns `/Applications/Xcode.app/Contents/Developer` and `simctl` works from the shell — a stale check from before Xcode existed, which is why those three are still outstanding rather than done.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).
