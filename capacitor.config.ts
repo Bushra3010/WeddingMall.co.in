@@ -71,7 +71,19 @@ const config: CapacitorConfig = {
      * to the browser mid-flow. Anything not on this list opens externally,
      * which is the behaviour we want for a vendor's own site.
      */
-    allowNavigation: ['www.weddingmall.co.in', 'weddingmall.co.in', '*.supabase.co'],
+    allowNavigation: [
+      /*
+       * The configured host is listed first and derived, not hardcoded.
+       * Everything not on this list opens in the system browser, so a build
+       * pointed at a staging or Railway URL would bounce straight out to Safari
+       * on its first navigation — the same failure that broke the first APK,
+       * which pointed at the apex while the server redirected to `www`.
+       */
+      new URL(serverUrl).host,
+      'www.weddingmall.co.in',
+      'weddingmall.co.in',
+      '*.supabase.co',
+    ],
   },
 
   /*
