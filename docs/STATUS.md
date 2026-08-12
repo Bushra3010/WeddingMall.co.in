@@ -573,6 +573,20 @@ Getting there needed the iOS platform itself: Xcode ships the SDK but not the si
 
 The simulator-control tooling reports Xcode "not selected" even though `xcode-select -p` correctly returns `/Applications/Xcode.app/Contents/Developer` and `simctl` works from the shell — a stale check from before Xcode existed, which is why those three are still outstanding rather than done.
 
+## Moved off Vercel to Railway (2026-08-12)
+
+Vercel suspended the account — `HTTP 402`, `x-vercel-error: DEPLOYMENT_DISABLED` — which took the website *and both mobile apps* down, since the apps load the deployed origin.
+
+Redeployed to Railway (project `harmonious-simplicity`, service `WeddingMall.co.in`, building from the GitHub repo). All 17 environment variables ported, `NEXT_PUBLIC_APP_URL` repointed, Node pinned to 20 to match what the build and tests were verified on.
+
+Verified live rather than assumed: every public route 200s, real Supabase data renders, the CSP and HSTS headers survived the move, and the admin block still behaves correctly on both a browser agent (→ sign-in) and the app agent (→ `/app/web-only`).
+
+**One defect I introduced and fixed.** I created the service domain with `targetPort: 3000`, assuming Next's default. Railway injects `PORT=8080` and `next start` honours it, so the build succeeded, the app ran, and every request 502'd. The logs said `Local: http://localhost:8080` in plain sight. Port on the domain must match the port the app was actually told to use.
+
+Custom domains `weddingmall.co.in` and `www.weddingmall.co.in` are attached and waiting on DNS — until those CNAMEs are changed at the registrar the apps still point at the dead Vercel origin.
+
+**Worth recording about the architecture:** a 402 is a *successful* HTTP response, so the service worker's offline fallback never fired and both apps rendered Vercel's suspension page. The trade that makes updates instant also makes a hosting outage an app outage.
+
 ## Blocked / outstanding
 
 1. **No SMTP provider, and Supabase rejects test domains.** The default mail is rate-limited to a few per hour, and Auth refuses reserved domains (`example.com`, `.test`) at public sign-up. So sign-up confirmations and the sign-up E2E test cannot run reliably. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` (Resend, per PRD 8.1) and use a real domain — the adapter is written and will pick it up (ADR-022).

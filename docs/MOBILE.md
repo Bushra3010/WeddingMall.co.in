@@ -345,6 +345,29 @@ this machine.
 
 ---
 
+## Hosting: the app follows the origin, not the host
+
+`capacitor.config.ts` points the WebView at `https://www.weddingmall.co.in`.
+Which platform serves that domain is invisible to the apps — the site moved from
+Vercel to Railway without either app being rebuilt, because the domain is the
+contract, not the provider.
+
+That is also the failure mode to watch. When the Vercel account was suspended
+the site returned **HTTP 402**, and both apps showed Vercel's "deployment is
+temporarily paused" page: a 402 is a successful HTTP response, so the service
+worker's offline fallback never fires. A hosting outage is an app outage.
+
+Railway project `harmonious-simplicity`, service `WeddingMall.co.in`, deployed
+from the GitHub repo. `NEXT_PUBLIC_APP_URL` must match whatever domain actually
+serves — it drives `metadataBase` and auth redirects.
+
+**Note on ports.** Railway injects `PORT` (8080) and `next start` honours it, so
+a service domain created with `targetPort: 3000` returns 502 even though the
+build succeeded and the app is running. The port on the domain has to match the
+port the app was told to use.
+
+---
+
 # iOS
 
 Added with `npx cap add ios`. Bundle identifier `com.weddingmall.app`, display
