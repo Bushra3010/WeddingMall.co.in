@@ -108,6 +108,9 @@ export async function signUp(_prev: unknown, form: FormData): Promise<ActionResu
 
     return null
   })
+
+  revalidatePath('/', 'layout')
+  redirect(safeRedirect(formValue(form, 'next')))
 }
 
 export async function requestPasswordReset(
