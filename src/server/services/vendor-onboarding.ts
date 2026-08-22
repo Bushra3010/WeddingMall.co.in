@@ -113,11 +113,11 @@ export async function createVendorForUser(actor: Actor): Promise<string | null> 
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('full_name, email')
+      .select('full_name')
       .eq('id', actor.userId)
       .maybeSingle()
 
-    const displayName = profile?.full_name || profile?.email || 'My Business'
+    const displayName = profile?.full_name || 'My Business'
     const slug = await uniqueSlug(displayName)
 
     const { data: vendor, error } = await supabase
