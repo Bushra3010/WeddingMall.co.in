@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { BadgeCheck, LineChart, MessageSquareText } from 'lucide-react'
 
+import { CopyLinkButton } from '@/components/vendor/copy-link-button'
 import { RegisterVendorForm } from '@/components/vendor/register-vendor-form'
 import { buildMetadata } from '@/lib/seo'
 import { getActor } from '@/server/dal/actor'
@@ -80,17 +81,7 @@ export default async function VendorJoinPage() {
                 value={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://weddingmall.co.in'}/vendor/join`}
                 className="border-sand-300 flex-1 rounded-lg border bg-sand-50 px-3 py-2 text-xs"
               />
-              <button
-                type="button"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(
-                    `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://weddingmall.co.in'}/vendor/join`,
-                  )
-                }}
-                className="border-sand-300 rounded-lg border bg-white px-3 py-2 text-xs font-medium hover:bg-sand-50"
-              >
-                Copy
-              </button>
+              <CopyLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://weddingmall.co.in'}/vendor/join`} />
             </div>
           </div>
         </div>
