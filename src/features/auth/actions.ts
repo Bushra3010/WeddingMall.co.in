@@ -15,6 +15,7 @@ import {
   signInSchema,
   signUpSchema,
 } from './schema'
+import { autoConfirmUser } from '@/server/jobs/confirm-user'
 
 /**
  * Auth server actions.
@@ -34,7 +35,6 @@ export async function signIn(_prev: unknown, form: FormData): Promise<ActionResu
     const input = signInSchema.parse({
       email: formValue(form, 'email'),
       password: formValue(form, 'password'),
-      next: formValue(form, 'next') || undefined,
     })
 
     const supabase = await createClient()
@@ -87,6 +87,11 @@ export async function signUp(_prev: unknown, form: FormData): Promise<ActionResu
         'signup_failed',
         'We could not create that account. Try signing in instead.',
       )
+    }
+
+    // Auto-confirm so the user can log in immediately without checking email.
+    if (data.user?.id) {
+      await autoConfirmUser(data.user.id)
     }
 
     // Consent is recorded against the policy version in force at sign-up.
