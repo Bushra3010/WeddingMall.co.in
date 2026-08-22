@@ -106,6 +106,18 @@ export async function signUp(_prev: unknown, form: FormData): Promise<ActionResu
       })
     }
 
+    // When email confirmation is enabled, signUp doesn't return a session even
+    // after we auto-confirm the user. Sign them in directly so they land on
+    // the wizard without a manual login step.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: input.email,
+      password: input.password,
+    })
+
+    if (signInError) {
+      log.warn('auth.signUp.autoSignIn.failed', { reason: signInError.message, email: input.email })
+    }
+
     return null
   })
 
