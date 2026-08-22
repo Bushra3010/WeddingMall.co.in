@@ -1,13 +1,8 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { BadgeCheck, LineChart, MessageSquareText } from 'lucide-react'
 
 import { CopyLinkButton } from '@/components/vendor/copy-link-button'
-import { RegisterVendorForm } from '@/components/vendor/register-vendor-form'
 import { buildMetadata } from '@/lib/seo'
-import { getActor } from '@/server/dal/actor'
-import { getMyVendors } from '@/server/dal/vendor-workspace'
-import { listCategories, listCities } from '@/server/dal/taxonomy'
 
 export const metadata = buildMetadata({
   title: 'List your wedding business',
@@ -18,20 +13,13 @@ export const metadata = buildMetadata({
 
 export const dynamic = 'force-dynamic'
 
-export default async function VendorJoinPage() {
-  const actor = await getActor()
-
-  // Already running a business here — go straight to the workspace.
-  if (actor.userId) {
-    const mine = await getMyVendors()
-    if (mine.length > 0) redirect('/vendor-dashboard')
-  }
-
-  const [categories, cities] = await Promise.all([listCategories(40), listCities(60)])
+export default function VendorJoinPage() {
+  const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://weddingmall.co.in'}/vendor/join`
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
       <div className="grid gap-10 lg:grid-cols-[1fr_24rem]">
+        {/* Left — benefits + share link */}
         <div>
           <h1 className="font-display text-sand-900 text-3xl sm:text-4xl">
             Grow your wedding business
@@ -69,7 +57,7 @@ export default async function VendorJoinPage() {
             ))}
           </ul>
 
-          {/* Shareable link for vendors */}
+          {/* Shareable link */}
           <div className="border-sand-200 mt-8 rounded-[var(--radius-card)] border bg-white p-4">
             <p className="text-sand-800 text-sm font-medium">Share this page with a vendor</p>
             <p className="text-sand-500 mt-1 text-xs">
@@ -78,45 +66,41 @@ export default async function VendorJoinPage() {
             <div className="mt-3 flex gap-2">
               <input
                 readOnly
-                value={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://weddingmall.co.in'}/vendor/join`}
+                value={shareUrl}
                 className="border-sand-300 flex-1 rounded-lg border bg-sand-50 px-3 py-2 text-xs"
               />
-              <CopyLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://weddingmall.co.in'}/vendor/join`} />
+              <CopyLinkButton url={shareUrl} />
             </div>
           </div>
         </div>
 
-        <div className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-6">
-          {actor.userId ? (
-            <>
-              <h2 className="font-display text-sand-900 text-xl">List your business</h2>
-              <p className="text-sand-600 mt-1 text-sm">
-                Create your business profile and start receiving enquiries.
-              </p>
-              <div className="mt-5">
-                <RegisterVendorForm categories={categories} cities={cities} />
-              </div>
-            </>
-          ) : (
-            <>
-              <h2 className="font-display text-sand-900 text-xl">Create your account &amp; business</h2>
-              <p className="text-sand-600 mt-1 text-sm">
-                Create your account and business profile in one go. It takes about 2 minutes.
-              </p>
-              <div className="mt-5">
-                <RegisterVendorForm categories={categories} cities={cities} />
-              </div>
-              <p className="text-sand-500 mt-4 text-xs">
-                Already have an account?{' '}
-                <Link
-                  href="/auth/sign-in?next=/vendor-dashboard"
-                  className="text-brand-700 hover:underline"
-                >
-                  Sign in
-                </Link>
-              </p>
-            </>
-          )}
+        {/* Right — simple sign up / sign in */}
+        <div className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-6 sm:p-8">
+          <h2 className="font-display text-sand-900 text-xl sm:text-2xl">
+            List your business
+          </h2>
+          <p className="text-sand-600 mt-1 text-sm">
+            Create your account and set up your listing in minutes.
+          </p>
+
+          <div className="mt-6 space-y-3">
+            <Link
+              href="/auth/sign-up?next=/vendor-dashboard/list"
+              className="bg-brand-600 hover:bg-brand-700 flex w-full items-center justify-center rounded-lg px-6 py-3 text-sm font-medium text-white transition-colors"
+            >
+              Create an account
+            </Link>
+            <Link
+              href="/auth/sign-in?next=/vendor-dashboard/list"
+              className="border-sand-300 flex w-full items-center justify-center rounded-lg border bg-white px-6 py-3 text-sm font-medium text-sand-800 hover:bg-sand-50 transition-colors"
+            >
+              I already have an account
+            </Link>
+          </div>
+
+          <p className="text-sand-500 mt-5 text-xs text-center">
+            Nothing is published until you submit for review and our team approves it.
+          </p>
         </div>
       </div>
     </div>
