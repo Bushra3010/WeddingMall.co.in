@@ -34,7 +34,7 @@ function translate(error: { code?: string; message?: string } | null, fallback: 
 }
 
 /** Finds a free slug. Races are still caught by the unique constraint. */
-async function uniqueSlug(base: string): Promise<string> {
+export async function uniqueSlug(base: string): Promise<string> {
   const supabase = await createClient()
   const root = slugify(base) || 'business'
 

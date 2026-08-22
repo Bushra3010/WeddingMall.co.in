@@ -2,10 +2,8 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { BadgeCheck, LineChart, MessageSquareText } from 'lucide-react'
 
-import { CreateVendorForm } from '@/components/vendor/create-vendor-form'
-import { buttonVariants } from '@/components/ui/button'
+import { RegisterVendorForm } from '@/components/vendor/register-vendor-form'
 import { buildMetadata } from '@/lib/seo'
-import { cn } from '@/lib/utils'
 import { getActor } from '@/server/dal/actor'
 import { getMyVendors } from '@/server/dal/vendor-workspace'
 import { listCategories, listCities } from '@/server/dal/taxonomy'
@@ -69,37 +67,63 @@ export default async function VendorJoinPage() {
               </li>
             ))}
           </ul>
+
+          {/* Shareable link for vendors */}
+          <div className="border-sand-200 mt-8 rounded-[var(--radius-card)] border bg-white p-4">
+            <p className="text-sand-800 text-sm font-medium">Share this page with a vendor</p>
+            <p className="text-sand-500 mt-1 text-xs">
+              Copy the link below and send it to vendors who want to list their business.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <input
+                readOnly
+                value={`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://weddingmall.co.in'}/vendor/join`}
+                className="border-sand-300 flex-1 rounded-lg border bg-sand-50 px-3 py-2 text-xs"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(
+                    `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://weddingmall.co.in'}/vendor/join`,
+                  )
+                }}
+                className="border-sand-300 rounded-lg border bg-white px-3 py-2 text-xs font-medium hover:bg-sand-50"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-6">
           {actor.userId ? (
             <>
-              <h2 className="font-display text-sand-900 text-xl">Tell us about your business</h2>
+              <h2 className="font-display text-sand-900 text-xl">List your business</h2>
               <p className="text-sand-600 mt-1 text-sm">
-                Three quick details to get started. You can change all of them later.
+                Create your business profile and start receiving enquiries.
               </p>
               <div className="mt-5">
-                <CreateVendorForm categories={categories} cities={cities} />
+                <RegisterVendorForm categories={categories} cities={cities} />
               </div>
             </>
           ) : (
             <>
-              <h2 className="font-display text-sand-900 text-xl">Create your account</h2>
+              <h2 className="font-display text-sand-900 text-xl">Create your account &amp; business</h2>
               <p className="text-sand-600 mt-1 text-sm">
-                You need an account before you can list a business. It takes a minute.
+                Create your account and business profile in one go. It takes about 2 minutes.
               </p>
-              <Link
-                href="/auth/sign-up?next=%2Fvendor%2Fjoin"
-                className={cn(buttonVariants({ size: 'lg' }), 'mt-5 w-full')}
-              >
-                Sign up
-              </Link>
-              <Link
-                href="/auth/sign-in?next=%2Fvendor%2Fjoin"
-                className={cn(buttonVariants({ variant: 'outline' }), 'mt-2 w-full')}
-              >
-                I already have an account
-              </Link>
+              <div className="mt-5">
+                <RegisterVendorForm categories={categories} cities={cities} />
+              </div>
+              <p className="text-sand-500 mt-4 text-xs">
+                Already have an account?{' '}
+                <Link
+                  href="/auth/sign-in?next=/vendor-dashboard"
+                  className="text-brand-700 hover:underline"
+                >
+                  Sign in
+                </Link>
+              </p>
             </>
           )}
         </div>

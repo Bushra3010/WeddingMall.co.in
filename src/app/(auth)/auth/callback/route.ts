@@ -22,7 +22,18 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) throw error
-    return NextResponse.redirect(`${origin}${next}`)
+
+    // If the user has a vendor, send them to the listing wizard; otherwise to onboarding
+    const { data: memberships } = await supabase
+      .from('vendor_memberships')
+      .select('vendor_id')
+      .limit(1)
+
+    const vendorNext = memberships && memberships.length > 0
+      ? '/vendor-dashboard/list'
+      : next
+
+    return NextResponse.redirect(`${origin}${vendorNext}`)
   } catch (error) {
     logError('auth.callback', error)
     return NextResponse.redirect(`${origin}/auth/sign-in?error=exchange_failed`)

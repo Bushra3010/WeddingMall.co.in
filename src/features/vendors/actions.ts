@@ -1,10 +1,16 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { runAction, ServiceError, type ActionResult } from '@/lib/action-result'
+import { createClient } from '@/lib/supabase/server'
+import { env } from '@/lib/env'
 import { getActor } from '@/server/dal/actor'
+import {
+  CURRENT_POLICY_VERSION,
+} from '@/features/auth/schema'
 import {
   createVendor,
   saveCategories,
@@ -12,6 +18,7 @@ import {
   saveVendorListing,
   saveVendorProfile,
   submitForReview,
+  uniqueSlug,
 } from '@/server/services/vendor-onboarding'
 import { changeMemberRole, inviteMember, revokeMember } from '@/server/services/vendor-team'
 import {
@@ -75,7 +82,7 @@ export async function createVendorAction(
 
   if (result.ok && created) {
     revalidatePath('/vendor-dashboard', 'layout')
-    redirect('/vendor-dashboard/onboarding')
+    redirect('/vendor-dashboard/list')
   }
   return result
 }
@@ -252,6 +259,123 @@ export async function revokeMemberAction(
   return result
 }
 
+export async function registerVendorAndCreateAccount(
+  _prev: unknown,
+  form: FormData,
+): Promise<ActionResult<{ vendorId: string }>> {
+  let created: { vendorId: string } | null = null
+
+  const result = await runAction('vendor.register', async () => {
+    const input = createVendorSchema.parse({
+      displayName: str(form, 'displayName'),
+      primaryCityId: str(form, 'primaryCityId'),
+      primaryCategoryId: str(form, 'primaryCategoryId'),
+    })
+
+    const fullName = str(form, 'fullName')
+    const email = str(form, 'email')
+    const password = str(form, 'password')
+    const acceptTerms = form.get('acceptTerms') === 'on' || form.get('acceptTerms') === 'true'
+
+    if (!fullName || !email || !password) {
+      throw new ServiceError('missing_fields', 'Please fill in all account details.')
+    }
+    if (!acceptTerms) {
+      throw new ServiceError('terms_required', 'You must accept the terms to continue.')
+    }
+
+    const supabase = await createClient()
+
+    // Create auth account
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: `${env.NEXT_PUBLIC_APP_URL}/vendor-dashboard/list`,
+      },
+    })
+
+    if (authError || !authData.user) {
+      throw new ServiceError(
+        'signup_failed',
+        authError?.message ?? 'We could not create your account. Try again.',
+      )
+    }
+
+    const userId = authData.user.id
+
+    // Record consent
+    const forwarded = (await headers()).get('x-forwarded-for')
+    await supabase.from('user_consents').insert({
+      user_id: userId,
+      consent_type: 'terms_and_privacy',
+      policy_version: CURRENT_POLICY_VERSION,
+      granted: true,
+      source: forwarded ? 'web' : 'web',
+    })
+
+    // Create vendor
+    const slug = await uniqueSlug(input.displayName)
+
+    const { data: vendor, error: vendorError } = await supabase
+      .from('vendors')
+      .insert({
+        display_name: input.displayName,
+        slug,
+        owner_user_id: userId,
+        status: 'draft',
+        primary_city_id: input.primaryCityId,
+      })
+      .select('id, slug')
+      .single()
+
+    if (vendorError || !vendor) {
+      throw new ServiceError('vendor_creation_failed', 'We could not create your business profile.')
+    }
+
+    // Create membership
+    const { error: membershipError } = await supabase.from('vendor_memberships').insert({
+      vendor_id: vendor.id,
+      user_id: userId,
+      role: 'vendor_owner',
+      status: 'active',
+    })
+    if (membershipError) {
+      throw new ServiceError('membership_failed', 'We could not set up your account access.')
+    }
+
+    // Create draft listing
+    const { error: listingError } = await supabase
+      .from('vendor_listings')
+      .insert({ vendor_id: vendor.id, status: 'draft' })
+    if (listingError) {
+      throw new ServiceError('listing_failed', 'We could not create your listing draft.')
+    }
+
+    // Save category
+    const { error: categoryError } = await supabase
+      .from('vendor_categories')
+      .insert({ vendor_id: vendor.id, category_id: input.primaryCategoryId, is_primary: true })
+    if (categoryError) {
+      throw new ServiceError('category_failed', 'We could not save your category.')
+    }
+
+    // Save service area
+    await supabase
+      .from('vendor_service_areas')
+      .insert({ vendor_id: vendor.id, city_id: input.primaryCityId, travel_available: false })
+
+    created = { vendorId: vendor.id }
+    return created
+  })
+
+  if (result.ok && created) {
+    revalidatePath('/vendor-dashboard', 'layout')
+    redirect('/vendor-dashboard/list')
+  }
+  return result
+}
 export async function decideVendorAction(
   _prev: unknown,
   form: FormData,
