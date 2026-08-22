@@ -101,6 +101,56 @@ export async function createVendor(actor: Actor, input: CreateVendorInput) {
   return { vendorId: vendor.id, slug: vendor.slug }
 }
 
+/**
+ * Creates a minimal draft vendor for a user who just signed up.
+ * Used when a user lands in the wizard without an existing vendor.
+ */
+export async function createVendorForUser(actor: Actor): Promise<string | null> {
+  if (!actor.userId) return null
+
+  try {
+    const supabase = await createClient()
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', actor.userId)
+      .maybeSingle()
+
+    const displayName = profile?.full_name || profile?.email || 'My Business'
+    const slug = await uniqueSlug(displayName)
+
+    const { data: vendor, error } = await supabase
+      .from('vendors')
+      .insert({
+        display_name: displayName,
+        slug,
+        owner_user_id: actor.userId,
+        status: 'draft',
+      })
+      .select('id')
+      .single()
+
+    if (error || !vendor) return null
+
+    await supabase.from('vendor_memberships').insert({
+      vendor_id: vendor.id,
+      user_id: actor.userId,
+      role: 'vendor_owner',
+      status: 'active',
+    })
+
+    await supabase.from('vendor_listings').insert({
+      vendor_id: vendor.id,
+      status: 'draft',
+    })
+
+    return vendor.id
+  } catch {
+    return null
+  }
+}
+
 export async function saveVendorProfile(actor: Actor, vendorId: string, input: VendorProfileInput) {
   assertVendorCapability(actor, vendorId, 'listing.edit')
   const supabase = await createClient()

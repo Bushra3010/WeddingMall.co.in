@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { WizardShell } from '@/components/vendor/wizard-shell'
 import { getMyVendors, getVendorWorkspace, getVerificationDocuments } from '@/server/dal/vendor-workspace'
 import { listCategories, listCities } from '@/server/dal/taxonomy'
+import { createVendorForUser } from '@/server/services/vendor-onboarding'
+import { getActor } from '@/server/dal/actor'
 
 import { buildMetadata } from '@/lib/seo'
 
@@ -13,12 +15,21 @@ type WizardPageProps = {
   params: Promise<{ step?: string[] }>
 }
 
-/**
- * Server Component: fetches all data, then hands off to the client-side wizard
- * for interactive step navigation.
- */
 export default async function ListingWizardPage({ params }: WizardPageProps) {
-  const mine = await getMyVendors()
+  const actor = await getActor()
+  if (!actor.userId) redirect('/auth/sign-in?next=/vendor-dashboard/list')
+
+  let mine = await getMyVendors()
+
+  // Auto-create vendor if this is their first time in the wizard
+  if (mine.length === 0) {
+    const slug = await createVendorForUser(actor)
+    if (slug) {
+      // Refresh the list after creation
+      mine = await getMyVendors()
+    }
+  }
+
   if (mine.length === 0) redirect('/vendor/join')
 
   const vendorId = mine[0].vendor.id
