@@ -60,7 +60,7 @@ export async function signIn(_prev: unknown, form: FormData): Promise<ActionResu
 }
 
 export async function signUp(_prev: unknown, form: FormData): Promise<ActionResult<null>> {
-  return runAction('auth.signUp', async () => {
+  const result = await runAction('auth.signUp', async () => {
     const input = signUpSchema.parse({
       fullName: formValue(form, 'fullName'),
       email: formValue(form, 'email'),
@@ -121,8 +121,12 @@ export async function signUp(_prev: unknown, form: FormData): Promise<ActionResu
     return null
   })
 
-  revalidatePath('/', 'layout')
-  redirect(safeRedirect(formValue(form, 'next')))
+  if (result.ok) {
+    revalidatePath('/', 'layout')
+    redirect(safeRedirect(formValue(form, 'next')))
+  }
+
+  return result
 }
 
 export async function requestPasswordReset(
