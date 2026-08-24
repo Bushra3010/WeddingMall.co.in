@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
@@ -7,19 +8,8 @@ import { signOut } from '@/features/auth/actions'
 import { cn } from '@/lib/utils'
 
 /**
- * Sign out. A form posting to a Server Action rather than a link, so it is a
- * POST and cannot be triggered by a crawler or a prefetch.
- *
- * `label` may be hidden on small screens, so the button always carries an
- * accessible name — an icon-only control with no name is unusable with a
- * screen reader and indistinguishable by voice control (PRD 7.3).
- *
- * The Server Action clears the auth cookie, but the browser client holds its
- * own copy of the session and is never told. Without the client sign-out
- * below, the header kept offering "Sign out" to somebody who had already
- * signed out. Both run: the client call clears local state immediately, and
- * the Server Action is what actually ends the session — a client-only sign-out
- * would leave the cookie the server trusts intact.
+ * Sign out. Clears the browser client session first, then calls the Server
+ * Action which clears the auth cookie and redirects home.
  */
 export function SignOutButton({
   className,
@@ -28,13 +18,23 @@ export function SignOutButton({
   className?: string
   showLabel?: boolean
 }) {
+  const router = useRouter()
+
+  const handleSignOut = async () => {
+    try {
+      // Clear the browser-side session immediately.
+      await createClient().auth.signOut()
+      // Clear the server-side cookie and redirect.
+      await signOut()
+    } catch {
+      // If the server action fails, the client session is already cleared —
+      // force a reload so the header reflects reality.
+      router.refresh()
+    }
+  }
+
   return (
-    <form
-      action={async () => {
-        await createClient().auth.signOut()
-        await signOut()
-      }}
-    >
+    <form action={handleSignOut}>
       <button
         type="submit"
         aria-label="Sign out"
