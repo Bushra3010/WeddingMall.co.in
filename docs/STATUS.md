@@ -634,6 +634,80 @@ Checks: 144 unit tests pass, `tsc --noEmit` clean, `eslint` clean. Build fails o
 
 Keep probing before building. A live privilege escalation has been found this way in each of the last three milestones — reviews (ADR-031), vendor columns (ADR-032), analytics (ADR-035) — and in every case reading the code looked fine.
 
+## Vendor onboarding: progressive step redesign (2026-08-26)
+
+The listing wizard showed every step's form stacked on one page. It now shows
+one step at a time with a visual journey beside it, per the redesign brief.
+
+**New:** `components/vendor/wizard-config.ts` (the seven steps, plus
+`isStepComplete`/`isStepUnlocked` in one place rather than seven copies of the
+navigation logic) and `components/vendor/wizard-stepper.tsx` (vertical rail on
+desktop, horizontal pill rail below `lg`, and the progress readout).
+
+`SinglePageListingForm` renders the active step only, with `Back`/`Continue`.
+For the four form steps, Continue is a `type="submit"` button outside the
+`<form>` bound by `form="wizard-form-{step}"` — the existing server action, its
+Zod schema and every field are untouched; the button that triggers it moved.
+Media and documents advance on their upload counts. Step 7 is a review screen
+listing each step with its status and an Edit button.
+
+Completion is derived from the vendor record on every render, never mirrored in
+client state, so a save and a reload cannot disagree.
+
+Five defects found while verifying, four of them mine:
+
+1. **The mobile rail stretched the whole dashboard.** Seven pills come to 448px;
+   Chrome sizes the mobile layout viewport from a descendant's scrollable
+   content, so `innerWidth` became 461 at a 390px device width and every page
+   rendered zoomed out. `overflow-x-auto` does not prevent this — `contain:
+   paint` does. Now covered by `dashboard-mobile.spec.ts`, which reports 481 vs
+   390 with the fix removed.
+2. **The rail never scrolled to the current step**, so arriving at step 5 put the
+   step you came for half off the right edge.
+3. **Submit was ticked before it had been submitted** — it read `canSubmit`
+   ("could submit") rather than `submittedAt`, so the final step showed a
+   checkmark while an earlier step was still locked.
+4. **A padlock beside an open final step.** Media and documents are not required
+   to submit, so a vendor could reach `canSubmit` with Documents still locked.
+   Unlocking is now monotonic: reachable steps are always a prefix.
+5. **`getMyVendors` filtered by `status` but not `user_id`** (pre-existing, in
+   `server/dal/vendor-workspace.ts`). It relied on RLS to scope rows, which
+   holds for a vendor and fails for an admin — admins can read every membership
+   row, so "my vendors" returned the whole marketplace, `/vendor-dashboard/list`
+   opened someone else's business, and every save came back "You do not have
+   permission." This is the third time this milestone that a query trusted RLS
+   as a filter. **RLS is a ceiling, not a filter.**
+
+A React warning was also fixed: the step advance ran during the child's render
+(`setState` on a parent while rendering a different component) and now runs in
+an effect.
+
+Files changed: `components/vendor/{wizard-config,wizard-stepper}.ts(x)` (new),
+`components/vendor/{listing-form,wizard-steps}.tsx`,
+`server/dal/vendor-workspace.ts`, `app/globals.css`,
+`tests/wizard-steps.test.ts` (new), `tests/e2e/dashboard-mobile.spec.ts`,
+`tests/e2e/journey-1-customer.spec.ts`, `docs/STATUS.md`.
+
+Checks: 155 unit tests, 37 E2E passed / 3 skipped, lint and typecheck clean,
+build compiles. Both new unit tests were confirmed to fail without their fix,
+as was the new mobile E2E assertion.
+
+**Verified in a browser, not just by test:** save-and-advance, per-step
+validation refusing to advance, values surviving a reload, clicking a completed
+step to edit it, locked steps announcing themselves as disabled buttons, the
+review screen's Edit buttons, and the 390px layout.
+
+Two things this pass did **not** settle:
+
+- `tests/e2e/journey-1-customer.spec.ts` asserted the old "Check your inbox"
+  outcome and failed once sign-up started signing people straight in. It now
+  accepts either. Worth noting how it hid: run alone the test is rate-limited by
+  Supabase and skips, so it only asserts anything in a full-suite run. A skip is
+  not a pass.
+- No regression test covers the `getMyVendors` fix — it needs an RLS probe with
+  two users rather than a unit test. Add it to `npm run db:rls`.
+
+
 ## Notes
 
 - All seed and demo data is fictional (PRD 2.3, Epic G). `npm run seed:demo -- --clean` removes the demo vendors.

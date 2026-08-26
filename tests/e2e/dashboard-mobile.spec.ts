@@ -60,8 +60,37 @@ test.afterAll(async () => {
     await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=200`, { headers })
   ).json()
   const user = (users.users ?? []).find((u: { email?: string }) => u.email === email)
-  if (user)
-    await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user.id}`, { method: 'DELETE', headers })
+  if (!user) return
+
+  /*
+   * Opening the listing wizard creates a vendor for a user who has none, so
+   * this suite leaves a business behind unless it clears up after itself.
+   * Everything hanging off `vendors` is `on delete cascade`, so the parent row
+   * is the only delete needed — but the membership has to be read first, since
+   * deleting the user takes the row that points at the vendor with it.
+   */
+  const rest = {
+    apikey: SERVICE_KEY,
+    Authorization: `Bearer ${SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+  }
+  const memberships = await (
+    await fetch(
+      `${SUPABASE_URL}/rest/v1/vendor_memberships?user_id=eq.${user.id}&select=vendor_id`,
+      {
+        headers: rest,
+      },
+    )
+  ).json()
+
+  for (const { vendor_id } of (memberships ?? []) as { vendor_id: string }[]) {
+    await fetch(`${SUPABASE_URL}/rest/v1/vendors?id=eq.${vendor_id}`, {
+      method: 'DELETE',
+      headers: rest,
+    })
+  }
+
+  await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user.id}`, { method: 'DELETE', headers })
 })
 
 async function signIn(page: import('@playwright/test').Page) {
@@ -75,7 +104,17 @@ async function signIn(page: import('@playwright/test').Page) {
   await page.waitForURL((url) => !url.pathname.startsWith('/auth/'), { timeout: 15_000 })
 }
 
-for (const route of ['/account', '/vendor-dashboard']) {
+/*
+ * `/vendor-dashboard/list` is included deliberately.
+ *
+ * The onboarding wizard's mobile step rail is seven pills wider than a phone,
+ * and Chrome sizes the mobile layout viewport from a descendant's scrollable
+ * content — so a rail that was scrolling correctly inside its own box still
+ * stretched `innerWidth` to 461 and rendered the entire dashboard zoomed out.
+ * The old list here stopped at `/vendor-dashboard`, which does not overflow,
+ * so nothing caught it.
+ */
+for (const route of ['/account', '/vendor-dashboard', '/vendor-dashboard/list']) {
   test(`${route} fits the viewport on a phone`, async ({ page }) => {
     test.skip(!SUPABASE_URL || !SERVICE_KEY, 'needs .env.local for the live project')
     await signIn(page)

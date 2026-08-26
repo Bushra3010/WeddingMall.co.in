@@ -265,3 +265,22 @@
     display: none;
   }
 }
+
+/*
+ * Onboarding step transition.
+ *
+ * A short fade with a few pixels of travel — enough to show that the panel
+ * changed without making someone wait to read it. Sits inside the existing
+ * `prefers-reduced-motion` block below, which disables every animation in this
+ * file, and the wizard applies it under `motion-safe:` as well.
+ */
+@keyframes wizard-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

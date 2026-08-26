@@ -220,12 +220,30 @@ export async function getVerificationDocuments(vendorId: string): Promise<Verifi
 }
 
 /** Vendors the signed-in user belongs to, for the workspace switcher. */
+/**
+ * The vendors the signed-in user is actually a member of.
+ *
+ * The `user_id` filter is not redundant with RLS. This query used to lean
+ * entirely on the policy to scope rows, which holds for a vendor user and fails
+ * for an admin: admins can read every membership row, so "my vendors" returned
+ * the whole marketplace. `/vendor-dashboard/list` then opened `mine[0]` — some
+ * other business — and every save came back "You do not have permission",
+ * because the guard checks membership rather than visibility.
+ *
+ * RLS is a ceiling, not a filter. Ownership queries state their subject.
+ */
 export const getMyVendors = cache(async () => {
   try {
     const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return []
+
     const { data, error } = await supabase
       .from('vendor_memberships')
       .select('role, status, vendors(id, display_name, slug, status)')
+      .eq('user_id', user.id)
       .eq('status', 'active')
     if (error) throw error
     return (data ?? [])

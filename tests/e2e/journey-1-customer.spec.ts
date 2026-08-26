@@ -164,6 +164,10 @@ test('a customer cannot open an enquiry that is not theirs', async ({ page }) =>
  * and .test are refused outright. Both surface as the same generic error, so
  * this test skips rather than failing the suite over provider policy.
  *
+ * Note the asymmetry that made this test misleading: run alone it tends to be
+ * refused and skip, and only in the full suite does it get far enough to
+ * assert anything. A skip is not a pass.
+ *
  * It will run for real once a proper SMTP provider and a domain Supabase
  * accepts are configured — see docs/STATUS.md.
  */
@@ -179,15 +183,33 @@ test('the sign-up form accepts a new account', async ({ page }) => {
   await page.getByRole('checkbox').check()
   await page.getByRole('button', { name: 'Create account' }).click()
 
+  /*
+   * Three outcomes are legitimate here, and the test used to know about only
+   * two of them.
+   *
+   * Sign-up now signs the new account straight in when the project does not
+   * require email confirmation, which is what a customer should get. This
+   * assertion still waited for "Check your inbox" and failed against a page
+   * that had done exactly the right thing — the account was created, signed in,
+   * and sitting on /account.
+   */
+  const signedIn = page.getByRole('button', { name: 'Sign out' })
   const confirmation = page.getByText('Check your inbox')
   const providerRefused = page.getByText(/could not create that account/i)
-  await expect(confirmation.or(providerRefused)).toBeVisible({ timeout: 20_000 })
+  await expect(signedIn.or(confirmation).or(providerRefused)).toBeVisible({ timeout: 20_000 })
 
   if (await providerRefused.isVisible()) {
     test.skip(
       true,
       'Supabase Auth refused the address (rate limit or reserved domain) — not a product failure',
     )
+  }
+
+  // Whichever of the two success paths ran, the account must not still be
+  // anonymous: the reported bug was a new account landing back on a sign-in
+  // wall.
+  if (await signedIn.isVisible()) {
+    await expect(page).toHaveURL(/\/account/)
   }
 
   // Clean up the account this test created.

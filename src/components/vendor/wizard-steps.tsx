@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
+
 import { fieldError, FormMessage, useAction } from '@/components/shared/action-form'
 import { SubmitButton } from '@/components/shared/submit-button'
 import { Field, Input, Textarea } from '@/components/ui/field'
@@ -18,18 +20,52 @@ import type { CategoryRow, CityRow } from '@/server/dal/taxonomy'
 
 const STEP_SECTION = 'space-y-4'
 
+/**
+ * Calls `onSuccess` once, when an action's state flips to ok.
+ *
+ * Adjusted during render rather than in an effect — React's documented way to
+ * react to a changed value, and the pattern already used elsewhere in this
+ * codebase. It is what lets the wizard shell advance a step only after the
+ * server has actually accepted the data, rather than optimistically on click.
+ */
+/**
+ * Run `onSuccess` once, the first time an action result comes back ok.
+ *
+ * The advance has to happen in an effect, not during render. Adjusting state
+ * while rendering is only legal for a component's own state; `onSuccess` here
+ * moves the *parent* wizard to the next step, and React warned about exactly
+ * that ("Cannot update a component while rendering a different component").
+ * It happened to work, which is the dangerous kind of wrong.
+ *
+ * The ref holds the last result object seen rather than a boolean, so two
+ * consecutive successful saves of the same step each advance — comparing on
+ * `ok` alone would swallow the second.
+ */
+function useOnSaved(state: { ok: boolean } | null, onSuccess?: () => void) {
+  const seen = useRef(state)
+
+  useEffect(() => {
+    if (seen.current === state) return
+    seen.current = state
+    if (state?.ok) onSuccess?.()
+  }, [state, onSuccess])
+}
+
 export function WizardBusinessStep({
   vendor,
   cities,
   readOnly,
   vendorId,
+  onSaved,
 }: {
   vendor: VendorWorkspace
   cities: CityRow[]
   readOnly: boolean
   vendorId: string
+  onSaved?: () => void
 }) {
   const [state, action] = useAction(saveProfileAction)
+  useOnSaved(state, onSaved)
 
   return (
     <div className={STEP_SECTION}>
@@ -37,7 +73,7 @@ export function WizardBusinessStep({
         The basics couples see first. All fields are editable later.
       </p>
 
-      <form action={action}>
+      <form action={action} id="wizard-form-business">
         <input type="hidden" name="vendorId" value={vendorId} />
         <FormMessage state={state} successMessage="Saved." />
 
@@ -96,7 +132,11 @@ export function WizardBusinessStep({
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Contact email" hint="Where enquiry alerts go. Not public." error={fieldError(state, 'email')}>
+            <Field
+              label="Contact email"
+              hint="Where enquiry alerts go. Not public."
+              error={fieldError(state, 'email')}
+            >
               {({ id, describedBy, invalid }) => (
                 <Input
                   id={id}
@@ -156,7 +196,11 @@ export function WizardBusinessStep({
             </Field>
           </div>
 
-          {!readOnly ? <SubmitButton className="w-full sm:w-auto" pendingLabel="Saving…">Save details</SubmitButton> : null}
+          {!readOnly ? (
+            <SubmitButton className="w-full sm:w-auto" pendingLabel="Saving…">
+              Save details
+            </SubmitButton>
+          ) : null}
         </div>
       </form>
     </div>
@@ -167,12 +211,15 @@ export function WizardAboutStep({
   vendor,
   readOnly,
   vendorId,
+  onSaved,
 }: {
   vendor: VendorWorkspace
   readOnly: boolean
   vendorId: string
+  onSaved?: () => void
 }) {
   const [state, action] = useAction(saveListingAction)
+  useOnSaved(state, onSaved)
 
   return (
     <div className={STEP_SECTION}>
@@ -180,7 +227,7 @@ export function WizardAboutStep({
         Write 50+ characters about your business. This is the first thing couples read.
       </p>
 
-      <form action={action}>
+      <form action={action} id="wizard-form-about">
         <input type="hidden" name="vendorId" value={vendorId} />
         <FormMessage state={state} successMessage="Saved." />
 
@@ -222,7 +269,11 @@ export function WizardAboutStep({
             )}
           </Field>
 
-          {!readOnly ? <SubmitButton className="w-full sm:w-auto" pendingLabel="Saving…">Save description</SubmitButton> : null}
+          {!readOnly ? (
+            <SubmitButton className="w-full sm:w-auto" pendingLabel="Saving…">
+              Save description
+            </SubmitButton>
+          ) : null}
         </div>
       </form>
     </div>
@@ -234,13 +285,16 @@ export function WizardCategoriesStep({
   categories,
   readOnly,
   vendorId,
+  onSaved,
 }: {
   vendor: VendorWorkspace
   categories: CategoryRow[]
   readOnly: boolean
   vendorId: string
+  onSaved?: () => void
 }) {
   const [state, action] = useAction(saveCategoriesAction)
+  useOnSaved(state, onSaved)
 
   return (
     <div className={STEP_SECTION}>
@@ -248,7 +302,7 @@ export function WizardCategoriesStep({
         Pick your main category. You can add up to 5 more later.
       </p>
 
-      <form action={action}>
+      <form action={action} id="wizard-form-categories">
         <input type="hidden" name="vendorId" value={vendorId} />
         <FormMessage state={state} successMessage="Saved." />
 
@@ -297,7 +351,11 @@ export function WizardCategoriesStep({
             </div>
           </fieldset>
 
-          {!readOnly ? <SubmitButton className="w-full sm:w-auto" pendingLabel="Saving…">Save categories</SubmitButton> : null}
+          {!readOnly ? (
+            <SubmitButton className="w-full sm:w-auto" pendingLabel="Saving…">
+              Save categories
+            </SubmitButton>
+          ) : null}
         </div>
       </form>
     </div>
@@ -309,13 +367,16 @@ export function WizardAreasStep({
   cities,
   readOnly,
   vendorId,
+  onSaved,
 }: {
   vendor: VendorWorkspace
   cities: CityRow[]
   readOnly: boolean
   vendorId: string
+  onSaved?: () => void
 }) {
   const [state, action] = useAction(saveServiceAreasAction)
+  useOnSaved(state, onSaved)
 
   return (
     <div className={STEP_SECTION}>
@@ -323,7 +384,7 @@ export function WizardAreasStep({
         Choose the cities you serve. Check &ldquo;travel available&rdquo; if you go on location.
       </p>
 
-      <form action={action}>
+      <form action={action} id="wizard-form-areas">
         <input type="hidden" name="vendorId" value={vendorId} />
         <FormMessage state={state} successMessage="Saved." />
 
@@ -353,7 +414,7 @@ export function WizardAreasStep({
             </div>
           </fieldset>
 
-          <label className="flex items-center gap-2 text-sm text-sand-700">
+          <label className="text-sand-700 flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               name="travelAvailable"
@@ -363,7 +424,11 @@ export function WizardAreasStep({
             I travel to other cities on request
           </label>
 
-          {!readOnly ? <SubmitButton className="w-full sm:w-auto" pendingLabel="Saving…">Save areas</SubmitButton> : null}
+          {!readOnly ? (
+            <SubmitButton className="w-full sm:w-auto" pendingLabel="Saving…">
+              Save areas
+            </SubmitButton>
+          ) : null}
         </div>
       </form>
     </div>
@@ -389,8 +454,8 @@ export function WizardMediaStep({
 
       {vendor.mediaCount > 0 ? (
         <p className="text-sand-600 text-sm">
-          You have <strong>{vendor.mediaCount}</strong> photo{vendor.mediaCount !== 1 ? 's' : ''} uploaded.
-          You can add more in the Portfolio section.
+          You have <strong>{vendor.mediaCount}</strong> photo{vendor.mediaCount !== 1 ? 's' : ''}{' '}
+          uploaded. You can add more in the Portfolio section.
         </p>
       ) : (
         <p className="text-sand-500 text-sm">
@@ -406,7 +471,9 @@ export function WizardMediaStep({
             <label className="text-sand-800 block text-sm font-medium">
               Photos <span className="text-[var(--color-danger)]">*</span>
             </label>
-            <p className="text-sand-500 mt-0.5 text-xs">Upload up to 20 images at a time. JPG, PNG. Up to 5 MB each.</p>
+            <p className="text-sand-500 mt-0.5 text-xs">
+              Upload up to 20 images at a time. JPG, PNG. Up to 5 MB each.
+            </p>
             <input
               type="file"
               name="files"
@@ -417,10 +484,10 @@ export function WizardMediaStep({
           </div>
 
           <div>
-            <label className="text-sand-800 block text-sm font-medium">
-              Alt text
-            </label>
-            <p className="text-sand-500 mt-0.5 text-xs">Describe the image for accessibility (optional).</p>
+            <label className="text-sand-800 block text-sm font-medium">Alt text</label>
+            <p className="text-sand-500 mt-0.5 text-xs">
+              Describe the image for accessibility (optional).
+            </p>
             <input
               type="text"
               name="altText"
@@ -462,15 +529,15 @@ export function WizardDocumentsStep({
   return (
     <div className={STEP_SECTION}>
       <p className="text-sand-600 text-sm">
-        Upload a business registration or GST certificate for the verified badge.
-        Documents are private — only the verification team can see them.
+        Upload a business registration or GST certificate for the verified badge. Documents are
+        private — only the verification team can see them.
       </p>
 
       <FormMessage state={uploadState} successMessage="Document uploaded." />
       <FormMessage state={deleteState} successMessage="Document removed." />
 
       {documents.length > 0 ? (
-        <ul className="divide-sand-200 border-sand-200 divide-y rounded-lg border mt-4">
+        <ul className="divide-sand-200 border-sand-200 mt-4 divide-y rounded-lg border">
           {documents.map((doc) => (
             <li key={doc.id} className="flex items-center justify-between gap-3 p-3 text-sm">
               <div>
@@ -481,7 +548,7 @@ export function WizardDocumentsStep({
                   <input type="hidden" name="documentId" value={doc.id} />
                   <button
                     type="submit"
-                    className="text-[var(--color-danger)] text-xs hover:underline"
+                    className="text-xs text-[var(--color-danger)] hover:underline"
                   >
                     Remove
                   </button>
@@ -491,7 +558,7 @@ export function WizardDocumentsStep({
           ))}
         </ul>
       ) : (
-        <p className="border-sand-300 text-sand-600 rounded-lg border border-dashed p-4 text-sm mt-4">
+        <p className="border-sand-300 text-sand-600 mt-4 rounded-lg border border-dashed p-4 text-sm">
           No documents uploaded yet. Add at least one to earn the verified badge.
         </p>
       )}
@@ -555,11 +622,13 @@ export function WizardSubmitStep({
   return (
     <div className={STEP_SECTION}>
       <p className="text-sand-600 text-sm">
-        Your listing is ready to go live once our team reviews it.
-        Nothing is public until approved.
+        Your listing is ready to go live once our team reviews it. Nothing is public until approved.
       </p>
 
-      <form action={action} className="border-sand-200 mt-4 rounded-[var(--radius-card)] border bg-sand-50 p-5">
+      <form
+        action={action}
+        className="border-sand-200 bg-sand-50 mt-4 rounded-[var(--radius-card)] border p-5"
+      >
         <input type="hidden" name="vendorId" value={vendorId} />
         <FormMessage state={state} successMessage="Submitted! We will be in touch shortly." />
 
@@ -605,8 +674,8 @@ export function WizardSubmitStep({
           <div className="rounded-lg bg-white p-3 text-sm">
             <p className="text-sand-900 font-medium">Everything looks good!</p>
             <p className="text-sand-700 mt-1">
-              Our team reviews new businesses within a few working days.
-              Your listing goes live once approved.
+              Our team reviews new businesses within a few working days. Your listing goes live once
+              approved.
             </p>
           </div>
         )}
