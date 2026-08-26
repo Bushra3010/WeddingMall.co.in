@@ -115,7 +115,17 @@ export async function signUp(_prev: unknown, form: FormData): Promise<ActionResu
     })
 
     if (signInError) {
+      /*
+       * Surfaced rather than warned about. Returning success here sends the
+       * caller to a protected route with no session, which bounces them back to
+       * where they started looking like the sign-up silently failed. Telling
+       * them to sign in is both true and actionable.
+       */
       log.warn('auth.signUp.autoSignIn.failed', { reason: signInError.message, email: input.email })
+      throw new ServiceError(
+        'signin_required',
+        'Your account was created. Please sign in to continue.',
+      )
     }
 
     return null

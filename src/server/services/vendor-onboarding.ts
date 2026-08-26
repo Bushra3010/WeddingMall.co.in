@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { logError } from '@/lib/observability/logger'
+
 import { createClient } from '@/lib/supabase/server'
 import { ServiceError } from '@/lib/action-result'
 import { assertVendorCapability, type Actor } from '@/lib/permissions'
@@ -131,7 +133,13 @@ export async function createVendorForUser(actor: Actor): Promise<string | null> 
       .select('id')
       .single()
 
-    if (error || !vendor) return null
+    if (error || !vendor) {
+      // Logged, not swallowed. This returning null silently sends the caller to
+      // /vendor/join with nothing to go on, which is indistinguishable from
+      // "you have no account" — the failure has to be visible somewhere.
+      logError('vendor.autoCreate.insertFailed', error, { userId: actor.userId, slug })
+      return null
+    }
 
     await supabase.from('vendor_memberships').insert({
       vendor_id: vendor.id,
@@ -146,7 +154,8 @@ export async function createVendorForUser(actor: Actor): Promise<string | null> 
     })
 
     return vendor.id
-  } catch {
+  } catch (error) {
+    logError('vendor.autoCreate.threw', error, { userId: actor.userId })
     return null
   }
 }
