@@ -36,6 +36,16 @@ function translate(error: { code?: string; message?: string } | null, fallback: 
 }
 
 /** Finds a free slug. Races are still caught by the unique constraint. */
+/**
+ * A slug that is probably free.
+ *
+ * **Best effort only.** The lookup runs through the request-scoped client, so
+ * RLS applies and rows the caller cannot see — another owner's draft vendor,
+ * most commonly — read as absent. Callers must still handle a 23505 from the
+ * unique index rather than treating this as a guarantee; `createVendorForUser`
+ * shows the pattern. Trusting this as authoritative is what broke vendor
+ * sign-up for anyone whose name collided with an existing draft.
+ */
 export async function uniqueSlug(base: string): Promise<string> {
   const supabase = await createClient()
   const root = slugify(base) || 'business'
@@ -120,24 +130,55 @@ export async function createVendorForUser(actor: Actor): Promise<string | null> 
       .maybeSingle()
 
     const displayName = profile?.full_name || 'My Business'
-    const slug = await uniqueSlug(displayName)
+    /*
+     * The unique index decides, not a lookup.
+     *
+     * `uniqueSlug` searches through the request-scoped client, which is subject
+     * to RLS — and a draft vendor belonging to someone else is invisible under
+     * those policies. So it reported a slug as free that already existed, and
+     * every sign-up by a user whose name matched an existing draft died on
+     * 23505 and bounced them back to /vendor/join. Two users called "alok" was
+     * all it took.
+     *
+     * "No row visible" never proves "no row exists" when RLS is in the way, so
+     * the insert is attempted and a duplicate is treated as a taken name rather
+     * than an error. The database is the only thing that can answer this.
+     */
+    const root = slugify(displayName) || 'business'
+    let vendor: { id: string } | null = null
+    let slug = root
 
-    const { data: vendor, error } = await supabase
-      .from('vendors')
-      .insert({
-        display_name: displayName,
-        slug,
-        owner_user_id: actor.userId,
-        status: 'draft',
-      })
-      .select('id')
-      .single()
+    for (let attempt = 0; attempt < 12; attempt++) {
+      slug = attempt === 0 ? root : `${root}-${attempt + 1}`
 
-    if (error || !vendor) {
-      // Logged, not swallowed. This returning null silently sends the caller to
-      // /vendor/join with nothing to go on, which is indistinguishable from
-      // "you have no account" — the failure has to be visible somewhere.
+      const { data, error } = await supabase
+        .from('vendors')
+        .insert({
+          display_name: displayName,
+          slug,
+          owner_user_id: actor.userId,
+          status: 'draft',
+        })
+        .select('id')
+        .single()
+
+      if (!error && data) {
+        vendor = data
+        break
+      }
+
+      // 23505 is the slug already being taken — try the next candidate.
+      if (error?.code === '23505') continue
+
       logError('vendor.autoCreate.insertFailed', error, { userId: actor.userId, slug })
+      return null
+    }
+
+    if (!vendor) {
+      logError('vendor.autoCreate.slugExhausted', new Error('no free slug after 12 attempts'), {
+        userId: actor.userId,
+        root,
+      })
       return null
     }
 
