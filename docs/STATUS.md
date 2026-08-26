@@ -1,6 +1,6 @@
 # Status
 
-Updated: 2026-08-01
+Updated: 2026-08-26
 
 ## Completed
 
@@ -616,6 +616,21 @@ Launch blockers, highest first:
 5. **Legal text still needs counsel** (PRD 14.3). *Deferred by the owner, 2026-08-02 — will be done later.* `/privacy` and `/terms` publish a truthful plain-English description of actual behaviour, clearly labelled as not lawyer-reviewed. That removed the 404s, not the legal requirement. Replace the bodies via `/admin/content` when the real documents exist — no deploy needed.
 
 Then product scope: message attachments, Realtime, and Google OAuth. No placeholder routes remain.
+
+## Vendor listing smoothness pass (2026-08-26)
+
+Six issues found in the post-onboarding listing flow and fixed:
+
+1. **`/vendor-dashboard/listing` rendered the old 2-step form** — it imported `ListingForm` from `onboarding-forms.tsx`, which only shows Business + About. Switched to the full `SinglePageListingForm` via `WizardShell`, matching the wizard entry page.
+2. **Media upload was a mock** — `WizardMediaStep` called an inline stub returning `{ uploaded: 0, requestId: 'mock' }`. Switched to the real `uploadMediaAction` from `features/listings/actions.ts`.
+3. **No scroll-spy on the sidebar** — clicking a section jumped smoothly but there was no visual indication of which section was in view. Added `IntersectionObserver` with `-80px -55% 0px` margins; the active item gets a branded badge instead of the plain completion dot.
+4. **Progress bar disagreed with the completion scorer** — the UI considered media complete at `> 0` photos while the backend scored it at `>= 3`. Synced to `>= 3`.
+5. **Submit-step "add now" links were broken routes** — they pointed at `/vendor-dashboard/list/{key}` URLs that hit a redirect stub. Rewrote as `#step-{key}` anchors with a click handler that smooth-scrolls to the right section.
+6. **Dead code** — `WizardStepper`/`WizardSection` in `wizard.tsx` were never imported; `SubmitListingCard` was removed from `listing/page.tsx` and is now fully unused. Deleted `wizard.tsx`; added a tombstone comment in `submit-listing-card.tsx` (kept the file in case the old onboarding flow at `/vendor-dashboard/onboarding` still needs it).
+
+Files changed: `app/vendor-dashboard/listing/page.tsx`, `components/vendor/listing-form.tsx`, `components/vendor/wizard-steps.tsx`, `components/vendor/wizard.tsx` (deleted), `components/vendor/submit-listing-card.tsx`, `docs/STATUS.md`.
+
+Checks: 144 unit tests pass, `tsc --noEmit` clean, `eslint` clean. Build fails only because `.env.local` is absent (expected on this machine); deploys fine with real env vars.
 
 Keep probing before building. A live privilege escalation has been found this way in each of the last three milestones — reviews (ADR-031), vendor columns (ADR-032), analytics (ADR-035) — and in every case reading the code looked fine.
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   WizardBusinessStep,
@@ -49,6 +49,17 @@ export function SinglePageListingForm({
   cities: CityRow[]
   vendorId: string
 }) {
+  const stepRefs = useRef<Record<StepKey, HTMLElement | null>>({
+    business: null,
+    about: null,
+    categories: null,
+    areas: null,
+    media: null,
+    documents: null,
+    submit: null,
+  })
+  const [activeStep, setActiveStep] = useState<StepKey>('business')
+
   const isStepComplete = useCallback(
     (step: StepKey): boolean => {
       const c = vendor.completion
@@ -62,7 +73,7 @@ export function SinglePageListingForm({
         case 'areas':
           return c.fields.find((f) => f.key === 'serviceAreas')?.done ?? false
         case 'media':
-          return vendor.mediaCount > 0
+          return vendor.mediaCount >= 3
         case 'documents':
           return vendor.documentCount > 0
         case 'submit':
@@ -81,8 +92,31 @@ export function SinglePageListingForm({
     const el = document.getElementById(`step-${step}`)
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setActiveStep(step)
     }
   }
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Pick the entry whose top is closest to (but below) the offset
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        if (visible[0]) {
+          const id = visible[0].target.id.replace('step-', '') as StepKey
+          setActiveStep(id)
+        }
+      },
+      { rootMargin: '-80px 0px -55% 0px', threshold: 0 },
+    )
+
+    Object.values(stepRefs.current).forEach((el) => {
+      if (el) observer.observe(el)
+    })
+
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
@@ -119,37 +153,37 @@ export function SinglePageListingForm({
         {/* Sections */}
         <div className="space-y-8">
           {/* Business */}
-          <section id="step-business" className="scroll-mt-6">
+          <section id="step-business" ref={(el) => { stepRefs.current.business = el }} className="scroll-mt-6">
             <WizardBusinessStep vendor={vendor} cities={cities} readOnly={false} vendorId={vendorId} />
           </section>
 
           {/* About */}
-          <section id="step-about" className="scroll-mt-6">
+          <section id="step-about" ref={(el) => { stepRefs.current.about = el }} className="scroll-mt-6">
             <WizardAboutStep vendor={vendor} readOnly={false} vendorId={vendorId} />
           </section>
 
           {/* Categories */}
-          <section id="step-categories" className="scroll-mt-6">
+          <section id="step-categories" ref={(el) => { stepRefs.current.categories = el }} className="scroll-mt-6">
             <WizardCategoriesStep vendor={vendor} categories={categories} readOnly={false} vendorId={vendorId} />
           </section>
 
           {/* Areas */}
-          <section id="step-areas" className="scroll-mt-6">
+          <section id="step-areas" ref={(el) => { stepRefs.current.areas = el }} className="scroll-mt-6">
             <WizardAreasStep vendor={vendor} cities={cities} readOnly={false} vendorId={vendorId} />
           </section>
 
           {/* Media */}
-          <section id="step-media" className="scroll-mt-6">
+          <section id="step-media" ref={(el) => { stepRefs.current.media = el }} className="scroll-mt-6">
             <WizardMediaStep vendor={vendor} readOnly={false} vendorId={vendorId} />
           </section>
 
           {/* Documents */}
-          <section id="step-documents" className="scroll-mt-6">
+          <section id="step-documents" ref={(el) => { stepRefs.current.documents = el }} className="scroll-mt-6">
             <WizardDocumentsStep vendor={vendor} documents={documents} readOnly={false} vendorId={vendorId} />
           </section>
 
           {/* Submit */}
-          <section id="step-submit" className="scroll-mt-6">
+          <section id="step-submit" ref={(el) => { stepRefs.current.submit = el }} className="scroll-mt-6">
             <WizardSubmitStep vendor={vendor} vendorId={vendorId} canSubmit={true} />
           </section>
         </div>
@@ -169,6 +203,7 @@ export function SinglePageListingForm({
             <ul className="space-y-0.5">
               {ALL_STEPS.map((step) => {
                 const done = isStepComplete(step)
+                const isActive = step === activeStep
                 return (
                   <li key={step}>
                     <button
@@ -176,20 +211,24 @@ export function SinglePageListingForm({
                       onClick={() => scrollTo(step)}
                       className={[
                         'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-left transition-colors',
-                        done
-                          ? 'text-[var(--color-success)] hover:bg-sand-50'
-                          : 'text-sand-700 hover:bg-sand-50',
+                        isActive
+                          ? 'bg-brand-50 text-brand-700'
+                          : done
+                            ? 'text-[var(--color-success)] hover:bg-sand-50'
+                            : 'text-sand-700 hover:bg-sand-50',
                       ].join(' ')}
                     >
                       <span
                         className={[
                           'flex size-5 shrink-0 items-center justify-center rounded-full text-xs',
-                          done
-                            ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
-                            : 'bg-sand-100 text-sand-500',
+                          isActive
+                            ? 'bg-brand-600 text-white'
+                            : done
+                              ? 'bg-[var(--color-success)]/10 text-[var(--color-success)]'
+                              : 'bg-sand-100 text-sand-500',
                         ].join(' ')}
                       >
-                        {done ? (
+                        {done && !isActive ? (
                           <svg className="size-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>

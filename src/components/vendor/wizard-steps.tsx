@@ -12,6 +12,7 @@ import {
   deleteDocumentAction,
   submitForReviewAction,
 } from '@/features/vendors/actions'
+import { uploadMediaAction } from '@/features/listings/actions'
 import type { VendorWorkspace, VerificationDocument } from '@/server/dal/vendor-workspace'
 import type { CategoryRow, CityRow } from '@/server/dal/taxonomy'
 
@@ -378,10 +379,7 @@ export function WizardMediaStep({
   readOnly: boolean
   vendorId: string
 }) {
-  const [, upload] = useAction(async () => {
-    // This will be wired to the existing uploadMediaAction when we add it to the wizard
-    return { ok: true, data: { uploaded: 0 }, requestId: 'mock' }
-  })
+  const [, upload] = useAction(uploadMediaAction)
 
   return (
     <div className={STEP_SECTION}>
@@ -569,17 +567,38 @@ export function WizardSubmitStep({
           <div className="rounded-lg bg-white p-3 text-sm">
             <p className="text-sand-900 font-medium">Before you can submit, add:</p>
             <ul className="text-sand-700 mt-1 list-inside list-disc">
-              {blocked.map((field) => (
-                <li key={field.key}>
-                  {field.label} —{' '}
-                  <a
-                    href={`/vendor-dashboard/list/${field.key === 'about' ? 'about' : field.key === 'displayName' || field.key === 'city' || field.key === 'categories' ? 'business' : field.key}`}
-                    className="text-brand-700 hover:underline"
-                  >
-                    add now
-                  </a>
-                </li>
-              ))}
+              {blocked.map((field) => {
+                const scrollTarget =
+                  field.key === 'displayName' || field.key === 'city'
+                    ? 'business'
+                    : field.key === 'about'
+                      ? 'about'
+                      : field.key === 'categories'
+                        ? 'categories'
+                        : field.key === 'serviceAreas'
+                          ? 'areas'
+                          : field.key === 'media'
+                            ? 'media'
+                            : field.key === 'documents'
+                              ? 'documents'
+                              : field.key
+                return (
+                  <li key={field.key}>
+                    {field.label} —{' '}
+                    <a
+                      href={`#step-${scrollTarget}`}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        const el = document.getElementById(`step-${scrollTarget}`)
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }}
+                      className="text-brand-700 hover:underline"
+                    >
+                      add now
+                    </a>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         ) : (

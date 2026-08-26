@@ -104,3 +104,4 @@ xcuserdata/
 /_*.mjs
 /_*.js
 /_*.ts
+.claude/

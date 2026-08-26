@@ -8,6 +8,8 @@ import { runAction, ServiceError, type ActionResult } from '@/lib/action-result'
 import { createClient } from '@/lib/supabase/server'
 import { env } from '@/lib/env'
 import { getActor } from '@/server/dal/actor'
+import { autoConfirmUser } from '@/server/jobs/confirm-user'
+import { log } from '@/lib/observability/logger'
 import {
   CURRENT_POLICY_VERSION,
 } from '@/features/auth/schema'
@@ -305,6 +307,9 @@ export async function registerVendorAndCreateAccount(
 
     const userId = authData.user.id
 
+    // Auto-confirm so the user can log in immediately without checking email.
+    await autoConfirmUser(userId)
+
     // Record consent
     const forwarded = (await headers()).get('x-forwarded-for')
     await supabase.from('user_consents').insert({
@@ -314,6 +319,18 @@ export async function registerVendorAndCreateAccount(
       granted: true,
       source: forwarded ? 'web' : 'web',
     })
+
+    // When email confirmation is enabled, signUp doesn't return a session even
+    // after we auto-confirm the user. Sign them in directly so they land on
+    // the listing without a manual login step.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (signInError) {
+      log.warn('vendor.register.autoSignIn.failed', { reason: signInError.message, email })
+    }
 
     // Create vendor
     const slug = await uniqueSlug(input.displayName)

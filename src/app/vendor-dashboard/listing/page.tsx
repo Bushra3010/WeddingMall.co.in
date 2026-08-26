@@ -2,15 +2,15 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { CheckCircle2, Clock, ExternalLink, XCircle } from 'lucide-react'
 
-import { ListingForm } from '@/components/vendor/onboarding-forms'
-import { SubmitListingCard } from '@/components/vendor/submit-listing-card'
+import { WizardShell } from '@/components/vendor/wizard-shell'
 import { PermissionDenied } from '@/components/ui/states'
 import { canVendor } from '@/lib/permissions'
 import { formatDateTime } from '@/lib/dates'
 import { NOINDEX } from '@/lib/seo'
 import { getActor } from '@/server/dal/actor'
 import { getListingVersions } from '@/server/dal/listings'
-import { getMyVendors, getVendorWorkspace } from '@/server/dal/vendor-workspace'
+import { getMyVendors, getVendorWorkspace, getVerificationDocuments } from '@/server/dal/vendor-workspace'
+import { listCategories, listCities } from '@/server/dal/taxonomy'
 
 export const metadata = { title: 'Listing', ...NOINDEX }
 export const dynamic = 'force-dynamic'
@@ -33,16 +33,19 @@ export default async function ListingPage() {
   if (mine.length === 0) redirect('/vendor/join')
 
   const vendorId = mine[0].vendor.id
-  const [vendor, versions] = await Promise.all([
+  const [vendor, versions, documents, categories, cities] = await Promise.all([
     getVendorWorkspace(vendorId),
     getListingVersions(vendorId),
+    getVerificationDocuments(vendorId),
+    listCategories(40),
+    listCities(60),
   ])
   if (!vendor) return <PermissionDenied />
 
   const published = versions.find((v) => v.status === 'approved')
   const pending = versions.find((v) => v.status === 'pending')
   const lastRejected = versions.find((v) => v.status === 'rejected')
-  const canEdit = canVendor(actor, vendorId, 'listing.edit')
+  const _canEdit = canVendor(actor, vendorId, 'listing.edit')
 
   return (
     <div className="space-y-6">
@@ -50,8 +53,8 @@ export default async function ListingPage() {
         <div>
           <h1 className="font-display text-sand-900 text-2xl">Listing</h1>
           <p className="text-sand-600 mt-1 max-w-prose text-sm">
-            Changes are saved as a draft. Your published listing stays live until an editor approves
-            the update.
+            Complete each section below and submit for review. Your published listing
+            stays live until an editor approves changes.
           </p>
         </div>
         {published && vendor.status === 'active' ? (
@@ -92,16 +95,14 @@ export default async function ListingPage() {
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        <div className="space-y-6">
-          <ListingForm vendor={vendor} readOnly={!canEdit} />
-          {canVendor(actor, vendorId, 'listing.submit') ? (
-            <SubmitListingCard
-              vendorId={vendorId}
-              hasPending={Boolean(pending)}
-              hasPublished={Boolean(published)}
-              aboutLength={vendor.about?.trim().length ?? 0}
-            />
-          ) : null}
+        <div className="min-w-0">
+          <WizardShell
+            vendor={vendor}
+            documents={documents}
+            categories={categories}
+            cities={cities}
+            vendorId={vendorId}
+          />
         </div>
 
         <section
