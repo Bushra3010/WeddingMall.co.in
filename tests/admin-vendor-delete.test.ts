@@ -24,9 +24,17 @@ const rpc = vi.fn(function (this: unknown): Promise<RpcResult> {
 })
 
 let receivers: unknown[] = []
-const client = { rpc, from: vi.fn() }
+/** Stands in for `.from('vendors').select(...).eq(...).maybeSingle()`. */
+const maybeSingle = vi.fn(async () => ({ data: { display_name: 'Blinksai', slug: 'blinksai' } }))
+const from = vi.fn(() => ({
+  select: () => ({ eq: () => ({ maybeSingle }) }),
+}))
+
+const auditWrite = vi.fn(async () => {})
+const client = { rpc, from }
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: vi.fn(async () => client) }))
+vi.mock('@/lib/security/audit', () => ({ audit: (...a: unknown[]) => auditWrite(...(a as [])) }))
 
 const { deleteVendorAsAdmin } = await import('@/server/services/admin-vendors')
 
@@ -35,6 +43,7 @@ const superAdmin = { userId: 'u1', adminRoles: ['super_admin'] as const, vendorR
 beforeEach(() => {
   receivers = []
   rpc.mockClear()
+  auditWrite.mockClear()
 })
 
 describe('deleteVendorAsAdmin', () => {
@@ -73,6 +82,35 @@ describe('deleteVendorAsAdmin', () => {
       code: 'conflict',
       message: 'Blinksai has customer history (3 enquiries).',
     })
+  })
+
+  it('records the deletion, naming the business rather than a bare id', async () => {
+    /*
+     * Six businesses were removed from production before anyone noticed this
+     * was missing. `admin_decide_vendor()` audits approve, reject and suspend
+     * itself; delete went through a different path and wrote nothing, so the
+     * only irreversible decision was the one with no record of who made it.
+     */
+    await deleteVendorAsAdmin(superAdmin, 'v1')
+
+    expect(auditWrite).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'vendor.delete',
+        entityId: 'v1',
+        actorUserId: 'u1',
+        before: expect.objectContaining({ display_name: 'Blinksai' }),
+      }),
+    )
+  })
+
+  it('does not record a deletion that was refused', async () => {
+    rpc.mockImplementationOnce(function (this: unknown): Promise<RpcResult> {
+      receivers.push(this)
+      return Promise.resolve({ error: { code: 'PT409', message: 'has customer history' } })
+    })
+
+    await expect(deleteVendorAsAdmin(superAdmin, 'v1')).rejects.toMatchObject({ code: 'conflict' })
+    expect(auditWrite).not.toHaveBeenCalled()
   })
 
   it('refuses an admin without admin.manage before touching the database', async () => {

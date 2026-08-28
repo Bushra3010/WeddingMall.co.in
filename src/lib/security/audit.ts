@@ -28,6 +28,14 @@ export type AuditAction =
   // which is the point: `actor_user_id` is `on delete set null`, and nothing
   // clears `entity_id`.
   | 'user.delete'
+  /*
+   * Removing a business. `admin_decide_vendor()` writes its own entry for
+   * approve / reject / suspend / reactivate, so deleting was the only decision
+   * in that family leaving no trace — and the only irreversible one. Six
+   * businesses were removed from production before this was noticed, with
+   * nothing in the log to say who or when.
+   */
+  | 'vendor.delete'
 
 /**
  * The IP is hashed, not stored.

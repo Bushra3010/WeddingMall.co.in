@@ -3,6 +3,7 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { ServiceError } from '@/lib/action-result'
 import { assertPermission, can, type Actor } from '@/lib/permissions'
+import { audit } from '@/lib/security/audit'
 import { describeDeleteError } from '@/features/admin/delete-errors'
 import type { AdminVendorInput } from '@/features/vendors/schema'
 
@@ -118,6 +119,17 @@ export async function deleteVendorAsAdmin(actor: Actor, vendorId: string) {
   const supabase = await createClient()
 
   /*
+   * Read the business before it stops existing, so the audit entry can name it.
+   * An entry that says only "some uuid was deleted" answers none of the
+   * questions anyone asks afterwards.
+   */
+  const { data: before } = await supabase
+    .from('vendors')
+    .select('display_name, slug, status')
+    .eq('id', vendorId)
+    .maybeSingle()
+
+  /*
    * `delete_vendor` arrives with migration 0035 and enters the generated types
    * on the next `npm run db:types`. Until that regeneration runs the `rpc()`
    * overload does not know the name, and `src/types/database.ts` is generated —
@@ -148,6 +160,24 @@ export async function deleteVendorAsAdmin(actor: Actor, vendorId: string) {
     const failure = describeDeleteError(error, 'We could not delete that business.')
     throw new ServiceError(failure.code, failure.message)
   }
+
+  /*
+   * Written after the delete, unlike the customer one — and for the opposite
+   * reason. `delete_vendor()` refuses far more often than it succeeds (any
+   * enquiry, payment, review or subscription stops it), so auditing first would
+   * fill the log with deletions that never happened. The customer path has its
+   * refusals in TypeScript, before the audit, so it does not have that problem.
+   *
+   * `void` so a failed audit write cannot fail a delete that already happened.
+   */
+  void audit({
+    action: 'vendor.delete',
+    entityType: 'vendor',
+    entityId: vendorId,
+    actorUserId: actor.userId,
+    before: before ?? undefined,
+    after: { deleted: true },
+  })
 
   return { id: vendorId }
 }

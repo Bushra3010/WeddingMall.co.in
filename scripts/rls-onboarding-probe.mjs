@@ -305,11 +305,43 @@ record('non-member cannot submit', outsiderSubmit.status >= 400, `status ${outsi
 const submit = await rpc('submit_vendor_for_review', { target_vendor: vendorId }, owner.jwt)
 record('owner can submit a complete profile', submit.status === 200, `status ${submit.status}`)
 
+/*
+ * Re-submitting while already pending is now allowed (migration 0035).
+ *
+ * This assertion used to require "already awaiting review". That guard was
+ * correct while a vendor could only reach `pending_review` by finishing the
+ * wizard — but registration now *opens* there, so the guard refused the one
+ * action a registered-but-incomplete vendor had left. It was removed
+ * deliberately; see ADR-041.
+ *
+ * The reason it is safe is the ordering: `submitted_at` is refreshed, and the
+ * queue is oldest-first, so re-submitting moves a vendor to the *back*. That is
+ * what is checked here — accepting the call is not enough, since a
+ * re-submission that jumped the queue would be a way to push past everyone
+ * waiting.
+ */
+const before = (await rest(`vendors?select=submitted_at&id=eq.${vendorId}`, SVC)).body?.[0]
+await new Promise((resolve) => setTimeout(resolve, 1100))
+
 const doubleSubmit = await rpc('submit_vendor_for_review', { target_vendor: vendorId }, owner.jwt)
 record(
-  'resubmitting while pending is rejected',
-  doubleSubmit.status >= 400 && /already awaiting/i.test(doubleSubmit.body?.message ?? ''),
-  doubleSubmit.body?.message ?? '',
+  'a vendor already awaiting review may re-submit',
+  doubleSubmit.status === 200,
+  `status ${doubleSubmit.status} ${doubleSubmit.body?.message ?? ''}`,
+)
+
+const after = (await rest(`vendors?select=submitted_at,status&id=eq.${vendorId}`, SVC)).body?.[0]
+record(
+  're-submitting refreshes submitted_at, sending them to the back of the queue',
+  Boolean(before?.submitted_at) &&
+    Boolean(after?.submitted_at) &&
+    new Date(after.submitted_at) > new Date(before.submitted_at),
+  `${before?.submitted_at} -> ${after?.submitted_at}`,
+)
+record(
+  're-submitting leaves the vendor awaiting review, not published',
+  after?.status === 'pending_review',
+  `status ${after?.status}`,
 )
 
 // Submission alone must not publish anything.
