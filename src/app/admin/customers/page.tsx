@@ -1,6 +1,9 @@
+import { DeleteRowButton } from '@/components/admin/delete-row-button'
 import { EmptyState } from '@/components/ui/states'
+import { deleteCustomerAction } from '@/features/admin/customer-actions'
 import { formatRelative } from '@/lib/dates'
 import { NOINDEX } from '@/lib/seo'
+import { can } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 import { requireElevatedAdmin } from '@/server/policies/require'
@@ -19,20 +22,39 @@ export const dynamic = 'force-dynamic'
  * would route around that entirely.
  */
 export default async function AdminCustomersPage() {
-  await requireElevatedAdmin('user.support')
+  const actor = await requireElevatedAdmin('user.support')
   const supabase = await createClient()
 
-  const [{ data: profiles }, { data: enquiries }, { data: reviews }, { data: shortlists }] =
-    await Promise.all([
-      supabase
-        .from('profiles')
-        .select('id, full_name, status, created_at')
-        .order('created_at', { ascending: false })
-        .limit(200),
-      supabase.from('enquiries').select('customer_id'),
-      supabase.from('reviews').select('customer_id'),
-      supabase.from('shortlists').select('user_id'),
-    ])
+  /*
+   * Deliberately stricter than the page itself. Browsing accounts is
+   * `user.support`; removing one is irreversible and takes the person's
+   * sign-in with it, so it is super-admin only — the same bar as deleting a
+   * business. The service re-checks; this only decides what to render.
+   */
+  const canDelete = can(actor, 'admin.manage')
+
+  const [
+    { data: profiles },
+    { data: enquiries },
+    { data: reviews },
+    { data: shortlists },
+    { data: messages },
+    { data: ownedVendors },
+    { data: adminMemberships },
+  ] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, full_name, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(200),
+    supabase.from('enquiries').select('customer_id'),
+    supabase.from('reviews').select('customer_id'),
+    supabase.from('shortlists').select('user_id'),
+    // The last three are for the delete guard, not the counts columns.
+    supabase.from('messages').select('sender_user_id'),
+    supabase.from('vendors').select('owner_user_id'),
+    supabase.from('admin_memberships').select('user_id').eq('status', 'active'),
+  ])
 
   const tally = (rows: { [k: string]: unknown }[] | null, key: string) => {
     const map = new Map<string, number>()
@@ -46,6 +68,32 @@ export default async function AdminCustomersPage() {
   const byEnquiry = tally(enquiries, 'customer_id')
   const byReview = tally(reviews, 'customer_id')
   const byShortlist = tally(shortlists, 'user_id')
+  const byMessage = tally(messages, 'sender_user_id')
+  const byOwnedVendor = tally(ownedVendors, 'owner_user_id')
+  const admins = new Set((adminMemberships ?? []).map((row) => row.user_id))
+
+  /*
+   * Why an account cannot be deleted, worked out before the button is drawn.
+   *
+   * These mirror the refusals in `deleteCustomerAsAdmin`, which is still the
+   * authority — this only decides what to render. Offering a button that is
+   * going to be refused is a dead end, and most accounts here are refused:
+   * anyone who registered a business owns one, and `vendors.owner_user_id` is
+   * `on delete restrict`.
+   */
+  function blockedBecause(id: string): string | null {
+    if (id === actor.userId) return 'This is you'
+    if (admins.has(id)) return 'Administrator'
+
+    const parts = [
+      byEnquiry.get(id) ? 'enquiries' : null,
+      byReview.get(id) ? 'reviews' : null,
+      byMessage.get(id) ? 'messages' : null,
+      byOwnedVendor.get(id) ? 'a business' : null,
+    ].filter((value): value is string => value !== null)
+
+    return parts.length > 0 ? `Has ${parts.join(', ')}` : null
+  }
 
   return (
     <div className="space-y-6">
@@ -84,6 +132,9 @@ export default async function AdminCustomersPage() {
                 <th scope="col" className="px-4 py-3 font-medium">
                   Joined
                 </th>
+                <th scope="col" className="px-4 py-3 text-right font-medium">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-sand-200 divide-y bg-white">
@@ -105,6 +156,20 @@ export default async function AdminCustomersPage() {
                   <td className="text-sand-700 px-4 py-3">{byReview.get(row.id) ?? 0}</td>
                   <td className="text-sand-600 px-4 py-3 whitespace-nowrap">
                     {formatRelative(row.created_at)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {!canDelete ? null : blockedBecause(row.id) ? (
+                      <span className="text-sand-500 text-xs whitespace-nowrap">
+                        {blockedBecause(row.id)}
+                      </span>
+                    ) : (
+                      <DeleteRowButton
+                        id={row.id}
+                        label={row.full_name ?? 'this account'}
+                        action={deleteCustomerAction}
+                        warning="The account and its sign-in are removed for good, along with the shortlist and notifications. This cannot be undone."
+                      />
+                    )}
                   </td>
                 </tr>
               ))}

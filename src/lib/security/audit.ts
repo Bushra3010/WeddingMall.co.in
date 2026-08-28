@@ -23,6 +23,11 @@ export type AuditAction =
   | 'vendor.moderate'
   | 'billing.override'
   | 'role.change'
+  // Removing a customer account. `audit_logs.action` is text, not an enum, so
+  // this needs no migration — but the entry outlives the account it describes,
+  // which is the point: `actor_user_id` is `on delete set null`, and nothing
+  // clears `entity_id`.
+  | 'user.delete'
 
 /**
  * The IP is hashed, not stored.
