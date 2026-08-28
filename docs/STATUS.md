@@ -775,6 +775,42 @@ fresh project. `--only` was added for this:
 PGPASSWORD='...' node --env-file=.env.local scripts/apply-migrations.mjs --only 0035
 ```
 
+## Address and map link (2026-08-28)
+
+Two optional fields on the Business step, after Primary city: **Address** and
+**Location link**. Neither blocks submission.
+
+Both live on `vendor_addresses`, which has existed since migration 0004 with
+`line1`, `line2`, `postal_code`, `latitude`, `longitude` and
+`public_visibility` — and which nothing in `src/` had ever read or written. It
+was empty in production, so migration `0036` adds the one column it lacked
+(`maps_url`) plus a unique index on `(vendor_id, type)`; without that index a
+second save would silently create a second business address.
+
+The link is stored as pasted, not parsed into `latitude`/`longitude`. Maps URLs
+arrive as `maps.app.goo.gl` short links, `/place/` URLs and `@lat,lng` URLs, and
+the short ones only resolve by following a redirect — guessing coordinates would
+put wrong pins on maps. Resolve them in a job later if wanted; the columns are
+already there.
+
+**`undefined` and `''` are deliberately different.** Two forms post to
+`saveProfileAction` — the wizard's Business step and `/vendor-dashboard/onboarding`
+— and the service skips the address write entirely when both fields are absent.
+Had an absent field sent `''`, saving on one form would have erased an address
+entered on the other. Both forms carry the fields now; the guard is what stops
+the next one that does not. Covered by `tests/vendor-address.test.ts`.
+
+Files: `supabase/migrations/0036_vendor_address_and_map_link.sql` (new),
+`features/vendors/schema.ts`, `features/vendors/actions.ts`,
+`server/services/vendor-onboarding.ts` (`saveVendorAddress`),
+`server/dal/vendor-workspace.ts`, `components/vendor/wizard-steps.tsx`,
+`components/vendor/onboarding-forms.tsx`, `tests/vendor-address.test.ts` (new).
+
+**Until `0036` is applied the two fields render but do not persist.** The write
+fails on the missing column and is logged rather than thrown, so the rest of the
+business details still save — but the address and link will not come back after
+a reload.
+
 ### Exact next task
 
 1. Apply `0035` with the command above, then `PGPASSWORD='...' npm run db:types`.

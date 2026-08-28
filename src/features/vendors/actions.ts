@@ -104,6 +104,15 @@ export async function saveProfileAction(
       phone: str(form, 'phone'),
       website: str(form, 'website'),
       foundedYear: str(form, 'foundedYear') || undefined,
+      /*
+       * `undefined` when the form did not carry the field at all, `''` when it
+       * did and the vendor emptied it. The difference is the whole point: two
+       * forms post to this action, and if a form that has no address input sent
+       * `''` it would erase an address entered on the other one. Clearing has
+       * to stay possible, so "absent" and "cleared" cannot collapse.
+       */
+      addressLine: form.has('addressLine') ? str(form, 'addressLine') : undefined,
+      mapsUrl: form.has('mapsUrl') ? str(form, 'mapsUrl') : undefined,
     })
     return saveVendorProfile(actor, vendorId(form), input)
   })

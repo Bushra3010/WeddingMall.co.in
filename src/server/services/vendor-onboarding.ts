@@ -309,7 +309,61 @@ export async function saveVendorProfile(actor: Actor, vendorId: string, input: V
     .eq('id', vendorId)
 
   if (error) translate(error, 'We could not save your business details.')
+
+  // Untouched when the form carried neither field — see the note in
+  // `saveProfileAction` on why absent and cleared have to stay distinguishable.
+  if (input.addressLine !== undefined || input.mapsUrl !== undefined) {
+    await saveVendorAddress(vendorId, input.addressLine ?? '', input.mapsUrl ?? '')
+  }
+
   return { vendorId }
+}
+
+/**
+ * The street address and map link, on `vendor_addresses`.
+ *
+ * Both optional, so "the vendor cleared them" has to be a real outcome — the
+ * columns are nulled rather than the write being skipped, or an address could
+ * never be removed once entered.
+ *
+ * The row is only created once there is something to put in it. An empty
+ * address row on every vendor would make `public_visibility` meaningless and
+ * put a blank line under every profile that opts into showing it.
+ *
+ * `onConflict: 'vendor_id,type'` relies on the unique index added in 0036;
+ * before that index the table had none, so a second save would have quietly
+ * created a second business address.
+ */
+async function saveVendorAddress(vendorId: string, addressLine: string, mapsUrl: string) {
+  const supabase = await createClient()
+  const line1 = addressLine.trim() || null
+  const maps = mapsUrl.trim() || null
+
+  const { data: existing } = await supabase
+    .from('vendor_addresses')
+    .select('id')
+    .eq('vendor_id', vendorId)
+    .eq('type', 'business')
+    .maybeSingle()
+
+  if (!existing && !line1 && !maps) return
+
+  /*
+   * `maps_url` is not in the generated types until `npm run db:types` runs
+   * after migration 0036, so the payload is cast on the way in. The table and
+   * every other column here are real and typed; only the new column is not.
+   */
+  const payload = { vendor_id: vendorId, type: 'business', line1, maps_url: maps }
+  const { error } = await supabase
+    .from('vendor_addresses')
+    .upsert(payload as never, { onConflict: 'vendor_id,type' })
+
+  // Deliberately not fatal. The business details themselves already saved, and
+  // failing the whole step over an optional address would lose the fields the
+  // vendor actually had to fill in.
+  if (error) {
+    logError('vendor.saveAddress.failed', error, { vendorId })
+  }
 }
 
 export async function saveVendorListing(

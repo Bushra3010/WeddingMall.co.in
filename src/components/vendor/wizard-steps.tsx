@@ -131,6 +131,47 @@ export function WizardBusinessStep({
             )}
           </Field>
 
+          {/*
+            Both optional, and both stored on `vendor_addresses` rather than on
+            the vendor row — that table has existed since 0004 for exactly this
+            and was never wired up.
+          */}
+          <Field
+            label="Address"
+            hint="Street address, if couples can visit you. Optional."
+            error={fieldError(state, 'addressLine')}
+          >
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                name="addressLine"
+                defaultValue={vendor.addressLine ?? ''}
+                disabled={readOnly}
+                aria-describedby={describedBy}
+                invalid={invalid}
+              />
+            )}
+          </Field>
+
+          <Field
+            label="Location link"
+            hint="A Google Maps, Apple Maps, or OpenStreetMap link. Optional."
+            error={fieldError(state, 'mapsUrl')}
+          >
+            {({ id, describedBy, invalid }) => (
+              <Input
+                id={id}
+                name="mapsUrl"
+                type="url"
+                placeholder="https://"
+                defaultValue={vendor.mapsUrl ?? ''}
+                disabled={readOnly}
+                aria-describedby={describedBy}
+                invalid={invalid}
+              />
+            )}
+          </Field>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
               label="Contact email"

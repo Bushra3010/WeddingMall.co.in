@@ -24,6 +24,9 @@ export interface VendorWorkspace {
   phone: string | null
   website: string | null
   foundedYear: number | null
+  /** Both from `vendor_addresses`, both optional. */
+  addressLine: string | null
+  mapsUrl: string | null
   submittedAt: string | null
   publishedAt: string | null
   rejectionReason: string | null
@@ -57,13 +60,26 @@ export const getVendorWorkspace = cache(
       if (error) throw error
       if (!vendor) return null
 
-      const [listing, categories, areas, packages, media, documents] = await Promise.all([
+      const [listing, address, categories, areas, packages, media, documents] = await Promise.all([
         supabase
           .from('vendor_listings')
           .select('status, about, experience_years, languages')
           .eq('vendor_id', vendorId)
           .maybeSingle()
           .then((r) => r.data),
+        /*
+         * `maps_url` arrives with migration 0036 and is not in the generated
+         * types until `npm run db:types` runs. Selected with `*` so this read
+         * does not name the column — the cast below is the only place that
+         * knows about it, and it disappears when the types are refreshed.
+         */
+        supabase
+          .from('vendor_addresses')
+          .select('*')
+          .eq('vendor_id', vendorId)
+          .eq('type', 'business')
+          .maybeSingle()
+          .then((r) => r.data as ({ line1: string | null; maps_url?: string | null } | null)),
         supabase
           .from('vendor_categories')
           .select('category_id, is_primary')
@@ -120,6 +136,8 @@ export const getVendorWorkspace = cache(
         phone: vendor.phone,
         website: vendor.website,
         foundedYear: vendor.founded_year,
+        addressLine: address?.line1 ?? null,
+        mapsUrl: address?.maps_url ?? null,
         submittedAt: vendor.submitted_at,
         publishedAt: vendor.published_at,
         rejectionReason: vendor.rejection_reason,

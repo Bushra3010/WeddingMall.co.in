@@ -36,6 +36,11 @@ export const vendorProfileSchema = z.object({
     .min(1900, 'Enter a year after 1900')
     .max(new Date().getFullYear(), 'That year is in the future')
     .optional(),
+  // Both optional, and both live on `vendor_addresses`. The link is kept as
+  // pasted rather than parsed into latitude/longitude — see migration 0036 for
+  // why guessing coordinates from a Maps URL puts wrong pins on maps.
+  addressLine: trimmed(200).optional().or(z.literal('')),
+  mapsUrl: z.url('Enter a full link including https://').max(500).optional().or(z.literal('')),
 })
 
 export const vendorListingSchema = z.object({
