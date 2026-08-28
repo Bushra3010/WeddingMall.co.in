@@ -83,6 +83,29 @@ describe('describeDeleteError', () => {
     )
   })
 
+  it('says so when the function is missing, instead of blaming the server', () => {
+    /*
+     * Cost a real round trip: Delete was clicked against a database that had
+     * not had migration 0035, and the admin got "Something went wrong on our
+     * side. Please try again." — advice that could never work, for a cause it
+     * did not name. Deploys and migrations are separate manual steps here, so
+     * this is a state production genuinely reaches.
+     */
+    const result = describeDeleteError(
+      {
+        code: 'PGRST202',
+        message: 'Could not find the function public.delete_vendor(p_id) in the schema cache',
+      },
+      FALLBACK,
+    )
+
+    expect(result.code).toBe('not_implemented')
+    expect(result.message).toMatch(/migration/i)
+    expect(result.message).toMatch(/Nothing was deleted/)
+    // PostgREST wrote the original; it names the function and the schema cache.
+    expect(result.message).not.toMatch(/schema cache|public\./)
+  })
+
   it('will not pass through a PT code with an empty message', () => {
     // An empty refusal tells an admin nothing; the fallback at least names the
     // operation that failed.

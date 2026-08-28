@@ -42,6 +42,27 @@ export function describeDeleteError(
   }
 
   /*
+   * The function is not in the database.
+   *
+   * PostgREST answers an unknown RPC with 404 PGRST202, which fell through to
+   * the generic "something went wrong on our side" — and that is the one
+   * message that cannot be acted on. Deploys and migrations are separate manual
+   * steps in this project, so the code routinely runs ahead of the schema and
+   * this is a state an admin will actually meet. Naming it turns a support
+   * ticket into a one-line fix.
+   *
+   * Our own wording, not PostgREST's: the raw text names the function and the
+   * schema cache, which is the database talking about itself (PRD 15).
+   */
+  if (code === 'PGRST202') {
+    return {
+      code: 'not_implemented',
+      message:
+        'This needs a database migration that has not been applied yet. Nothing was deleted.',
+    }
+  }
+
+  /*
    * A real constraint violation — something reached the table without going
    * through the function. Still a conflict, but Postgres wrote this message
    * about its own schema, so only the classification survives.
