@@ -13,6 +13,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      /*
+       * Next resolves `server-only` through its own bundler rather than from
+       * node_modules, so Vitest cannot resolve it and every module under
+       * `src/server/**` failed at collection. That is why none of those
+       * services had a unit test — and why a detached-method call in
+       * `deleteVendorAsAdmin` reached production. The application still gets
+       * the real guard; only the test runner sees the stub.
+       */
+      'server-only': fileURLToPath(new URL('./tests/stubs/server-only.ts', import.meta.url)),
     },
   },
   test: {

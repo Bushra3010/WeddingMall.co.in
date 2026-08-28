@@ -124,16 +124,25 @@ export async function deleteVendorAsAdmin(actor: Actor, vendorId: string) {
    * hand-editing it is forbidden (CLAUDE.md invariant 4) and would be undone by
    * the next generation anyway.
    *
-   * Narrowed to this one call rather than widened at the client, and typed on
-   * the way out so the error handling below stays checked. Delete the cast once
-   * the types have been refreshed; the call underneath is already correct.
+   * **The cast is on the client, not on the method, and that matters.** Writing
+   * `const rpc = supabase.rpc as ...` reads as the narrower, tidier version of
+   * this and is broken: it detaches the function from its receiver, and
+   * supabase-js's `rpc` reads `this.rest`. That shipped, and every delete died
+   * with "Cannot read properties of undefined (reading 'rest')" — a TypeError,
+   * so it never reached `describeDeleteError` and surfaced to admins as the
+   * generic "something went wrong on our side". Keep the call a method call.
+   *
+   * Typed on the way out so the error handling below stays checked. Delete the
+   * cast once the types have been refreshed; the call itself is already right.
    */
-  const rpc = supabase.rpc as unknown as (
-    name: 'delete_vendor',
-    args: { p_id: string },
-  ) => Promise<{ error: { code?: string | null; message?: string | null } | null }>
+  const client = supabase as unknown as {
+    rpc: (
+      name: 'delete_vendor',
+      args: { p_id: string },
+    ) => Promise<{ error: { code?: string | null; message?: string | null } | null }>
+  }
 
-  const { error } = await rpc('delete_vendor', { p_id: vendorId })
+  const { error } = await client.rpc('delete_vendor', { p_id: vendorId })
 
   if (error) {
     const failure = describeDeleteError(error, 'We could not delete that business.')
