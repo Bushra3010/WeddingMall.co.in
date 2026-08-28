@@ -127,6 +127,84 @@ if (!vendorId) {
   process.exit(1)
 }
 
+/*
+ * Migration 0035 widened `vendors: create own` from `status = 'draft'` to
+ * `status in ('draft', 'pending_review')` so a registration reaches the review
+ * queue instead of a private draft nobody watches.
+ *
+ * Both halves of that are probed. The second is the one that matters: the
+ * policy is the only thing standing between "apply for review" and "publish
+ * yourself", and a widened check is exactly the kind of change that quietly
+ * becomes `true` on the next edit.
+ */
+const registered = await rest(
+  'vendors',
+  ANON,
+  {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      display_name: 'M2 Probe Applicant',
+      slug: `${slug}-applicant`,
+      owner_user_id: owner.id,
+      status: 'pending_review',
+      submitted_at: new Date().toISOString(),
+      primary_city_id: city?.id,
+    }),
+  },
+  owner.jwt,
+)
+record(
+  'owner can register a vendor straight into the review queue',
+  registered.status === 201,
+  `status ${registered.status}`,
+)
+const applicantId = registered.body?.[0]?.id
+
+const selfPublish = await rest(
+  'vendors',
+  ANON,
+  {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      display_name: 'M2 Probe Self Publish',
+      slug: `${slug}-self-publish`,
+      owner_user_id: owner.id,
+      status: 'active',
+      primary_city_id: city?.id,
+    }),
+  },
+  owner.jwt,
+)
+record(
+  'owner cannot register a vendor as already live',
+  selfPublish.status >= 400,
+  `status ${selfPublish.status}`,
+)
+
+const selfVerify = await rest(
+  'vendors',
+  ANON,
+  {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      display_name: 'M2 Probe Self Verify',
+      slug: `${slug}-self-verify`,
+      owner_user_id: owner.id,
+      status: 'suspended',
+      primary_city_id: city?.id,
+    }),
+  },
+  owner.jwt,
+)
+record(
+  'owner cannot register a vendor into any other status',
+  selfVerify.status >= 400,
+  `status ${selfVerify.status}`,
+)
+
 const bootstrap = await rest(
   'vendor_memberships',
   ANON,
@@ -573,6 +651,10 @@ record(
 console.log('\ncleaning up…')
 await rest(`audit_logs?entity_id=eq.${vendorId}`, SVC, { method: 'DELETE' })
 await rest(`vendors?id=eq.${vendorId}`, SVC, { method: 'DELETE' })
+if (applicantId) {
+  await rest(`audit_logs?entity_id=eq.${applicantId}`, SVC, { method: 'DELETE' })
+  await rest(`vendors?id=eq.${applicantId}`, SVC, { method: 'DELETE' })
+}
 for (const u of [owner, editor, outsider, verifier, analyst]) {
   await rest(`admin_memberships?user_id=eq.${u.id}`, SVC, { method: 'DELETE' })
   await fetch(`${URL_BASE}/auth/v1/admin/users/${u.id}`, {

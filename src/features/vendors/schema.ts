@@ -110,6 +110,47 @@ export const adminDecisionSchema = z
     path: ['reason'],
   })
 
+/**
+ * Admin-side edit of a business (PRD 6.11).
+ *
+ * Deliberately the vendor's own profile fields plus the slug and the
+ * description — not `status`, `verification_status`, `plan_id`, or
+ * `is_featured`. Those move only through `admin_decide_vendor()`, which writes
+ * an audit entry and keeps the listing, the verification record, and the search
+ * index in step; the 0022 column guard is the second line if this one is ever
+ * widened by accident.
+ */
+export const adminVendorSchema = z
+  .object({
+    vendorId: z.uuid(),
+    displayName: trimmed(120).min(2, 'Enter the business name'),
+    legalName: trimmed(160).optional().or(z.literal('')),
+    slug: vendorSlugSchema,
+    primaryCityId: z.uuid('Choose a primary city'),
+    email: z.email('Enter a valid email').max(254).optional().or(z.literal('')),
+    phone: trimmed(20)
+      .regex(/^[+()\d\s-]*$/, 'Enter a valid phone number')
+      .optional()
+      .or(z.literal('')),
+    website: z.url('Enter a full URL including https://').max(300).optional().or(z.literal('')),
+    foundedYear: z.coerce
+      .number()
+      .int()
+      .min(1900, 'Enter a year after 1900')
+      .max(new Date().getFullYear(), 'That year is in the future')
+      .optional(),
+    about: trimmed(4000).optional().or(z.literal('')),
+  })
+  // Empty is allowed — a registration that has not been written yet — but a
+  // stub is not. 50 is the same floor `submit_vendor_for_review()` applies, so
+  // an admin cannot save their way past the gate a vendor has to clear.
+  .refine((value) => !value.about || value.about.length >= 50, {
+    message: 'Write at least 50 characters, or leave the description empty',
+    path: ['about'],
+  })
+
+export type AdminVendorInput = z.infer<typeof adminVendorSchema>
+
 export const categoryFormSchema = z.object({
   id: z.uuid().optional(),
   name: trimmed(80).min(2, 'Enter a name'),

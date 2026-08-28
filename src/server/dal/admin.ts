@@ -19,9 +19,22 @@ export interface ReviewQueueRow {
   cityName: string | null
   categoryName: string | null
   documentCount: number
+  /**
+   * What the listing is still missing, in the vendor's own words — empty when
+   * there is nothing outstanding.
+   *
+   * Registration now opens at `pending_review` (migration 0035), so the queue
+   * legitimately contains businesses that have applied but not yet written
+   * anything. Without this an admin cannot tell those apart from a finished
+   * submission, and approving one publishes a blank profile.
+   */
+  missing: string[]
 }
 
 export type VendorStatus = Enums<'vendor_status'>
+
+/** Mirrors the gate in `submit_vendor_for_review()`; see migration 0009. */
+const MIN_ABOUT_LENGTH = 50
 
 export async function getReviewQueue(
   status: VendorStatus = 'pending_review',
@@ -31,7 +44,7 @@ export async function getReviewQueue(
     const { data, error } = await supabase
       .from('vendors')
       .select(
-        'id, display_name, slug, status, verification_status, submitted_at, cities(name), vendor_categories(is_primary, categories(name)), vendor_verifications(status, vendor_documents(id))',
+        'id, display_name, slug, status, verification_status, submitted_at, primary_city_id, cities(name), vendor_listings(about), vendor_categories(is_primary, categories(name)), vendor_service_areas(city_id), vendor_verifications(status, vendor_documents(id))',
       )
       .eq('status', status)
       .order('submitted_at', { ascending: true, nullsFirst: false })
@@ -39,20 +52,36 @@ export async function getReviewQueue(
 
     if (error) throw error
 
-    return (data ?? []).map((row) => ({
-      id: row.id,
-      displayName: row.display_name,
-      slug: row.slug,
-      status: row.status,
-      verificationStatus: row.verification_status,
-      submittedAt: row.submitted_at,
-      cityName: row.cities?.name ?? null,
-      categoryName: row.vendor_categories?.find((c) => c.is_primary)?.categories?.name ?? null,
-      documentCount: (row.vendor_verifications ?? []).reduce(
-        (n, v) => n + (v.vendor_documents?.length ?? 0),
-        0,
-      ),
-    }))
+    return (data ?? []).map((row) => {
+      // A one-to-one embed comes back as an object on some PostgREST versions
+      // and a one-element array on others; both shapes reach this code.
+      const listing = Array.isArray(row.vendor_listings)
+        ? row.vendor_listings[0]
+        : row.vendor_listings
+
+      const missing = [
+        row.primary_city_id ? null : 'city',
+        (row.vendor_categories ?? []).length > 0 ? null : 'category',
+        (row.vendor_service_areas ?? []).length > 0 ? null : 'service area',
+        (listing?.about?.trim().length ?? 0) >= MIN_ABOUT_LENGTH ? null : 'description',
+      ].filter((label): label is string => label !== null)
+
+      return {
+        id: row.id,
+        displayName: row.display_name,
+        slug: row.slug,
+        status: row.status,
+        verificationStatus: row.verification_status,
+        submittedAt: row.submitted_at,
+        cityName: row.cities?.name ?? null,
+        categoryName: row.vendor_categories?.find((c) => c.is_primary)?.categories?.name ?? null,
+        documentCount: (row.vendor_verifications ?? []).reduce(
+          (n, v) => n + (v.vendor_documents?.length ?? 0),
+          0,
+        ),
+        missing,
+      }
+    })
   } catch (error) {
     logError('dal.getReviewQueue', error, { status })
     return []
@@ -125,6 +154,8 @@ export interface AdminVendorDetail {
   publishedAt: string | null
   rejectionReason: string | null
   suspendedReason: string | null
+  /** Needed by the admin edit form, which has to preselect the current city. */
+  primaryCityId: string | null
   cityName: string | null
   about: string | null
   experienceYears: number | null
@@ -143,7 +174,7 @@ export async function getAdminVendor(vendorId: string): Promise<AdminVendorDetai
       .select(
         `id, display_name, legal_name, slug, status, verification_status, email, phone, website,
          founded_year, submitted_at, published_at, rejection_reason, suspended_reason,
-         cities(name),
+         primary_city_id, cities(name),
          vendor_listings(about, experience_years),
          vendor_categories(categories(name)),
          vendor_service_areas(cities(name)),
@@ -175,6 +206,7 @@ export async function getAdminVendor(vendorId: string): Promise<AdminVendorDetai
       publishedAt: data.published_at,
       rejectionReason: data.rejection_reason,
       suspendedReason: data.suspended_reason,
+      primaryCityId: data.primary_city_id,
       cityName: data.cities?.name ?? null,
       about: listing?.about ?? null,
       experienceYears: listing?.experience_years ?? null,

@@ -69,9 +69,16 @@ export default async function OnboardingPage() {
           <ServiceAreasForm vendor={vendor} cities={cities} readOnly={!canEdit} />
           <ListingForm vendor={vendor} readOnly={!canEdit} />
           <DocumentsSection vendor={vendor} documents={documents} readOnly={!canManageDocuments} />
-          {canSubmit && vendor.status !== 'pending_review' ? (
-            <SubmitForReviewCard vendor={vendor} />
-          ) : null}
+          {/*
+            Shown while awaiting review too, since migration 0035.
+            A registration now *starts* at `pending_review`, so hiding the card
+            for that status removed the one control a newly registered business
+            needs — they could fill in every field and have no way to tell us
+            they had. `submit_vendor_for_review()` accepts a re-submission and
+            refreshes `submitted_at`, which sorts them to the back of the
+            oldest-first queue rather than the front.
+          */}
+          {canSubmit ? <SubmitForReviewCard vendor={vendor} /> : null}
         </div>
 
         <div className="lg:sticky lg:top-6 lg:self-start">

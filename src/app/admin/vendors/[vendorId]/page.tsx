@@ -3,11 +3,14 @@ import { notFound } from 'next/navigation'
 
 import { DecisionForm } from '@/components/admin/decision-form'
 import { DocumentLink } from '@/components/admin/document-link'
+import { VendorDeletePanel } from '@/components/admin/vendor-delete-panel'
+import { VendorEditForm } from '@/components/admin/vendor-edit-form'
 import { NOINDEX } from '@/lib/seo'
 import { can } from '@/lib/permissions'
 import { formatDateTime } from '@/lib/dates'
 import { requireElevatedAdmin } from '@/server/policies/require'
 import { getAdminVendor, getAuditTrail } from '@/server/dal/admin'
+import { listCities } from '@/server/dal/taxonomy'
 
 export const metadata = { title: 'Vendor detail', ...NOINDEX }
 export const dynamic = 'force-dynamic'
@@ -20,8 +23,16 @@ export default async function AdminVendorDetailPage({
   const actor = await requireElevatedAdmin('vendor.read')
   const { vendorId } = await params
 
-  const [vendor, audit] = await Promise.all([getAdminVendor(vendorId), getAuditTrail(vendorId)])
+  const [vendor, audit, cities] = await Promise.all([
+    getAdminVendor(vendorId),
+    getAuditTrail(vendorId),
+    // 200 rather than the public default of 24: an admin correcting a business
+    // must be able to reach any city, not just the ones on the homepage.
+    listCities(200),
+  ])
   if (!vendor) notFound()
+
+  const canEdit = can(actor, 'vendor.verify') || can(actor, 'vendor.suspend')
 
   return (
     <div className="space-y-6">
@@ -100,6 +111,43 @@ export default async function AdminVendorDetailPage({
             </p>
           </section>
 
+          {/* `id` is the target of the Edit link on the vendor list, so an
+              admin arrives with the form already in view. */}
+          <section
+            id="edit"
+            className="border-sand-200 scroll-mt-6 rounded-[var(--radius-card)] border bg-white p-5"
+          >
+            <h2 className="font-display text-sand-900 text-lg">Edit details</h2>
+            {canEdit ? (
+              <>
+                <p className="text-sand-600 mt-1 mb-4 text-sm">
+                  Corrections made on the business&rsquo;s behalf. Publication and verification are
+                  decided in the panel alongside, not here.
+                </p>
+                <VendorEditForm
+                  vendor={{
+                    id: vendor.id,
+                    displayName: vendor.displayName,
+                    legalName: vendor.legalName,
+                    slug: vendor.slug,
+                    primaryCityId: vendor.primaryCityId,
+                    cityName: vendor.cityName,
+                    email: vendor.email,
+                    phone: vendor.phone,
+                    website: vendor.website,
+                    foundedYear: vendor.foundedYear,
+                    about: vendor.about,
+                  }}
+                  cities={cities}
+                />
+              </>
+            ) : (
+              <p className="text-sand-600 mt-2 text-sm">
+                Editing a business requires the vendor.verify or vendor.suspend permission.
+              </p>
+            )}
+          </section>
+
           <section className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-5">
             <h2 className="font-display text-sand-900 text-lg">Verification documents</h2>
             {vendor.documents.length === 0 ? (
@@ -145,7 +193,11 @@ export default async function AdminVendorDetailPage({
             status={vendor.status}
             canVerify={can(actor, 'vendor.verify')}
             canSuspend={can(actor, 'vendor.suspend')}
-          />
+          >
+            {can(actor, 'admin.manage') ? (
+              <VendorDeletePanel vendorId={vendor.id} displayName={vendor.displayName} />
+            ) : null}
+          </DecisionForm>
         </div>
       </div>
     </div>

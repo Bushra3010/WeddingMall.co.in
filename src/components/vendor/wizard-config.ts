@@ -114,14 +114,21 @@ export function isStepComplete(step: StepKey, vendor: VendorWorkspace): boolean 
       return vendor.documentCount > 0
     case 'submit':
       /*
-       * Submitted, not merely submittable.
+       * Submitted *and* submittable — both halves are load-bearing.
        *
-       * `canSubmit` means the required fields are filled — it was showing a tick
-       * on Submit while Documents still sat locked, which reads as "you already
-       * finished the last step but not the one before it". A step is only done
-       * once the vendor has actually sent the listing for review.
+       * `canSubmit` alone means the required fields are filled; that showed a
+       * tick on Submit while Documents still sat locked, which reads as "you
+       * already finished the last step but not the one before it".
+       *
+       * The status check alone is now wrong in the other direction. Since
+       * migration 0035 a registration *opens* at `pending_review` with a
+       * `submitted_at`, so "not a draft" would tick the final step for someone
+       * who has written nothing at all — congratulating a brand-new vendor on
+       * finishing the form they have not started.
        */
-      return Boolean(vendor.submittedAt) || vendor.status !== 'draft'
+      return (
+        vendor.completion.canSubmit && (Boolean(vendor.submittedAt) || vendor.status !== 'draft')
+      )
     default:
       return false
   }

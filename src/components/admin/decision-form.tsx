@@ -34,11 +34,22 @@ export function DecisionForm({
   status,
   canVerify,
   canSuspend,
+  children,
 }: {
   vendorId: string
   status: string
   canVerify: boolean
   canSuspend: boolean
+  /**
+   * Rendered inside the card, below the decision form — the delete control.
+   *
+   * A sibling of the form rather than part of it, and deliberately not a fifth
+   * radio. Approve, reject, suspend and request-changes all go through
+   * `admin_decide_vendor()`, are reversible, and are recorded; delete is none of
+   * those. Sharing the "Record decision" button with them would put an
+   * irreversible action one mis-click from four routine ones.
+   */
+  children?: React.ReactNode
 }) {
   const [state, action] = useAction(decideVendorAction)
   const [decision, setDecision] = useState<AdminDecision>('approve')
@@ -58,65 +69,71 @@ export function DecisionForm({
 
   if (available.length === 0) {
     return (
-      <p className="border-sand-300 bg-sand-50 text-sand-700 rounded-lg border p-3 text-sm">
-        You do not have permission to make a decision on this business.
-      </p>
+      <div className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-5">
+        <p className="border-sand-300 bg-sand-50 text-sand-700 rounded-lg border p-3 text-sm">
+          You do not have permission to make a decision on this business.
+        </p>
+        {/* Delete is a different permission, so it can still be available to
+            someone with no decision to make. */}
+        {children}
+      </div>
     )
   }
 
   const needsReason = available.find((option) => option.value === decision)?.needsReason ?? true
 
   return (
-    <form
-      action={action}
-      className="border-sand-200 space-y-4 rounded-[var(--radius-card)] border bg-white p-5"
-    >
-      <h2 className="font-display text-sand-900 text-lg">Decision</h2>
-      <input type="hidden" name="vendorId" value={vendorId} />
-      <FormMessage state={state} successMessage="Decision recorded." />
+    <div className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-5">
+      <form action={action} className="space-y-4">
+        <h2 className="font-display text-sand-900 text-lg">Decision</h2>
+        <input type="hidden" name="vendorId" value={vendorId} />
+        <FormMessage state={state} successMessage="Decision recorded." />
 
-      <fieldset>
-        <legend className="text-sand-800 text-sm font-medium">Choose an outcome</legend>
-        <div className="mt-2 space-y-2">
-          {available.map((option) => (
-            <label key={option.value} className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="decision"
-                value={option.value}
-                checked={decision === option.value}
-                onChange={() => setDecision(option.value)}
-                className="size-4"
-              />
-              <span className={option.tone}>{option.label}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+        <fieldset>
+          <legend className="text-sand-800 text-sm font-medium">Choose an outcome</legend>
+          <div className="mt-2 space-y-2">
+            {available.map((option) => (
+              <label key={option.value} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="decision"
+                  value={option.value}
+                  checked={decision === option.value}
+                  onChange={() => setDecision(option.value)}
+                  className="size-4"
+                />
+                <span className={option.tone}>{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
-      <Field
-        label="Reason"
-        hint={
-          needsReason
-            ? 'Shared with the vendor so they know what to fix. Recorded in the audit log.'
-            : 'Optional for an approval.'
-        }
-        error={fieldError(state, 'reason')}
-        required={needsReason}
-      >
-        {({ id, describedBy, invalid }) => (
-          <Textarea
-            id={id}
-            name="reason"
-            required={needsReason}
-            maxLength={1000}
-            aria-describedby={describedBy}
-            invalid={invalid}
-          />
-        )}
-      </Field>
+        <Field
+          label="Reason"
+          hint={
+            needsReason
+              ? 'Shared with the vendor so they know what to fix. Recorded in the audit log.'
+              : 'Optional for an approval.'
+          }
+          error={fieldError(state, 'reason')}
+          required={needsReason}
+        >
+          {({ id, describedBy, invalid }) => (
+            <Textarea
+              id={id}
+              name="reason"
+              required={needsReason}
+              maxLength={1000}
+              aria-describedby={describedBy}
+              invalid={invalid}
+            />
+          )}
+        </Field>
 
-      <SubmitButton pendingLabel="Recording…">Record decision</SubmitButton>
-    </form>
+        <SubmitButton pendingLabel="Recording…">Record decision</SubmitButton>
+      </form>
+
+      {children}
+    </div>
   )
 }

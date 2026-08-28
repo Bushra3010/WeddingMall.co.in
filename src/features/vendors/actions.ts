@@ -15,6 +15,7 @@ import {
 } from '@/features/auth/schema'
 import {
   createVendor,
+  insertRegisteringVendor,
   saveCategories,
   saveServiceAreas,
   saveVendorListing,
@@ -335,17 +336,30 @@ export async function registerVendorAndCreateAccount(
     // Create vendor
     const slug = await uniqueSlug(input.displayName)
 
-    const { data: vendor, error: vendorError } = await supabase
-      .from('vendors')
-      .insert({
-        display_name: input.displayName,
-        slug,
-        owner_user_id: userId,
-        status: 'draft',
-        primary_city_id: input.primaryCityId,
-      })
-      .select('id, slug')
-      .single()
+    /*
+     * Registration lands in the review queue, not in a private draft.
+     *
+     * It used to insert `draft`, and the live data showed what that cost: 18
+     * vendors, zero of them ever `pending_review`. A registration was invisible
+     * on every admin screen anyone actually watches until the vendor finished
+     * the whole wizard and pressed a final button — which not one of them ever
+     * did, including the ones whose listing was complete enough to pass.
+     *
+     * Migration 0035 widens the `vendors: create own` insert policy to permit
+     * this status. It is not a way to self-publish: `pending_review` is not
+     * public, and the 0022 column guard still refuses any status *update* from
+     * a non-moderator.
+     *
+     * `insertRegisteringVendor` falls back to `draft` if that migration has not
+     * been applied yet, so this code can be deployed ahead of it without taking
+     * sign-up down. See the note on that function.
+     */
+    const { data: vendor, error: vendorError } = await insertRegisteringVendor(supabase, {
+      display_name: input.displayName,
+      slug,
+      owner_user_id: userId,
+      primary_city_id: input.primaryCityId,
+    })
 
     if (vendorError || !vendor) {
       throw new ServiceError('vendor_creation_failed', 'We could not create your business profile.')
@@ -362,10 +376,16 @@ export async function registerVendorAndCreateAccount(
       throw new ServiceError('membership_failed', 'We could not set up your account access.')
     }
 
-    // Create draft listing
-    const { error: listingError } = await supabase
-      .from('vendor_listings')
-      .insert({ vendor_id: vendor.id, status: 'draft' })
+    // The listing tracks the vendor it belongs to. Read from the row that came
+    // back, never assumed: if the fallback above landed this in `draft`, a
+    // `pending` listing here would put the business in the listing moderation
+    // queue while absent from the vendor queue.
+    const queued = vendor.status === 'pending_review'
+    const { error: listingError } = await supabase.from('vendor_listings').insert({
+      vendor_id: vendor.id,
+      status: queued ? 'pending' : 'draft',
+      submitted_at: queued ? new Date().toISOString() : null,
+    })
     if (listingError) {
       throw new ServiceError('listing_failed', 'We could not create your listing draft.')
     }
@@ -382,6 +402,25 @@ export async function registerVendorAndCreateAccount(
     await supabase
       .from('vendor_service_areas')
       .insert({ vendor_id: vendor.id, city_id: input.primaryCityId, travel_available: false })
+
+    /*
+     * Open the verification record here rather than leaving it to
+     * `submit_vendor_for_review()`. The admin queue counts documents through
+     * this row, and `/admin/verifications` reads it — without one, a business
+     * that is genuinely awaiting review shows no verification at all.
+     * Re-submission later reuses this row instead of stacking a second.
+     *
+     * Only when the business actually reached the queue; a draft has nothing to
+     * verify yet.
+     */
+    if (queued) {
+      await supabase.from('vendor_verifications').insert({
+        vendor_id: vendor.id,
+        type: 'business_registration',
+        status: 'pending',
+        submitted_at: new Date().toISOString(),
+      })
+    }
 
     created = { vendorId: vendor.id }
     return created

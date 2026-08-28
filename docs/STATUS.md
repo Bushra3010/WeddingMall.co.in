@@ -708,6 +708,95 @@ Two things this pass did **not** settle:
   two users rather than a unit test. Add it to `npm run db:rls`.
 
 
+## Admin vendor management (2026-08-28)
+
+Reported as "the admin panel is not properly working" — a newly registered
+vendor did not appear in it, and there were no View / Edit / Approve / Reject /
+Delete controls.
+
+**Audited against the live database first.** Registration was never broken. 18
+vendors, 9 `active`, 9 `draft`, **zero** ever `pending_review`. Every row was
+present with its membership, listing, category and service area. Two separate
+causes hid them: `/admin/vendors` defaulted to the `active` tab, which a new
+business structurally cannot be in, and `draft → pending_review` needed the
+vendor to finish the wizard and press a final button that nobody ever had — one
+`vendor.submitted_for_review` entry in the whole audit log, from three weeks
+earlier. The newest registration passed every gate in
+`submit_vendor_for_review()` and was still `draft` with `submitted_at = null`.
+
+Approve and Reject were **not** broken or disconnected — they existed on the
+detail page and worked. Edit did not exist. Delete could not: `public.vendors`
+had no DELETE policy in any of 0001–0034, so a delete matched zero rows and
+returned 200. See ADR-041 and ADR-042.
+
+**Changed.** Migration `0035_vendor_registration_and_admin_delete.sql` (new):
+widens `vendors: create own` to permit `pending_review`, drops the
+"already awaiting review" guard so a vendor can re-submit after completing, adds
+`delete_vendor()` and `vendors: admin delete` on `admin.manage`.
+`features/vendors/actions.ts`, `server/services/vendor-onboarding.ts`
+(registration writes `pending_review`; `createVendorForUser` deliberately stays
+`draft`), `server/services/admin-vendors.ts` (new),
+`features/admin/vendor-actions.ts` (new), `features/vendors/schema.ts`
+(`adminVendorSchema`), `server/dal/admin.ts` (`missing` per queue row,
+`primaryCityId`), `components/admin/{vendor-row-actions,vendor-edit-form,vendor-delete-panel}.tsx`
+(new), `app/admin/vendors/page.tsx` (defaults to Awaiting review, row actions),
+`app/admin/vendors/[vendorId]/page.tsx` (edit section, delete panel),
+`components/vendor/wizard-config.ts`, `app/vendor-dashboard/onboarding/page.tsx`,
+`scripts/apply-migrations.mjs` (`--only`), `scripts/rls-onboarding-probe.mjs`,
+`scripts/rls-taxonomy-probe.mjs`, `tests/admin-vendor-schema.test.ts` (new),
+`tests/wizard-steps.test.ts`.
+
+Checks: `npm run verify` clean — lint, typecheck, 163 unit tests, build.
+
+### Remaining issue — the migration is not applied
+
+`0035` has been **read carefully but never executed**: `PGPASSWORD` was not
+available in this environment and there is no local Postgres, Docker or `psql`.
+The 9 new RLS probes have never run.
+
+**Registration does not break in the meantime.** `insertRegisteringVendor()`
+attempts `pending_review` and falls back to `draft` on a 42501, logging
+`vendor.register.migration0035NotApplied`. Deploys and migrations are separate
+manual steps in this project, so "code ahead of schema" is a real state and a
+sign-up that 500s would be a worse answer than one that behaves as it did last
+week. The listing status and the verification record follow the row that came
+back, so the fallback cannot produce a `draft` vendor carrying a `pending`
+listing. **Delete the fallback once `0035` is applied** — it is dead code from
+that moment.
+
+Until then, Delete in the admin panel will fail on click (`delete_vendor` does
+not exist yet) and new registrations keep landing under the Draft tab.
+
+`npm run db:apply` replays every migration from 0001 and stops at 0002, because
+the early files use plain `create table` / `create policy` — it only works on a
+fresh project. `--only` was added for this:
+
+```bash
+PGPASSWORD='...' node --env-file=.env.local scripts/apply-migrations.mjs --only 0035
+```
+
+### Exact next task
+
+1. Apply `0035` with the command above, then `PGPASSWORD='...' npm run db:types`.
+2. Delete two temporary shims that exist only because the schema is behind:
+   the `supabase.rpc as unknown as` cast in `server/services/admin-vendors.ts`
+   (`delete_vendor` is not in the generated types yet) and the `draft` fallback
+   in `insertRegisteringVendor()` in `server/services/vendor-onboarding.ts`.
+   Both say so in a comment above them.
+3. `npm run db:rls` — 5 new probes (3 in onboarding, 6 in taxonomy) that have
+   never been run.
+4. Walk the flow in a browser: register → appears under Awaiting review →
+   View / Edit / Approve / Reject / Delete.
+5. The 9 existing `draft` vendors stay where they are. Decide whether to move
+   the complete ones (Pearl Banquet hall, Krishna Vatika) into the queue by
+   hand.
+6. Pre-existing drift, found in passing and **not** fixed: *Krishna Vatika* has
+   `vendor_listings.status = 'pending'` with `vendors.status = 'draft'`. There
+   are two submit paths — `submit_vendor_for_review()` (vendor + listing) and
+   `submit_listing_for_review()` (listing only) — so a business can sit in
+   `/admin/listings` while absent from `/admin/vendors`.
+
+
 ## Notes
 
 - All seed and demo data is fictional (PRD 2.3, Epic G). `npm run seed:demo -- --clean` removes the demo vendors.

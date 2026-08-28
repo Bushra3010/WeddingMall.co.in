@@ -3,6 +3,19 @@
  * project, one statement-batch per file, reporting the first failure precisely.
  *
  * Usage: PGPASSWORD='...' node apply.mjs [--seed] [--host <pooler-host>]
+ *                                        [--only <prefix>]
+ *
+ * There is no ledger of what has already run — every file is replayed in
+ * filename order, and the run stops at the first failure. Against a database
+ * that already has the schema that means it stops at 0002, because the early
+ * migrations use plain `create table` and `create policy`. So this works for a
+ * fresh project and for nothing else, unless you name what you want:
+ *
+ *   node --env-file=.env.local scripts/apply-migrations.mjs --only 0035
+ *
+ * `--only` matches on the start of the filename and applies just those files.
+ * Migrations from 0032 onward are written to be idempotent, so re-running one
+ * is safe; the older ones are not.
  */
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -26,6 +39,8 @@ const args = process.argv.slice(2)
 const withSeed = args.includes('--seed') || args.includes('--seed-only')
 const seedOnly = args.includes('--seed-only')
 const hostArg = args.includes('--host') ? args[args.indexOf('--host') + 1] : null
+const onlyArg = args.includes('--only') ? args[args.indexOf('--only') + 1] : null
+if (args.includes('--only') && !onlyArg) throw new Error('--only needs a filename prefix, e.g. 0035')
 
 const REGIONS = [
   'ap-south-1',
@@ -86,8 +101,13 @@ const files = seedOnly
   ? []
   : readdirSync(join(ROOT, 'migrations'))
       .filter((f) => f.endsWith('.sql'))
+      .filter((f) => !onlyArg || f.startsWith(onlyArg))
       .sort()
 if (withSeed) files.push('__seed__')
+
+if (onlyArg && files.length === 0) {
+  throw new Error(`No migration starts with "${onlyArg}"`)
+}
 
 let failed = false
 for (const file of files) {

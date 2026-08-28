@@ -59,6 +59,76 @@ export async function uniqueSlug(base: string): Promise<string> {
 }
 
 /**
+ * Insert a registering business, in the review queue where the database allows
+ * it.
+ *
+ * ## Why this is not a plain insert
+ *
+ * Registration writes `pending_review`, which migration 0035 permits by
+ * widening the `vendors: create own` policy from `status = 'draft'`. Until that
+ * migration is applied the old policy is still in force and the insert is
+ * refused outright with 42501 — so shipping this code ahead of its migration
+ * takes vendor sign-up down completely.
+ *
+ * Deploys and migrations are separate actions here (Railway has no deploy
+ * trigger; migrations are applied by hand), so "the code is ahead of the
+ * schema" is a state this application will genuinely be in. A registration that
+ * lands in `draft` is the behaviour from before this change and is recoverable
+ * — the vendor submits from the wizard. A registration that 500s is not.
+ *
+ * **This fallback is temporary.** Once 0035 is applied the first branch always
+ * wins and the second is dead code; delete it then. The warning exists so that
+ * "new vendors still are not reaching the queue" is answerable from the logs
+ * rather than by re-deriving this whole investigation.
+ */
+export async function insertRegisteringVendor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  row: {
+    display_name: string
+    slug: string
+    owner_user_id: string
+    primary_city_id?: string | null
+  },
+) {
+  const queued = await supabase
+    .from('vendors')
+    .insert({ ...row, status: 'pending_review', submitted_at: new Date().toISOString() })
+    .select('id, slug, status')
+    .single()
+
+  // 42501 here means one specific thing: the insert policy still requires
+  // `draft`. Any other failure is a real one and is returned untouched.
+  if (queued.error?.code !== '42501') return queued
+
+  logError(
+    'vendor.register.migration0035NotApplied',
+    new Error('vendors: create own still requires draft — registration fell back'),
+    { slug: row.slug },
+  )
+
+  return supabase
+    .from('vendors')
+    .insert({ ...row, status: 'draft' })
+    .select('id, slug, status')
+    .single()
+}
+
+/**
+ * The listing status that goes with a freshly inserted vendor.
+ *
+ * Read from the row that came back rather than assumed, so the fallback above
+ * cannot leave a `draft` business carrying a `pending` listing. That pairing is
+ * a real defect in this database already — one vendor sits in the listing
+ * moderation queue while absent from the vendor queue — and it is not worth
+ * manufacturing more of it.
+ */
+function listingStateFor(vendorStatus: string) {
+  return vendorStatus === 'pending_review'
+    ? { status: 'pending' as const, submitted_at: new Date().toISOString() }
+    : { status: 'draft' as const, submitted_at: null }
+}
+
+/**
  * Creates the vendor, the owner membership, and the draft listing.
  *
  * Not atomic: PostgREST has no multi-statement transaction. The order is chosen
@@ -73,17 +143,16 @@ export async function createVendor(actor: Actor, input: CreateVendorInput) {
   const supabase = await createClient()
   const slug = await uniqueSlug(input.displayName)
 
-  const { data: vendor, error } = await supabase
-    .from('vendors')
-    .insert({
-      display_name: input.displayName,
-      slug,
-      owner_user_id: actor.userId,
-      status: 'draft',
-      primary_city_id: input.primaryCityId,
-    })
-    .select('id, slug')
-    .single()
+  // Same reasoning as `registerVendorAndCreateAccount`: this form already
+  // collects a name, a city, and a category, so the business is substantial
+  // enough to be looked at. It goes to the queue rather than to a draft nobody
+  // watches. Permitted by the widened insert policy in migration 0035.
+  const { data: vendor, error } = await insertRegisteringVendor(supabase, {
+    display_name: input.displayName,
+    slug,
+    owner_user_id: actor.userId,
+    primary_city_id: input.primaryCityId,
+  })
 
   if (error || !vendor) translate(error, 'We could not create your business profile.')
 
@@ -97,7 +166,7 @@ export async function createVendor(actor: Actor, input: CreateVendorInput) {
 
   const { error: listingError } = await supabase
     .from('vendor_listings')
-    .insert({ vendor_id: vendor.id, status: 'draft' })
+    .insert({ vendor_id: vendor.id, ...listingStateFor(vendor.status) })
   if (listingError) translate(listingError, 'We could not create your listing draft.')
 
   const { error: categoryError } = await supabase
@@ -110,12 +179,33 @@ export async function createVendor(actor: Actor, input: CreateVendorInput) {
     .from('vendor_service_areas')
     .insert({ vendor_id: vendor.id, city_id: input.primaryCityId, travel_available: false })
 
+  // The record the verification queue and the document count read from. Only
+  // opened for a business that is actually awaiting review — a draft has
+  // nothing to verify yet, and `submit_vendor_for_review()` opens one when it
+  // gets there.
+  if (vendor.status === 'pending_review') {
+    await supabase.from('vendor_verifications').insert({
+      vendor_id: vendor.id,
+      type: 'business_registration',
+      status: 'pending',
+      submitted_at: new Date().toISOString(),
+    })
+  }
+
   return { vendorId: vendor.id, slug: vendor.slug }
 }
 
 /**
  * Creates a minimal draft vendor for a user who just signed up.
  * Used when a user lands in the wizard without an existing vendor.
+ *
+ * Stays `draft` while the two real registration paths above now open at
+ * `pending_review`. This one is not a registration — it is the recovery path
+ * for someone who reached the wizard without a vendor row, so it has no city,
+ * no category, and a display name guessed from their profile. Putting that in
+ * the review queue would give an admin a row with nothing in it to review and
+ * no way to tell it apart from a business that had actually applied. It becomes
+ * `pending_review` the moment they finish the wizard and submit.
  */
 export async function createVendorForUser(actor: Actor): Promise<string | null> {
   if (!actor.userId) return null

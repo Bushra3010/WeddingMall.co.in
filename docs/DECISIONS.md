@@ -708,3 +708,50 @@ Reproduced: a vendor member's query returned 3 enquiries, 0 of them theirs. An a
 The same shape exists wherever a policy has an `or` in it. `reviews: own read` and `shortlists` were checked; the review reads had it, shortlists did not.
 
 **The test had to be at the page level.** An RLS probe passes throughout — it was passing throughout. `tests/e2e/conversation-privacy.spec.ts` signs in as a vendor member and asserts the customer page neither lists nor opens someone else's enquiry. Verified by reverting the fix: the test fails with `Expected 404, Received 200`, and passes with it. A regression test that was never seen to fail is a guess.
+
+---
+
+## ADR-041 — Registration is an application, so it goes in the queue
+
+**Date:** 2026-08-28 · **Status:** accepted
+
+Reported as "the admin panel is not properly working": a newly registered vendor did not appear in it.
+
+Checked against the live database before changing anything. 18 vendors — 9 `active`, 9 `draft`, and **zero** ever in `pending_review`. Registration was working perfectly: every row was there, with its membership, listing, category and service area intact. It was writing `draft`, and `/admin/vendors` defaulted to the `active` tab, so a new business landed on the one tab it structurally could not be in. It was under "Draft" — visible, and nowhere anyone looks.
+
+The second half is worse. `draft → pending_review` required the vendor to finish the whole wizard and press a final button. Nobody ever had: one `vendor.submitted_for_review` entry in the entire audit log, from three weeks earlier. The newest registration — primary city set, one category, one service area, a 2,108-character description — satisfied every gate in `submit_vendor_for_review()` and was still sitting at `draft` with `submitted_at = null`. Someone filled in everything and stopped one click short, and no admin had any way to move them on.
+
+**Decision:** registration writes `pending_review`. `vendors: create own` widens from `status = 'draft'` to `status in ('draft', 'pending_review')`, and the admin list defaults to "Awaiting review".
+
+The alternative — keep `draft` and surface it better in the admin UI — was offered and declined. It is the more conservative option and it keeps the review queue meaning "a vendor says they are finished", which this change gives up: the queue now contains applications, some of them empty. Three things pay for that:
+
+- **`missing` on every queue row.** The list names what a business still lacks — "Listing incomplete — no category, no description" — so an admin cannot approve a blank profile without being told it is blank.
+- **Re-submission is allowed.** `submit_vendor_for_review()` used to raise "already awaiting review". With registration opening at `pending_review` that guard would have refused the one action a vendor has left, so it is gone. Re-submitting refreshes `submitted_at`, which sorts them to the *back* of the oldest-first queue — there is nothing to game.
+- **The wizard stopped lying.** `isStepComplete('submit')` read "not a draft", which after this change ticked the final step for someone who had written nothing. It now requires `canSubmit` as well.
+
+**What did not change, deliberately.** `createVendorForUser` still writes `draft`. It is not a registration — it is the recovery path for a user who reaches the wizard without a vendor row, with no city, no category, and a name guessed from their profile. That belongs in a draft, not in front of a reviewer.
+
+**The widened policy is the thing to watch.** It is the only barrier between "apply for review" and "publish yourself", and a check that has been relaxed once is easy to relax again. `rls-onboarding-probe.mjs` now asserts all three cases: `pending_review` is accepted, `active` is refused, and so is everything else.
+
+---
+
+## ADR-042 — A delete that could not run, and a policy that never existed
+
+**Date:** 2026-08-28 · **Status:** accepted
+
+The same report asked why the admin panel had no View / Edit / Approve / Reject / Delete. Approve, Reject and View already existed and worked — on the detail page, reachable only by clicking a vendor's name. They were never broken, just unreachable from the list.
+
+Edit did not exist. Delete could not.
+
+**`public.vendors` had no DELETE policy at all** — not a restrictive one, none, across 0001–0034. With RLS enabled and no policy, a delete matches zero rows and PostgREST answers `200` with an empty body. "Refused" and "done" are indistinguishable to the caller. Any delete button wired up before this would have appeared to work and silently done nothing.
+
+**Decision:** `delete_vendor()` in migration 0035, same shape as `delete_city()` (0032) and `delete_category()` (0034) — lock the row with `for update`, count what points at it, raise `PT409` naming the blockers or delete. Gated by `vendors: admin delete` on `admin.manage`.
+
+Two details worth recording:
+
+- **`admin.manage`, not `vendor.verify`.** A verifier decides whether a business goes live and can suspend one. Removing it outright is a different act with no undo, and suspension covers every routine case — so it is super-admin only, and the refusal message says "Suspend it instead" rather than just refusing.
+- **Thirteen of the fifteen foreign keys into `vendors` cascade**, including `reviews`. A delete wired straight to `DELETE FROM` would have taken a customer's review with the business it was written about. Enquiries, payments, reviews and subscriptions are counted first and refuse the delete.
+
+Delete sits inside the Decision card, below the outcomes — asked for, and right: it is the fifth thing an admin does to a business, so looking for it anywhere else is a waste of time. It is **not** a fifth radio. The four outcomes above it go through `admin_decide_vendor()`, are reversible, and leave an audit entry; delete is none of those, and sharing their radio group and their "Record decision" button would put an irreversible action one mis-click from four routine ones. It keeps its own confirm step.
+
+Editing is deliberately narrow: the vendor's own fields, the slug, and the description. Not `status`, `verification_status`, `plan_id`, or `is_featured` — those move only through `admin_decide_vendor()`, which writes an audit entry. A text input that quietly set `status` would leave no record of who published what, and the 0022 column guard is the second line if this schema is ever widened by accident.

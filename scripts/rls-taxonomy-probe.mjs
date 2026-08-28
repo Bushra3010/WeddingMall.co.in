@@ -308,7 +308,89 @@ try {
   record('an unused plan is deleted', !(await stillThere('plans', planId)), `HTTP ${okPlan.status}`)
 
   // -------------------------------------------------------------------------
-  // 8. None of this is reachable without the right role
+  // 8. Businesses (migration 0035)
+  //
+  // `public.vendors` had no DELETE policy at all before 0035 — not a
+  // restrictive one, none — so a delete matched zero rows and PostgREST
+  // answered 200 with an empty body. "Refused" and "done" were indistinguishable
+  // to the caller, which is why every assertion here reads the table back
+  // rather than trusting a status code.
+  //
+  // Fifteen tables carry a `vendor_id` and thirteen cascade, including
+  // `reviews`. `delete_vendor()` refuses rather than taking a customer's review
+  // with the business it is about.
+  // -------------------------------------------------------------------------
+  const verifier = await createUser('verifier')
+  await makeAdmin(verifier.id, 'vendor_verifier')
+  cleanup.push(() =>
+    fetch(`${URL_BASE}/auth/v1/admin/users/${verifier.id}`, {
+      method: 'DELETE',
+      headers: { apikey: SVC, Authorization: `Bearer ${SVC}` },
+    }),
+  )
+
+  /** A disposable business, so no real supply is at risk. */
+  async function makeVendor(tag) {
+    const { body } = await rest('vendors?select=id', SVC, {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        display_name: `Probe ${tag}`,
+        slug: `probe-vendor-${tag}-${Date.now()}`,
+        owner_user_id: stranger.id,
+        status: 'draft',
+      }),
+    })
+    const id = body[0].id
+    cleanup.push(() => rest(`vendors?id=eq.${id}`, SVC, { method: 'DELETE' }))
+    return id
+  }
+
+  const guardedVendor = await makeVendor('guarded')
+  await rpc('delete_vendor', guardedVendor, ANON)
+  record('an anonymous caller cannot delete a business', await stillThere('vendors', guardedVendor))
+  await rpc('delete_vendor', guardedVendor, ANON, stranger.jwt)
+  record(
+    'a signed-in non-admin cannot delete a business',
+    await stillThere('vendors', guardedVendor),
+  )
+
+  // The distinction the policy exists to draw. A verifier decides whether a
+  // business goes live and can suspend one; removing it outright is a
+  // different act, and `admin.manage` is the only thing that grants it.
+  await rpc('delete_vendor', guardedVendor, ANON, verifier.jwt)
+  record(
+    'a vendor verifier cannot delete a business, only suspend it',
+    await stillThere('vendors', guardedVendor),
+  )
+
+  const busyVendor = await makeVendor('busy')
+  const { body: subBody } = await rest('subscriptions?select=id', SVC, {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ vendor_id: busyVendor, plan_id: inUsePlan.id, status: 'active' }),
+  })
+  const subId = subBody?.[0]?.id
+  cleanup.push(() => rest(`subscriptions?id=eq.${subId}`, SVC, { method: 'DELETE' }))
+  record('a business was given a subscription to block its delete', Boolean(subId))
+
+  const refusedVendor = await rpc('delete_vendor', busyVendor, ANON, admin.jwt)
+  record(
+    'a business with commercial history is refused even for a super admin',
+    await stillThere('vendors', busyVendor),
+    `HTTP ${refusedVendor.status}`,
+  )
+
+  await rest(`subscriptions?id=eq.${subId}`, SVC, { method: 'DELETE' })
+  const okVendor = await rpc('delete_vendor', busyVendor, ANON, admin.jwt)
+  record(
+    'the same business deletes once nothing points at it',
+    !(await stillThere('vendors', busyVendor)),
+    `HTTP ${okVendor.status}`,
+  )
+
+  // -------------------------------------------------------------------------
+  // 9. None of this is reachable without the right role
   // -------------------------------------------------------------------------
   const { body: guardBody } = await rest('categories?select=id', SVC, {
     method: 'POST',

@@ -61,6 +61,25 @@ describe('isStepComplete', () => {
     expect(isStepComplete('submit', finished({ status: 'pending_review' }))).toBe(true)
   })
 
+  it('does not tick Submit for a registration that has not been filled in', () => {
+    /*
+     * Since migration 0035 a vendor registers straight into `pending_review`
+     * with a `submitted_at`, so "has been submitted" is true from the first
+     * second — before they have written a description or picked a category.
+     * Ticking the final step there tells someone they have finished a form they
+     * have not started.
+     */
+    const justRegistered = vendor({
+      displayName: 'Pearl Banquet Hall',
+      primaryCityId: 'c1',
+      status: 'pending_review',
+      submittedAt: '2026-08-27T10:50:56Z',
+    })
+
+    expect(isStepComplete('submit', justRegistered)).toBe(false)
+    expect(isStepUnlocked('submit', justRegistered)).toBe(false)
+  })
+
   it('requires a real about, not just any text', () => {
     expect(isStepComplete('about', vendor({ about: 'too short' }))).toBe(false)
     expect(isStepComplete('about', vendor({ about: 'x'.repeat(50) }))).toBe(true)
