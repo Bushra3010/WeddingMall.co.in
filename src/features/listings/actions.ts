@@ -115,7 +115,13 @@ export async function uploadMediaAction(
     }
     return { uploaded: files.length }
   })
-  if (result.ok) revalidatePath('/vendor-dashboard/portfolio')
+  if (result.ok) {
+    revalidatePath('/vendor-dashboard/portfolio')
+    // The wizard's Media step uploads through this action too, and reads its
+    // "you have N photos" line — and the Media tick — from the same count.
+    // Without this the upload succeeded and the step went on saying zero.
+    revalidatePath('/vendor-dashboard/list')
+  }
   return result
 }
 

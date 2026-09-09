@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { fieldError, FormMessage, useAction } from '@/components/shared/action-form'
 import { SubmitButton } from '@/components/shared/submit-button'
@@ -485,7 +485,26 @@ export function WizardMediaStep({
   readOnly: boolean
   vendorId: string
 }) {
-  const [, upload] = useAction(uploadMediaAction)
+  /*
+   * The upload state was discarded here — `const [, upload]`. Every failure was
+   * therefore silent: a vendor picked a photo, pressed Upload, and nothing
+   * visible happened, whether the file was rejected, too large, or the request
+   * never left the browser. The Portfolio screen has always rendered this; the
+   * wizard, where a vendor first meets it, did not.
+   */
+  const [uploadState, upload] = useAction(uploadMediaAction)
+
+  /*
+   * Total bytes, checked before submitting.
+   *
+   * Server Actions send the whole form as one request body, and Next caps that
+   * (12 MB here — see next.config.ts). So "up to 20 images at a time" is only
+   * true for small ones, and going over the cap fails at the framework
+   * boundary with nothing useful to show. Counting first turns that into a
+   * sentence the vendor can act on.
+   */
+  const [tooLarge, setTooLarge] = useState<string | null>(null)
+  const MAX_BATCH_BYTES = 11 * 1024 * 1024
 
   return (
     <div className={STEP_SECTION}>
@@ -507,19 +526,45 @@ export function WizardMediaStep({
       {!readOnly ? (
         <form action={upload} className="border-sand-200 mt-4 space-y-3 border-t pt-4">
           <input type="hidden" name="vendorId" value={vendorId} />
+          <FormMessage state={uploadState} successMessage="Photos uploaded." />
+          {tooLarge ? (
+            <p
+              role="alert"
+              className="rounded-lg bg-[color-mix(in_oklch,var(--color-danger)_10%,white)] px-3 py-2 text-sm text-[var(--color-danger)]"
+            >
+              {tooLarge}
+            </p>
+          ) : null}
 
           <div>
             <label className="text-sand-800 block text-sm font-medium">
               Photos <span className="text-[var(--color-danger)]">*</span>
             </label>
             <p className="text-sand-500 mt-0.5 text-xs">
-              Upload up to 20 images at a time. JPG, PNG. Up to 5 MB each.
+              JPG, PNG, WebP or AVIF, up to 10 MB each and about 11 MB per upload — so a few at a
+              time for large photos.
             </p>
             <input
               type="file"
               name="files"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,image/avif"
               multiple
+              onChange={(event) => {
+                const files = Array.from(event.target.files ?? [])
+                const total = files.reduce((sum, file) => sum + file.size, 0)
+                const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1)
+
+                const oversize = files.find((file) => file.size > 10 * 1024 * 1024)
+                if (oversize) {
+                  setTooLarge(`${oversize.name} is ${mb(oversize.size)} MB. Each photo must be under 10 MB.`)
+                } else if (total > MAX_BATCH_BYTES) {
+                  setTooLarge(
+                    `Those ${files.length} photos come to ${mb(total)} MB, which is more than one upload can carry. Select fewer and upload again.`,
+                  )
+                } else {
+                  setTooLarge(null)
+                }
+              }}
               className="border-sand-300 mt-1.5 block w-full rounded-lg border bg-white p-2 text-sm"
             />
           </div>
@@ -537,7 +582,9 @@ export function WizardMediaStep({
             />
           </div>
 
-          <SubmitButton pendingLabel="Uploading…">Upload photos</SubmitButton>
+          <SubmitButton pendingLabel="Uploading…" disabled={tooLarge !== null}>
+            Upload photos
+          </SubmitButton>
         </form>
       ) : null}
 
