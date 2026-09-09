@@ -54,18 +54,61 @@ async function authAdmin(path, init = {}) {
 
 // --- cleanup of any previous demo run -------------------------------------
 
+/*
+ * Demo rows are identified by their **owner's email domain**, not by the
+ * `suspended_reason` tag this used to key on.
+ *
+ * The tag is a real column with a real meaning: `admin_decide_vendor()` writes
+ * the admin's reason into it when a vendor is suspended, which silently
+ * destroys the marker. Two demo vendors were suspended through the admin panel
+ * and became invisible to this cleanup — so re-seeding tried to recreate owners
+ * whose accounts still existed, and died on `could not create owner`.
+ *
+ * The owner's email cannot be overwritten by anything the app does, so it is
+ * the one durable marker. `suspended_reason` is still set below for backwards
+ * compatibility with anything already tagged, but nothing reads it here.
+ */
 console.log('removing any previous demo data…')
-const existing = await rest(`vendors?select=id,owner_user_id&suspended_reason=eq.${DEMO_TAG}`)
-for (const v of existing) {
-  await rest(`vendors?id=eq.${v.id}`, { method: 'DELETE' })
-}
-const users = await authAdmin('admin/users?per_page=200')
-for (const u of users?.users ?? []) {
-  if (u.email?.endsWith(DEMO_EMAIL_DOMAIN)) {
-    await authAdmin(`admin/users/${u.id}`, { method: 'DELETE' })
+
+const allUsers = await authAdmin('admin/users?per_page=200')
+const demoOwnerIds = new Set(
+  (allUsers?.users ?? []).filter((u) => u.email?.endsWith(DEMO_EMAIL_DOMAIN)).map((u) => u.id),
+)
+
+const allVendors = await rest('vendors?select=id,slug,owner_user_id,suspended_reason')
+const previous = allVendors.filter(
+  (v) => demoOwnerIds.has(v.owner_user_id) || v.suspended_reason === DEMO_TAG,
+)
+
+/** Slugs a previous run left behind because something real still points at them. */
+const kept = []
+
+for (const v of previous) {
+  const res = await fetch(`${URL_BASE}/rest/v1/vendors?id=eq.${v.id}`, {
+    method: 'DELETE',
+    headers: { apikey: SVC, Authorization: `Bearer ${SVC}`, 'Content-Type': 'application/json' },
+  })
+
+  /*
+   * 409 means a real customer's enquiry, review or payment points at this demo
+   * vendor — `enquiries.vendor_id` and friends are `on delete restrict`. That
+   * is not a failure to work around: a couple really did enquire, and the row
+   * that records it outranks a fixture. Left in place and reported.
+   */
+  if (res.status === 409) {
+    kept.push(v.slug)
+    demoOwnerIds.delete(v.owner_user_id)
   }
 }
-console.log(`  removed ${existing.length} vendor(s)`)
+
+for (const id of demoOwnerIds) {
+  await authAdmin(`admin/users/${id}`, { method: 'DELETE' })
+}
+
+console.log(`  removed ${previous.length - kept.length} vendor(s)`)
+if (kept.length > 0) {
+  console.log(`  kept ${kept.length} with real customer history: ${kept.join(', ')}`)
+}
 
 if (process.argv.includes('--clean')) {
   console.log('clean only — done')
@@ -194,6 +237,13 @@ for (const [index, item] of DEMO.entries()) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
 
+  // Survived cleanup because a real enquiry points at it. Recreating it would
+  // collide on the unique slug and take the whole run down with it.
+  if (kept.includes(slugBase)) {
+    console.log(`  ${item.name} — kept, has real customer history`)
+    continue
+  }
+
   const owner = await authAdmin('admin/users', {
     method: 'POST',
     body: JSON.stringify({
@@ -203,7 +253,14 @@ for (const [index, item] of DEMO.entries()) {
       user_metadata: { full_name: `${item.name} Owner` },
     }),
   })
-  if (!owner?.id) throw new Error(`could not create owner for ${item.name}`)
+  if (!owner?.id) {
+    // Named, so the next person does not have to reconstruct the cause from a
+    // bare "could not create owner".
+    throw new Error(
+      `could not create owner for ${item.name} — an account for owner-${slugBase}@${DEMO_EMAIL_DOMAIN} ` +
+        `probably still exists because its vendor could not be deleted. Response: ${JSON.stringify(owner)}`,
+    )
+  }
 
   const city = cityBy[item.city]
   const category = catBy[item.category]
