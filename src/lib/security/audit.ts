@@ -36,6 +36,16 @@ export type AuditAction =
    * nothing in the log to say who or when.
    */
   | 'vendor.delete'
+  /*
+   * An admin acting on a business's behalf (0040): adding or removing a
+   * verification document, entering or removing payout details. The vendor's
+   * own equivalents are deliberately not audited — a business editing its own
+   * record is not an event anyone investigates. Somebody else editing it is,
+   * and these two carry the most sensitive things the table holds: a scan of an
+   * identity document, and the account the money goes to.
+   */
+  | 'vendor.document'
+  | 'vendor.payout'
 
 /**
  * The IP is hashed, not stored.

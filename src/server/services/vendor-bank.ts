@@ -2,11 +2,11 @@ import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
 import { ServiceError } from '@/lib/action-result'
-import { assertVendorCapability, can, type Actor } from '@/lib/permissions'
+import { can, canVendor, PermissionError, type Actor } from '@/lib/permissions'
 import { logError } from '@/lib/observability/logger'
 import { audit } from '@/lib/security/audit'
 import { isMissingBankTable, readBankAccountRow } from '@/server/dal/vendor-bank'
-import type { BankAccountInput } from '@/features/vendors/bank-schema'
+import { maskAccountNumber, type BankAccountInput } from '@/features/vendors/bank-schema'
 
 /**
  * Payout bank details (migration 0038).
@@ -19,6 +19,51 @@ import type { BankAccountInput } from '@/features/vendors/bank-schema'
  */
 
 const TABLE = 'vendor_bank_accounts'
+
+/**
+ * The owner of the business, or the finance desk (migration 0040).
+ *
+ * The admin half is `billing.manage` — the permission 0038 already granted the
+ * UPDATE to, and which `finance_admin` and `super_admin` hold. Deliberately not
+ * `vendor.verify`: a verifier reads the account to check it against a cancelled
+ * cheque, which is why the read policy admits them, and reading it is not a
+ * reason to be able to change where money is sent.
+ *
+ * Mirrors the four policies on the table exactly. RLS is the boundary; this
+ * turns a 42501 into a sentence.
+ */
+function assertMayManageBank(actor: Actor, vendorId: string): void {
+  if (canVendor(actor, vendorId, 'billing.manage')) return
+  if (can(actor, 'billing.manage')) return
+  throw new PermissionError(
+    'Changing payout details needs the billing.manage permission, or ownership of this business.',
+  )
+}
+
+/** True when this is an admin editing somebody else's payout account. */
+function actingAsAdmin(actor: Actor, vendorId: string): boolean {
+  return !canVendor(actor, vendorId, 'billing.manage') && can(actor, 'billing.manage')
+}
+
+/**
+ * What an audit entry may hold.
+ *
+ * The masked number, never the digits. An audit log is long-lived, read by
+ * people investigating something unrelated, and readable by anyone with
+ * `admin.manage` — writing the full account number into it would put a copy
+ * outside the table whose whole point is that reading it is a recorded,
+ * permission-checked act (`revealBankAccount`).
+ */
+async function bankStateForAudit(vendorId: string): Promise<Record<string, unknown>> {
+  const row = await readBankAccountRow(vendorId)
+  if (!row) return { onFile: false }
+  return {
+    onFile: true,
+    accountHolderName: row.account_holder_name,
+    accountNumberMasked: maskAccountNumber(row.account_number),
+    ifsc: row.ifsc,
+  }
+}
 
 /**
  * Writes only. The reads live in `dal/vendor-bank.ts` per CLAUDE.md, and the
@@ -68,7 +113,13 @@ function notMigratedError(vendorId: string, error: unknown): ServiceError {
 }
 
 export async function saveBankAccount(actor: Actor, vendorId: string, input: BankAccountInput) {
-  assertVendorCapability(actor, vendorId, 'billing.manage')
+  assertMayManageBank(actor, vendorId)
+
+  // Read before the write, and only when it will be recorded — an admin editing
+  // somebody else's payout account. Doing it unconditionally would put a second
+  // query on every vendor's own save for a log line nobody writes.
+  const asAdmin = actingAsAdmin(actor, vendorId)
+  const before = asAdmin ? await bankStateForAudit(vendorId) : null
 
   const supabase = (await createClient()) as unknown as BankWriteClient
 
@@ -117,12 +168,28 @@ export async function saveBankAccount(actor: Actor, vendorId: string, input: Ban
     throw new ServiceError('internal_error', 'We could not save those bank details.')
   }
 
+  if (before) {
+    void audit({
+      action: 'vendor.payout',
+      entityType: 'vendor',
+      entityId: vendorId,
+      actorUserId: actor.userId,
+      before,
+      after: {
+        onFile: true,
+        accountHolderName: input.accountHolderName,
+        accountNumberMasked: maskAccountNumber(input.accountNumber),
+        ifsc: input.ifsc,
+      },
+    })
+  }
+
   return { vendorId }
 }
 
 /** Attach an uploaded cancelled cheque to the account on file. */
 export async function setChequeDocument(actor: Actor, vendorId: string, documentId: string | null) {
-  assertVendorCapability(actor, vendorId, 'billing.manage')
+  assertMayManageBank(actor, vendorId)
 
   const supabase = (await createClient()) as unknown as BankWriteClient
   const { error } = await supabase
@@ -158,7 +225,10 @@ export async function setChequeDocument(actor: Actor, vendorId: string, document
 }
 
 export async function deleteBankAccount(actor: Actor, vendorId: string) {
-  assertVendorCapability(actor, vendorId, 'billing.manage')
+  assertMayManageBank(actor, vendorId)
+
+  const asAdmin = actingAsAdmin(actor, vendorId)
+  const before = asAdmin ? await bankStateForAudit(vendorId) : null
 
   const supabase = (await createClient()) as unknown as BankWriteClient
   const { error } = await supabase.from(TABLE).delete().eq('vendor_id', vendorId)
@@ -168,6 +238,18 @@ export async function deleteBankAccount(actor: Actor, vendorId: string) {
     logError('service.deleteBankAccount', error, { vendorId })
     throw new ServiceError('internal_error', 'We could not remove those bank details.')
   }
+
+  if (before) {
+    void audit({
+      action: 'vendor.payout',
+      entityType: 'vendor',
+      entityId: vendorId,
+      actorUserId: actor.userId,
+      before,
+      after: { onFile: false },
+    })
+  }
+
   return { ok: true }
 }
 

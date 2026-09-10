@@ -1026,6 +1026,113 @@ created." Neither surfaces a Postgres message (invariant 7).
    `vendor_listings.status = 'pending'` with `vendors.status = 'draft'`, and the
    9 existing `draft` vendors have not been triaged.
 
+## An admin can file documents and payout details (2026-09-10)
+
+Reported from `/admin/vendors/<id>`: both sections could be read and neither
+could be written. "Verification documents" listed files and offered no way to add
+one; "Payout details" said *Only the business owner can add them*. That was true
+of the schema and useless in practice — businesses here are signed up over the
+phone and at wedding fairs (which is why 0039 exists), so the person holding the
+GST certificate and the cancelled cheque is an admin sitting beside the owner.
+The fallback was WhatsApp, which is exactly what 0038 was written to stop.
+
+**Migration `0040`.** Nothing here widens who may *read* anything; every policy
+touched already admitted an admin on the read side and the gap was entirely on
+insert and delete.
+
+- `vendor_verifications: member submit`, `vendor_documents: member insert` and
+  `vendor_documents: member delete` now also admit `vendor.verify`.
+- `vendor_bank_accounts` insert and delete now also admit `billing.manage`, which
+  0038 had already granted the UPDATE to. A half-open door: an admin could fix a
+  typo in an account that existed, could not enter the first one, and could not
+  remove a wrong one at all.
+
+**Two different permissions, on purpose.** Documents are `vendor.verify` — the
+permission that already reads them. Payout details are `billing.manage`. A
+verifier reads an account number to check it against a cheque, and reading it is
+not a reason to be able to redirect where money is sent; `vendor.read`, held by
+analysts and support agents, gets neither.
+
+**A dead branch closed before it became reachable.** 0038's guard returns early
+for staff, so "changing the account number, IFSC or holder name clears the
+verification" was skipped for admins. That rule is not theirs to skip — a check
+made against details that have since been replaced is not a check, whoever did
+the replacing. It was unreachable while no admin write path existed. `0040`
+applies it to admin writes too, skipping the clear only when the same statement
+sets `verified_at` itself, so verifying while correcting still works in one go.
+
+**Admin writes are audited, and the audit holds the masked number.**
+`vendor.document` and `vendor.payout` entries are keyed to the vendor, so they
+appear in the trail already rendered on the same page. `audit_logs` is long-lived
+and readable by anyone with `admin.manage`, so writing the digits into it would
+put a copy of the account number outside the one table where reading it is a
+recorded, permission-checked act. A vendor editing their own record is
+deliberately not audited, and skips the extra read that builds the `before` half.
+
+**A latent bug found while extending the delete.** A DELETE that RLS filters out
+returns success with zero rows — and `deleteVerificationDocument` then removed the
+storage object with the service-role client, which bypasses RLS. The row would
+have survived pointing at a file that no longer existed. Now the count is checked
+before the object is touched.
+
+**Payout details stay optional and gate nothing.** A business can be published,
+verified and taking enquiries with none on file. The empty state used to read as
+a refusal; it now says so explicitly, matching `optional: true` on the wizard's
+Bank step.
+
+**Files.** New: `supabase/migrations/0040_admin_manages_documents_and_payouts.sql`,
+`features/admin/{vendor-documents,vendor-support-actions}.ts`,
+`components/admin/{vendor-documents-manager,vendor-bank-editor}.tsx`,
+`tests/admin-vendor-support.test.ts`. Edited:
+`app/admin/vendors/[vendorId]/page.tsx`, `server/services/{verification,vendor-bank}.ts`,
+`lib/security/audit.ts`.
+
+**Checks.** Lint clean, typecheck clean, **251 unit tests passing** (235 before —
+16 new), build compiles and every route renders.
+
+### Remaining issue — still nothing run against a database
+
+There is **still no `.env.local` in this working copy**, so this is the same
+position as 2026-08-28: `0035` through `0040` have been read carefully and none
+of them has been executed from here. `npm run db:types`, `npm run db:rls` and
+`npm run check:permissions` did not run either.
+
+`0040` depends on `0038`. Until both are applied the payout form fails legibly —
+the service maps `42P01`/`PGRST205` to "Payout details are not switched on yet" —
+and the document uploader fails with a permission refusal rather than a Postgres
+message.
+
+### Exact next task
+
+1. Apply the outstanding migrations, oldest first, checking which are already
+   applied. `npm run db:apply` replays from `0001`, so use `--only`:
+
+   ```bash
+   PGPASSWORD='...' node --env-file=.env.local scripts/apply-migrations.mjs --only 0040
+   ```
+
+   Repeat for `0035`–`0039` if they are not there yet.
+2. `PGPASSWORD='...' npm run db:types`, then delete the three temporary casts
+   listed in the 2026-08-28 entry.
+3. **The RLS probes for `vendor_bank_accounts` are still missing**, and `0040`
+   adds to what they have to cover. Both directions, and per ADR-035 every
+   write-refusal assertion must read the target table with the service role:
+   - a `vendor_verifier` may insert and delete a `vendor_documents` row and may
+     **not** write `vendor_bank_accounts`;
+   - a `finance_admin` may write `vendor_bank_accounts` and may **not** insert a
+     document;
+   - a `support_agent` and an `analyst` may do neither;
+   - a `vendor_manager` reads no bank row at all;
+   - an admin changing the account number has `verified_at` cleared.
+4. Walk it in a browser as `super_admin`: upload a GST certificate and a
+   cancelled cheque from `/admin/vendors/<id>`, check the cheque attaches to the
+   payout account, enter and then replace payout details, and confirm the
+   `vendor.document` and `vendor.payout` rows land in the audit trail on the same
+   page with the number masked.
+5. Still outstanding from 2026-08-28: *Krishna Vatika* has
+   `vendor_listings.status = 'pending'` with `vendors.status = 'draft'`, and the
+   9 existing `draft` vendors have not been triaged.
+
 ## Notes
 
 - All seed and demo data is fictional (PRD 2.3, Epic G). `npm run seed:demo -- --clean` removes the demo vendors.

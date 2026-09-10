@@ -4,7 +4,9 @@ import { notFound } from 'next/navigation'
 import { BankReveal } from '@/components/admin/bank-reveal'
 import { DecisionForm } from '@/components/admin/decision-form'
 import { DocumentLink } from '@/components/admin/document-link'
+import { VendorBankEditor } from '@/components/admin/vendor-bank-editor'
 import { VendorDeletePanel } from '@/components/admin/vendor-delete-panel'
+import { VendorDocumentsManager } from '@/components/admin/vendor-documents-manager'
 import { VendorEditForm } from '@/components/admin/vendor-edit-form'
 import { NOINDEX } from '@/lib/seo'
 import { can } from '@/lib/permissions'
@@ -30,6 +32,8 @@ export default async function AdminVendorDetailPage({
   // and so the section is absent rather than empty, which would read as "this
   // business has no payout details" to someone simply not allowed to see them.
   const canSeeBank = can(actor, 'billing.manage') || can(actor, 'vendor.verify')
+  // Writing them is the finance desk's, not the verifier's — 0040 mirrors this.
+  const canEditBank = can(actor, 'billing.manage')
 
   const [vendor, audit, cities, bank] = await Promise.all([
     getAdminVendor(vendorId),
@@ -157,23 +161,19 @@ export default async function AdminVendorDetailPage({
             )}
           </section>
 
+          {/*
+            Documents are added and removed here as well as read (0040). The
+            list was read-only until then, which left a business signed up over
+            the phone with no route for its paperwork at all — the person
+            holding the GST certificate is the admin, not the owner.
+          */}
           <section className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-5">
-            <h2 className="font-display text-sand-900 text-lg">Verification documents</h2>
-            {vendor.documents.length === 0 ? (
-              <p className="text-sand-600 mt-2 text-sm">No documents uploaded.</p>
-            ) : (
-              <ul className="mt-3 space-y-2">
-                {vendor.documents.map((doc) => (
-                  <li key={doc.id} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-sand-800">{doc.documentType}</span>
-                    <DocumentLink documentId={doc.id} />
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="text-sand-500 mt-3 text-xs">
-              Documents open through a link that expires after two minutes. Opening one is recorded.
-            </p>
+            <h2 className="font-display text-sand-900 mb-3 text-lg">Verification documents</h2>
+            <VendorDocumentsManager
+              vendorId={vendor.id}
+              documents={vendor.documents}
+              canManage={can(actor, 'vendor.verify')}
+            />
           </section>
 
           {/*
@@ -233,9 +233,35 @@ export default async function AdminVendorDetailPage({
                 </>
               ) : (
                 <p className="text-sand-600 mt-2 text-sm">
-                  No payout details on file. Only the business owner can add them.
+                  No payout details on file. Optional — a business can be published, verified and
+                  taking enquiries without them.
                 </p>
               )}
+
+              {/*
+                Editing arrives with 0040. Until it, this section could only be
+                read, and said so: "Only the business owner can add them". That
+                was true of the schema and useless in practice — the fallback
+                was collecting account numbers over WhatsApp, which is what 0038
+                was written to stop.
+              */}
+              <VendorBankEditor
+                vendorId={vendor.id}
+                hasAccount={Boolean(bank)}
+                canManage={canEditBank}
+                defaults={
+                  bank
+                    ? {
+                        accountHolderName: bank.accountHolderName,
+                        ifsc: bank.ifsc,
+                        accountType: bank.accountType,
+                        bankName: bank.bankName,
+                        branchName: bank.branchName,
+                        upiId: bank.upiId,
+                      }
+                    : null
+                }
+              />
             </section>
           ) : null}
 

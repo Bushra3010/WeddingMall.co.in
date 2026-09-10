@@ -3,9 +3,10 @@ import 'server-only'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ServiceError } from '@/lib/action-result'
-import { assertVendorCapability, can, type Actor } from '@/lib/permissions'
+import { can, canVendor, PermissionError, type Actor } from '@/lib/permissions'
 import { ALLOWED_DOCUMENT_TYPES, MAX_DOCUMENT_BYTES } from '@/features/vendors/schema'
 import { logError } from '@/lib/observability/logger'
+import { audit } from '@/lib/security/audit'
 
 const BUCKET = 'vendor-documents'
 
@@ -16,6 +17,40 @@ const BUCKET = 'vendor-documents'
  * directly — reads go through a short-lived signed URL issued only after a
  * permission check here.
  */
+
+/**
+ * Who may add or remove a document: the business's own team, or an admin who
+ * verifies businesses.
+ *
+ * The admin branch arrives with migration 0040. Until it, an admin could open a
+ * document and never add one — so a business signed up over the phone, whose
+ * GST certificate is sitting in the salesperson's inbox, had no route in at all
+ * except asking the owner to log in and do it themselves.
+ *
+ * `vendor.verify` and not `vendor.read`: the second is held by analysts,
+ * content admins and support agents, and is the permission that merely lists
+ * businesses. This mirrors the policies in 0040 exactly — RLS is the boundary,
+ * and this exists to produce a sentence instead of a 42501 (CLAUDE.md
+ * invariant 2).
+ */
+function assertMayManageDocuments(actor: Actor, vendorId: string): void {
+  if (canVendor(actor, vendorId, 'team.manage')) return
+  if (can(actor, 'vendor.verify')) return
+  throw new PermissionError(
+    'Adding or removing verification documents needs the vendor.verify permission, or the team.manage capability on this business.',
+  )
+}
+
+/**
+ * True when the actor is doing this to somebody else's business.
+ *
+ * Only these writes are audited. A business filing its own paperwork is not an
+ * event anyone investigates; an administrator putting a document on another
+ * company's record is, and PRD 10.3 asks for it.
+ */
+function actingAsAdmin(actor: Actor, vendorId: string): boolean {
+  return !canVendor(actor, vendorId, 'team.manage') && can(actor, 'vendor.verify')
+}
 
 /**
  * Uploads through the service-role client rather than the user's session.
@@ -32,7 +67,7 @@ export async function uploadVerificationDocument(
   file: File,
   documentType: string,
 ) {
-  assertVendorCapability(actor, vendorId, 'team.manage')
+  assertMayManageDocuments(actor, vendorId)
 
   if (file.size === 0) {
     throw new ServiceError('invalid_file', 'That file is empty.')
@@ -103,6 +138,26 @@ export async function uploadVerificationDocument(
     throw new ServiceError('internal_error', 'We could not record that document.')
   }
 
+  /*
+   * `void` for the reason `deleteVendorAsAdmin` gives: the file is stored and
+   * the row is written, so a failed audit line must not turn a completed upload
+   * into an error. `audit()` never throws and logs its own failure loudly.
+   *
+   * The entity is the vendor rather than the document, so the entry lands in
+   * the trail that `/admin/vendors/[vendorId]` already renders — that page
+   * filters `audit_logs` on `entity_id`, and an entry keyed to a document id
+   * would be written and never seen.
+   */
+  if (actingAsAdmin(actor, vendorId)) {
+    void audit({
+      action: 'vendor.document',
+      entityType: 'vendor',
+      entityId: vendorId,
+      actorUserId: actor.userId,
+      after: { added: documentType, path: objectPath },
+    })
+  }
+
   return { path: objectPath }
 }
 
@@ -154,7 +209,7 @@ export async function deleteVerificationDocument(actor: Actor, documentId: strin
 
   const { data: doc } = await supabase
     .from('vendor_documents')
-    .select('storage_path, vendor_verifications(vendor_id)')
+    .select('storage_path, document_type, vendor_verifications(vendor_id)')
     .eq('id', documentId)
     .maybeSingle()
 
@@ -162,11 +217,37 @@ export async function deleteVerificationDocument(actor: Actor, documentId: strin
 
   const vendorId = doc.vendor_verifications?.vendor_id
   if (!vendorId) throw new ServiceError('not_found', 'That document is not available.')
-  assertVendorCapability(actor, vendorId, 'team.manage')
+  assertMayManageDocuments(actor, vendorId)
 
-  const { error } = await supabase.from('vendor_documents').delete().eq('id', documentId)
+  const { error, count } = await supabase
+    .from('vendor_documents')
+    .delete({ count: 'exact' })
+    .eq('id', documentId)
   if (error) throw new ServiceError('internal_error', 'We could not remove that document.')
 
+  /*
+   * A DELETE that RLS filters out reports success with zero rows — the same
+   * shape `updateVendorAsAdmin` checks for. It matters more here than there:
+   * the object below is removed with the service-role client, which bypasses
+   * RLS, so reporting success on a filtered delete would take the *file* away
+   * and leave the row pointing at nothing.
+   */
+  if (count === 0) {
+    throw new ServiceError('forbidden', 'You cannot remove that document.')
+  }
+
   await createAdminClient().storage.from(BUCKET).remove([doc.storage_path])
+
+  if (actingAsAdmin(actor, vendorId)) {
+    void audit({
+      action: 'vendor.document',
+      entityType: 'vendor',
+      entityId: vendorId,
+      actorUserId: actor.userId,
+      before: { documentType: doc.document_type },
+      after: { removed: doc.document_type },
+    })
+  }
+
   return { ok: true }
 }
