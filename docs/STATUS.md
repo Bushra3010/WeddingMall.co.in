@@ -833,6 +833,199 @@ a reload.
    `/admin/listings` while absent from `/admin/vendors`.
 
 
+## Photo uploads, payout details, admin-created listings (2026-09-10)
+
+Three reported problems, finished in one pass. The first was started in an
+earlier session and is now complete; the other two existed as a migration and a
+service layer with **no UI at all**, so neither was reachable.
+
+### 1. Photos could not be uploaded
+
+Reported as "Those 2 photos come to 13.4 MB, which is more than one upload can
+carry. Select fewer and upload again." — accurate and no help at all, because
+two pictures off a phone are 13 MB and there is no smaller number than two.
+
+A Server Action sends the whole form as **one** request body, capped at 12 MB in
+`next.config.ts`. The Media step counted the bytes first and refused, which
+turned a framework limit into a sentence without making it any less of a wall.
+Raising the cap only moves it: a 48-megapixel camera produces 12 MB files on its
+own.
+
+Fixed by not sending originals. `lib/images/compress.ts` downscales each photo
+to 2400px in the browser (≈6.7 MB → 400-800 KB) and `PhotoUploader` sends **one
+photo per request**, so batch size stops being a limit that exists. Failures are
+per photo — eight uploaded and one rejected now reads as that, not as one failed
+request. Both screens that had their own copy of the upload form (the wizard's
+Media step and Portfolio) now share the component.
+
+HEIC is refused by name rather than by a decode failure: Safari reads it, Chrome
+and Firefox do not, and "your iPhone is set to HEIC, here is the setting" is
+actionable where "we could not read that image" is not.
+
+The compression is a convenience, not a check — `uploadMedia()` re-validates
+MIME and size, and the bucket enforces its own limit behind that.
+
+### 2. Payout bank details and a cancelled cheque
+
+Vendors were being asked for account details over WhatsApp and in spreadsheets,
+which is the least auditable place to keep them and the easiest to get wrong by
+a digit. Now a **Bank** step in the listing wizard, plus an admin view.
+
+- **Gated on `billing.manage`, not `listing.edit`.** `vendor_can()` grants
+  `billing.manage` to `vendor_owner` alone. The capability that lets a hired
+  editor rewrite a description is the wrong bar for changing where the money
+  goes. Admin-side it is `billing.manage` or `vendor.verify` — not
+  `vendor.read`, which analysts and support agents hold.
+- **The account number is never rendered, to anyone.** A Server Component's
+  props are serialised into the HTML, so masking in the markup would be theatre
+  — View Source would show every digit, with no audit entry. `dal/vendor-bank.ts`
+  masks on the server and only ever returns `••••••3456`. The full value comes
+  from `revealBankAccount()`, which writes a `pii.reveal` audit row **before**
+  returning it. Same shape as opening a verification document.
+- **Typed twice, and the confirmation refuses paste.** A wrong digit is a valid
+  account number belonging to somebody else, and the first symptom is a payment
+  that has already left. Re-entry is the only check available.
+- **The cheque is not a new file mechanism.** It goes into the existing private
+  `vendor-documents` bucket as a `cancelled_cheque` document, inheriting the
+  signed-URL reads, the audit entry on open, and the storage policies already
+  probed.
+- Changing the account number, IFSC or holder name **clears the verification**,
+  in SQL — a check made against details that have since been replaced is not a
+  check. A vendor cannot set `verified_at` themselves.
+
+The step is **optional**: it never blocks submission, and the review screen says
+"Optional — not added" rather than "Not finished yet", which would be the wizard
+reporting a block that does not exist.
+
+### 3. An admin can create a listing directly
+
+Businesses are signed up over the phone, at wedding fairs, and by a salesperson
+sitting beside the owner. In all three the person with the details is an admin.
+The panel could approve, edit, suspend and delete a business; it could not
+create one. `/admin/vendors/new` now does, gated on `vendor.verify`.
+
+`admin_create_vendor()` is one function rather than a sequence of inserts
+because four separate things block the obvious version: `vendors: create own`
+requires `auth.uid() = owner_user_id`; `status` may only open at `draft` or
+`pending_review` and the 0022 guard refuses an update to it; a published
+business needs five rows plus an approved `vendor_listing_versions` row (0037
+exists because that one was missed and seven live vendors went missing from the
+homepage); and `owner_user_id` is NOT NULL.
+
+**Publishing does not verify.** `p_publish` makes the business live and leaves
+`verification_status = 'unverified'`. Live means we are showing it; Verified
+means somebody checked its documents, and it renders as a badge. A badge meaning
+"an admin was in a hurry" devalues it everywhere else it appears. The form and
+the success screen both say so.
+
+Owner email names an existing account, or blank leaves the listing with the
+creating admin until it is handed over. An **unknown** email is refused rather
+than falling back — "I typed their email and it went to me instead" is a bug
+report nobody enjoys.
+
+### Three bugs found while verifying, all mine
+
+1. **`bankAccount !== null` ticked the Bank step for every new vendor.** The
+   field is absent rather than null on a fresh workspace, and `undefined !==
+   null` is true — so Bank showed unlocked with all six steps before it still
+   padlocked. The strict comparison looks like the careful one and is the wrong
+   tool for an optional field. Caught by the existing prefix assertion in
+   `wizard-steps.test.ts`, which failed exactly as it was written to.
+2. **`isStepUnlocked` could break its own prefix invariant.** It returned true
+   for any complete step, which contradicts "unlock up to the frontier" whenever
+   a *later* step is complete and an earlier one is not. Latent before Bank
+   existed; reachable the moment an optional step sat second-to-last. Now the
+   limit is the furthest of the two, which satisfies both intents by
+   construction.
+3. **A brand-new vendor would have been told they are not their own owner.**
+   `getActor()` is `cache()`d and resolves before `createVendorForUser()` writes
+   the membership, so `actor.vendorRoles` is empty for a vendor created on the
+   same request. Same memoisation that once made this page redirect new vendors
+   out of the wizard they had just signed up for.
+
+Also fixed: `bank-actions.ts` called `getActorDocumentIdByPath` from
+`dal/vendors`, **which does not exist** — the cheque upload would have thrown a
+TypeError on every attempt. It is now `getDocumentIdByStoragePath` in
+`dal/vendor-workspace`, and the upload reports the attach outcome separately,
+since the file is stored either way and "uploaded" alone would not tell a vendor
+to come back and save the account details first.
+
+**Files.** New: `lib/images/compress.ts`, `components/vendor/{photo-uploader,bank-details-form}.tsx`,
+`components/admin/{bank-reveal,vendor-create-form}.tsx`,
+`server/dal/vendor-bank.ts`, `server/services/vendor-bank.ts`,
+`features/vendors/{bank-schema,bank-actions}.ts`,
+`features/admin/vendor-create-errors.ts`, `app/admin/vendors/new/page.tsx`,
+`supabase/migrations/{0038_vendor_bank_accounts,0039_admin_creates_a_listing}.sql`,
+and four test files. Edited: `components/vendor/{wizard-config,wizard-steps,listing-form,wizard-shell,portfolio-manager}.tsx`,
+`features/listings/actions.ts`, `features/vendors/schema.ts`,
+`features/admin/vendor-actions.ts`, `server/services/admin-vendors.ts`,
+`server/dal/vendor-workspace.ts`, `app/admin/vendors/{page,[vendorId]/page}.tsx`,
+`app/vendor-dashboard/{list,listing}/page.tsx`, `tests/wizard-steps.test.ts`.
+
+**Checks.** Lint clean, typecheck clean, **235 unit tests passing** (188 before —
+47 new across `bank-schema`, `admin-create-vendor`, `image-compress` and
+`wizard-steps`), build compiles and all routes render including
+`/admin/vendors/new`.
+
+### Remaining issue — nothing was run against a database
+
+There is **no `.env.local` in this working copy**, so `PGPASSWORD` and the
+Supabase keys are absent. That means:
+
+- **`0038` and `0039` have been read carefully but never executed**, and neither
+  has `0035`, `0036` or `0037` as far as this session can tell — STATUS has
+  recorded `0035` as unapplied since 2026-08-28 and there was no way to check.
+- `npm run db:types` has not run, so `vendor_bank_accounts` and
+  `admin_create_vendor` are not in the generated types. Both are reached through
+  a narrow cast, each marked **delete this once the types are regenerated**.
+- `npm run db:rls` and `npm run check:permissions` did not run. There are **no
+  RLS probes for `vendor_bank_accounts`**, which is the table most deserving of
+  them.
+- `npm run build` was completed with placeholder environment values to prove it
+  compiles; page data was collected against an unreachable host, so every DAL
+  read logged a failure and degraded, as designed.
+
+**Both new features fail legibly until their migration is applied.** The bank
+service maps `42P01`/`PGRST205` to "Payout details are not switched on yet" and
+logs `service.vendorBank.migration0038NotApplied`; the create path maps
+`PGRST202` to "needs migration 0039, which has not been applied yet. Nothing was
+created." Neither surfaces a Postgres message (invariant 7).
+
+### Exact next task
+
+1. Apply the outstanding migrations, oldest first. `npm run db:apply` replays
+   from `0001` and stops at `0002`, so use `--only`:
+
+   ```bash
+   PGPASSWORD='...' node --env-file=.env.local scripts/apply-migrations.mjs --only 0035
+   ```
+
+   Repeat for `0036`, `0037`, `0038`, `0039` — checking first which are already
+   applied, since this session could not.
+2. `PGPASSWORD='...' npm run db:types`, then delete the three temporary casts
+   that exist only because the schema is behind: `BankWriteClient` in
+   `services/vendor-bank.ts`, `BankReadClient` in `dal/vendor-bank.ts`, and the
+   `admin_create_vendor` cast in `services/admin-vendors.ts`. Each says so above
+   it. Also delete the `draft` fallback in `insertRegisteringVendor()` once
+   `0035` is applied.
+3. **Write the missing RLS probes for `vendor_bank_accounts`**, both directions:
+   a `vendor_manager` must read nothing; a `vendor_owner` reads their own row and
+   no other vendor's; an `analyst` reads nothing; `vendor.verify` reads it; a
+   vendor cannot set `verified_at`; a vendor cannot point `cheque_document_id` at
+   another business's document. Per ADR-035's standing rule, every write-refusal
+   assertion must **read the target table with the service role** rather than
+   trust the write's status code.
+4. Probe `admin_create_vendor` as a non-admin and as `analyst` — it must refuse
+   both — and confirm a published vendor reaches search (`refresh_vendor_search_text`
+   runs inside it, but that has never been observed here).
+5. Walk all three flows in a browser: upload two large phone photos in one go;
+   enter bank details, upload a cheque, reveal the number as an admin and check
+   the `pii.reveal` row lands; create a business from `/admin/vendors/new` both
+   as a draft and published.
+6. Still outstanding from 2026-08-28 and untouched here: *Krishna Vatika* has
+   `vendor_listings.status = 'pending'` with `vendors.status = 'draft'`, and the
+   9 existing `draft` vendors have not been triaged.
+
 ## Notes
 
 - All seed and demo data is fictional (PRD 2.3, Epic G). `npm run seed:demo -- --clean` removes the demo vendors.
