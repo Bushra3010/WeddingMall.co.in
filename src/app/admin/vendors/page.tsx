@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Plus } from 'lucide-react'
 
 import { VendorRowActions } from '@/components/admin/vendor-row-actions'
 import { EmptyState } from '@/components/ui/states'
@@ -42,8 +43,22 @@ export default async function AdminVendorsPage({
 
   return (
     <div className="space-y-6">
-      <header>
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-sand-900 text-2xl">Vendors</h1>
+        {/*
+          Only for `vendor.verify`. The page itself needs `vendor.read`, which
+          analysts and support agents hold — and creating a listing that can go
+          live in the same click is a moderation act, not a read.
+        */}
+        {canVerify ? (
+          <Link
+            href="/admin/vendors/new"
+            className="bg-brand-700 inline-flex min-h-11 items-center gap-2 rounded-lg px-5 text-sm font-medium text-white"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            Add a business
+          </Link>
+        ) : null}
       </header>
 
       <nav aria-label="Filter by status" className="flex flex-wrap gap-1">

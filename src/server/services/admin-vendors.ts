@@ -5,7 +5,8 @@ import { ServiceError } from '@/lib/action-result'
 import { assertPermission, can, type Actor } from '@/lib/permissions'
 import { audit } from '@/lib/security/audit'
 import { describeDeleteError } from '@/features/admin/delete-errors'
-import type { AdminVendorInput } from '@/features/vendors/schema'
+import { describeCreateVendorError } from '@/features/admin/vendor-create-errors'
+import type { AdminCreateVendorInput, AdminVendorInput } from '@/features/vendors/schema'
 
 /**
  * Admin edit and delete for a business (PRD 6.11, Epic E).
@@ -97,6 +98,115 @@ export async function updateVendorAsAdmin(actor: Actor, input: AdminVendorInput)
   }
 
   return { vendorId: input.vendorId }
+}
+
+/**
+ * Create a business on an admin's behalf, optionally publishing it immediately
+ * (migration 0039).
+ *
+ * ## Why this is one RPC and not a sequence of inserts
+ *
+ * Four things block the obvious version. `vendors: create own` requires
+ * `auth.uid() = owner_user_id`, so an admin cannot insert a row owned by the
+ * vendor. `vendors.status` may only open at `draft` or `pending_review`, and the
+ * 0022 column guard refuses an *update* to `status` — so "create it, then
+ * activate it" is not reachable either. A published business needs five rows
+ * written together plus an approved `vendor_listing_versions` row, which is what
+ * search actually keys on; 0037 exists because that last one was missed once and
+ * seven live vendors went missing from the homepage. And `owner_user_id` is NOT
+ * NULL, so somebody has to own it.
+ *
+ * All of that belongs in one transaction, which is what a function gives.
+ *
+ * ## Live is not verified
+ *
+ * `publish` sets the business active and the listing approved. It deliberately
+ * leaves `verification_status = 'unverified'`. "Live" means we are showing this
+ * business; "Verified" means somebody checked its registration documents, and it
+ * renders as a badge next to the name. An admin creating a listing from a phone
+ * call has done the first and not the second, and a badge that means "an admin
+ * was in a hurry" devalues it everywhere else it appears.
+ */
+export async function createVendorAsAdmin(actor: Actor, input: AdminCreateVendorInput) {
+  // `admin_create_vendor` re-checks this itself, which is the check that counts
+  // — it is SECURITY DEFINER and reachable over PostgREST by any authenticated
+  // caller. This one exists so the refusal is a sentence rather than a 42501.
+  assertPermission(actor, 'vendor.verify')
+
+  const supabase = await createClient()
+
+  /*
+   * `admin_create_vendor` arrives with migration 0039 and enters the generated
+   * types on the next `npm run db:types`. Until then the `rpc()` overload does
+   * not know the name, and `src/types/database.ts` is generated — hand-editing
+   * it is forbidden (CLAUDE.md invariant 4).
+   *
+   * The cast is on the **client**, not on the method. Writing
+   * `const rpc = supabase.rpc as …` reads as the tidier version of this and is
+   * broken: it detaches the function from its receiver, and supabase-js's `rpc`
+   * reads `this.rest`. That shipped once and every delete died with "Cannot read
+   * properties of undefined (reading 'rest')" — a TypeError, so it never reached
+   * the error mapper and surfaced as a generic internal error.
+   *
+   * Delete the cast once the types have been refreshed; the call is already
+   * right.
+   */
+  const client = supabase as unknown as {
+    rpc: (
+      name: 'admin_create_vendor',
+      args: Record<string, unknown>,
+    ) => Promise<{
+      data: { vendorId?: string; slug?: string; status?: string; ownerIsCreator?: boolean } | null
+      error: { code?: string | null; message?: string | null } | null
+    }>
+  }
+
+  const { data, error } = await client.rpc('admin_create_vendor', {
+    p_display_name: input.displayName,
+    p_slug: input.slug,
+    p_primary_category: input.primaryCategoryId,
+    p_primary_city: input.primaryCityId,
+    p_about: input.about?.trim() || null,
+    p_email: input.email || null,
+    p_phone: input.phone || null,
+    p_website: input.website || null,
+    p_owner_email: input.ownerEmail || null,
+    p_publish: input.publish,
+  })
+
+  if (error) {
+    const failure = describeCreateVendorError(error, 'We could not create that business.')
+    throw new ServiceError(
+      failure.code,
+      failure.message,
+      failure.field ? { [failure.field]: [failure.message] } : undefined,
+    )
+  }
+
+  /*
+   * A `jsonb`-returning function that raised nothing should always give a row
+   * back. If it somehow did not, the id is what every caller needs — reporting
+   * success without one would send the admin to `/admin/vendors/undefined`.
+   */
+  if (!data?.vendorId) {
+    throw new ServiceError(
+      'internal_error',
+      'The business may have been created, but we could not confirm it. Check the vendor list.',
+    )
+  }
+
+  /*
+   * The function writes its own `vendor.admin_created` audit row, inside the
+   * same transaction as the inserts — so a create that succeeds is always
+   * logged and one that rolls back never is. Nothing is written here, because a
+   * second entry from the application would give one event two names.
+   */
+  return {
+    vendorId: data.vendorId,
+    slug: data.slug ?? input.slug,
+    status: data.status ?? (input.publish ? 'active' : 'draft'),
+    ownerIsCreator: data.ownerIsCreator ?? !input.ownerEmail,
+  }
 }
 
 /**

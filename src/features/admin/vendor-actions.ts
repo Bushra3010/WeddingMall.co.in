@@ -5,8 +5,12 @@ import { redirect } from 'next/navigation'
 
 import { runAction, ServiceError, type ActionResult } from '@/lib/action-result'
 import { getActor } from '@/server/dal/actor'
-import { deleteVendorAsAdmin, updateVendorAsAdmin } from '@/server/services/admin-vendors'
-import { adminVendorSchema } from '@/features/vendors/schema'
+import {
+  createVendorAsAdmin,
+  deleteVendorAsAdmin,
+  updateVendorAsAdmin,
+} from '@/server/services/admin-vendors'
+import { adminCreateVendorSchema, adminVendorSchema } from '@/features/vendors/schema'
 
 /**
  * Admin vendor management (PRD 6.11).
@@ -49,6 +53,52 @@ export async function saveAdminVendorAction(
     revalidatePath('/admin/vendors')
     revalidatePath(`/admin/vendors/${result.data.vendorId}`)
     // A renamed or re-slugged business changes what the public site serves.
+    revalidatePath('/vendors')
+    revalidatePath('/')
+  }
+  return result
+}
+
+/**
+ * Create a business from the admin panel (migration 0039).
+ *
+ * Returns the new id rather than redirecting. The form needs to say what
+ * happened — live, or saved as a draft; owned by the person named, or held by
+ * the admin who made it — and a redirect would throw that away, leaving the
+ * admin on a vendor page with no idea whether the listing is public.
+ */
+export async function createAdminVendorAction(
+  _prev: unknown,
+  form: FormData,
+): Promise<
+  ActionResult<{ vendorId: string; slug: string; status: string; ownerIsCreator: boolean }>
+> {
+  const result = await runAction('admin.createVendor', async () => {
+    const actor = await getActor()
+    const input = adminCreateVendorSchema.parse({
+      displayName: str(form, 'displayName'),
+      slug: str(form, 'slug'),
+      primaryCategoryId: str(form, 'primaryCategoryId'),
+      primaryCityId: str(form, 'primaryCityId'),
+      about: str(form, 'about'),
+      email: str(form, 'email'),
+      phone: str(form, 'phone'),
+      website: str(form, 'website'),
+      ownerEmail: str(form, 'ownerEmail'),
+      // An unchecked checkbox is absent from FormData entirely, so this is
+      // "present and on" rather than a string comparison against something that
+      // may not be there.
+      publish: form.get('publish') === 'on',
+    })
+
+    return createVendorAsAdmin(actor, input)
+  })
+
+  if (result.ok) {
+    revalidatePath('/admin/vendors')
+    // A published business changes the public site immediately — it went live
+    // without passing through the review queue, so nothing else will revalidate
+    // these for us.
     revalidatePath('/vendors')
     revalidatePath('/')
   }

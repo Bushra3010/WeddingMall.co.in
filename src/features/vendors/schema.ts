@@ -156,6 +156,58 @@ export const adminVendorSchema = z
 
 export type AdminVendorInput = z.infer<typeof adminVendorSchema>
 
+/**
+ * Admin-side *creation* of a business (migration 0039).
+ *
+ * Businesses get signed up over the phone, at wedding fairs, and by a
+ * salesperson sitting next to the owner. In all three the person holding the
+ * details is an admin, and until now the panel could approve, edit, suspend and
+ * delete a business but not create one.
+ *
+ * Every rule here is mirrored by `admin_create_vendor()`, which is the one that
+ * counts — it is `SECURITY DEFINER` and reachable by any authenticated caller
+ * over PostgREST, so validating only in Zod would validate only the polite path.
+ * This exists to name the field that is wrong.
+ */
+export const adminCreateVendorSchema = z
+  .object({
+    displayName: trimmed(120).min(2, 'Enter the business name'),
+    slug: vendorSlugSchema,
+    primaryCategoryId: z.uuid('Choose a category'),
+    primaryCityId: z.uuid('Choose a city'),
+    about: trimmed(4000).optional().or(z.literal('')),
+    email: z.email('Enter a valid email').max(254).optional().or(z.literal('')),
+    phone: trimmed(20)
+      .regex(/^[+()\d\s-]*$/, 'Enter a valid phone number')
+      .optional()
+      .or(z.literal('')),
+    website: z.url('Enter a full URL including https://').max(300).optional().or(z.literal('')),
+    /**
+     * Blank means the creating admin holds the listing until it is handed over.
+     * A named address that has no account is refused rather than falling back to
+     * the admin — "I typed their email and it went to me instead" is a bug
+     * report nobody enjoys.
+     */
+    ownerEmail: z
+      .email('Enter a valid email, or leave it blank')
+      .max(254)
+      .optional()
+      .or(z.literal('')),
+    publish: z.boolean().default(false),
+  })
+  /*
+   * The same 50-character floor `submit_vendor_for_review()` applies, and for
+   * the same reason: publishing straight past the queue must not be a way to
+   * put a blank profile in front of couples. A draft may be as empty as it
+   * likes — it is not visible to anyone.
+   */
+  .refine((value) => !value.publish || (value.about?.trim().length ?? 0) >= 50, {
+    message: 'A listing going live needs a description of at least 50 characters',
+    path: ['about'],
+  })
+
+export type AdminCreateVendorInput = z.infer<typeof adminCreateVendorSchema>
+
 export const categoryFormSchema = z.object({
   id: z.uuid().optional(),
   name: trimmed(80).min(2, 'Enter a name'),
