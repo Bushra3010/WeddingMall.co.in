@@ -68,6 +68,7 @@ export function SinglePageListingForm({
   vendorId,
   canManageBank,
   showHeader = true,
+  canSubmit = true,
 }: {
   vendor: VendorWorkspace
   documents: VerificationDocument[]
@@ -82,6 +83,8 @@ export function SinglePageListingForm({
   canManageBank: boolean
   /** False where the page already has a heading — see the header below. */
   showHeader?: boolean
+  /** False for an admin editing a listing that is not their business's. */
+  canSubmit?: boolean
 }) {
   const complete = useCallback((step: StepKey) => isStepComplete(step, vendor), [vendor])
   const unlocked = useCallback((step: StepKey) => isStepUnlocked(step, vendor), [vendor])
@@ -199,7 +202,12 @@ export function SinglePageListingForm({
                 ) : current === 'bank' ? (
                   <WizardBankStep {...stepProps} canManageBank={canManageBank} />
                 ) : (
-                  <ReviewStep vendor={vendor} vendorId={vendorId} onEdit={goTo} />
+                  <ReviewStep
+                    vendor={vendor}
+                    vendorId={vendorId}
+                    onEdit={goTo}
+                    canSubmit={canSubmit}
+                  />
                 )}
               </div>
 
@@ -272,10 +280,12 @@ function ReviewStep({
   vendor,
   vendorId,
   onEdit,
+  canSubmit,
 }: {
   vendor: VendorWorkspace
   vendorId: string
   onEdit: (step: StepKey) => void
+  canSubmit: boolean
 }) {
   const reviewable = STEPS.filter((s) => s.id !== 'submit')
 
@@ -323,7 +333,7 @@ function ReviewStep({
         })}
       </ul>
 
-      <WizardSubmitStep vendor={vendor} vendorId={vendorId} canSubmit />
+      <WizardSubmitStep vendor={vendor} vendorId={vendorId} canSubmit={canSubmit} />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { Image as ImageIcon } from 'lucide-react'
 
 import { BankReveal } from '@/components/admin/bank-reveal'
 import { DecisionForm } from '@/components/admin/decision-form'
@@ -65,14 +66,31 @@ export default async function AdminVendorDetailPage({
             {vendor.submittedAt ? ` · submitted ${formatDateTime(vendor.submittedAt)}` : ''}
           </p>
         </div>
-        {vendor.status === 'active' ? (
-          <Link
-            href={`/vendor/${vendor.slug}`}
-            className="text-brand-700 text-sm font-medium hover:underline"
-          >
-            View public profile
-          </Link>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-4">
+          {/*
+            The listing editor is the vendor's own wizard (0041) — photographs,
+            categories, service areas, packages. The Edit details form below
+            covers the registration fields only, which is why this is a separate
+            destination rather than another section on this page.
+          */}
+          {can(actor, 'listing.moderate') ? (
+            <Link
+              href={`/admin/vendors/${vendor.id}/listing`}
+              className="text-brand-700 inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
+            >
+              <ImageIcon aria-hidden="true" className="size-3.5" />
+              Edit listing &amp; photos
+            </Link>
+          ) : null}
+          {vendor.status === 'active' ? (
+            <Link
+              href={`/vendor/${vendor.slug}`}
+              className="text-brand-700 text-sm font-medium hover:underline"
+            >
+              View public profile
+            </Link>
+          ) : null}
+        </div>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">

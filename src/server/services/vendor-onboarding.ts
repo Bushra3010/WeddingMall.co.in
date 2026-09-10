@@ -4,7 +4,7 @@ import { logError } from '@/lib/observability/logger'
 
 import { createClient } from '@/lib/supabase/server'
 import { ServiceError } from '@/lib/action-result'
-import { assertVendorCapability, type Actor } from '@/lib/permissions'
+import { assertListingCapability, assertVendorCapability, type Actor } from '@/lib/permissions'
 import { slugify } from '@/features/vendors/schema'
 import type { CreateVendorInput, VendorProfileInput } from '@/features/vendors/schema'
 
@@ -292,7 +292,7 @@ export async function createVendorForUser(actor: Actor): Promise<string | null> 
 }
 
 export async function saveVendorProfile(actor: Actor, vendorId: string, input: VendorProfileInput) {
-  assertVendorCapability(actor, vendorId, 'listing.edit')
+  assertListingCapability(actor, vendorId, 'listing.edit')
   const supabase = await createClient()
 
   const { error } = await supabase
@@ -371,7 +371,7 @@ export async function saveVendorListing(
   vendorId: string,
   input: { about: string; experienceYears?: number; languages: string[] },
 ) {
-  assertVendorCapability(actor, vendorId, 'listing.edit')
+  assertListingCapability(actor, vendorId, 'listing.edit')
   const supabase = await createClient()
 
   const { error } = await supabase.from('vendor_listings').upsert(
@@ -394,7 +394,7 @@ export async function saveCategories(
   primaryCategoryId: string,
   additionalCategoryIds: string[],
 ) {
-  assertVendorCapability(actor, vendorId, 'listing.edit')
+  assertListingCapability(actor, vendorId, 'listing.edit')
   const supabase = await createClient()
 
   // Replace wholesale. The partial unique index allows only one primary, so
@@ -423,7 +423,7 @@ export async function saveServiceAreas(
   cityIds: string[],
   travelAvailable: boolean,
 ) {
-  assertVendorCapability(actor, vendorId, 'listing.edit')
+  assertListingCapability(actor, vendorId, 'listing.edit')
   const supabase = await createClient()
 
   const { error: deleteError } = await supabase

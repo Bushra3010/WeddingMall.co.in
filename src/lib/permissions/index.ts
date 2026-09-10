@@ -66,3 +66,37 @@ export function assertVendorCapability(
 ): void {
   if (!canVendor(actor, vendorId, capability)) throw new PermissionError()
 }
+
+/**
+ * The business's own team, or an admin who moderates listings (migration 0041).
+ *
+ * Used by everything that edits listing *content* — photographs, categories,
+ * service areas, packages, availability, the description. An admin signing a
+ * business up over the phone has to be able to finish the listing, not only
+ * create the registration and then wait for someone else to add a photograph.
+ *
+ * `listing.moderate` is the same permission that decides who may approve a
+ * listing version, so nobody gains the ability to publish who could not already
+ * do so. It is held by `super_admin`, `operations_admin` and `vendor_verifier`;
+ * a support agent, an analyst, a content admin and the finance desk hold none
+ * of it.
+ *
+ * Deliberately **not** used for `listing.submit`. Submitting sends a listing to
+ * the queue the admin themselves works, and it writes an audit entry attributed
+ * to the vendor. An admin publishes through the decision panel, which records
+ * the decision under their own name.
+ */
+export function assertListingCapability(
+  actor: Actor,
+  vendorId: string,
+  capability: VendorCapability,
+): void {
+  if (canVendor(actor, vendorId, capability)) return
+  if (can(actor, 'listing.moderate')) return
+  throw new PermissionError()
+}
+
+/** True when the actor is editing a listing that is not their own business's. */
+export function isListingModerator(actor: Actor, vendorId: string): boolean {
+  return !canVendor(actor, vendorId, 'listing.edit') && can(actor, 'listing.moderate')
+}

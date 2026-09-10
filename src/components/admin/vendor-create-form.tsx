@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, ExternalLink } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Image as ImageIcon } from 'lucide-react'
 
 import { fieldError, FormMessage, useAction } from '@/components/shared/action-form'
 import { SubmitButton } from '@/components/shared/submit-button'
@@ -91,10 +91,25 @@ export function VendorCreateForm({
           </li>
         </ul>
 
+        {/*
+          The photographs are the point of the next step, so it is the primary
+          button rather than a link buried on the business page. This form takes
+          a name, a category and a description; a listing with none of a
+          business's work on it is not one a couple will enquire from, and the
+          moment an admin has just typed the details is the moment they still
+          have the photographs to hand.
+        */}
         <div className="flex flex-wrap gap-3">
           <Link
-            href={`/admin/vendors/${vendorId}`}
+            href={`/admin/vendors/${vendorId}/listing`}
             className="bg-brand-700 inline-flex min-h-11 items-center gap-2 rounded-lg px-5 text-sm font-medium text-white"
+          >
+            <ImageIcon aria-hidden="true" className="size-4" />
+            Add photos and finish the listing
+          </Link>
+          <Link
+            href={`/admin/vendors/${vendorId}`}
+            className="border-sand-300 text-sand-900 inline-flex min-h-11 items-center gap-2 rounded-lg border bg-white px-5 text-sm font-medium"
           >
             Open the business
           </Link>

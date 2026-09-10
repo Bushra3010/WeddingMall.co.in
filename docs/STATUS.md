@@ -1133,6 +1133,106 @@ message.
    `vendor_listings.status = 'pending'` with `vendors.status = 'draft'`, and the
    9 existing `draft` vendors have not been triaged.
 
+## An admin can edit the listing, photographs and all (2026-09-10)
+
+Reported straight after the last change: *"admin me vendor jo add kar raha hai
+usme photo daalne ka option hi nahi hai"* — and the same is true of service
+areas, packages, availability and the street address. `/admin/vendors/new`
+(0039) takes a name, a category, a city and a description; after that the panel
+had nothing. A business signed up over the phone could be created and never
+finished.
+
+**The editor is the vendor's own wizard, not an admin-shaped copy of it.**
+`/admin/vendors/[vendorId]/listing` renders `WizardShell` — the identical
+component behind `/vendor-dashboard/listing`. A second editor would have been a
+second set of validation rules, a second completion meter, and two places for
+"what a listing needs" to drift apart. Every action it fires already re-checks
+permission server-side, so the component needed no admin branch at all.
+
+**Migration `0041`, one permission.** `listing.moderate` — the permission that
+already decides who may approve a listing version — now also carries read and
+write on `vendor_listings`, `vendor_categories`, `vendor_service_areas`,
+`vendor_addresses`, `vendor_attribute_values`, `vendor_media`, `vendor_packages`
+and `vendor_availability`. Each is a **new** policy beside the member policy
+from 0004 rather than a replacement, so nothing a vendor could do to their own
+row narrows. `content_admin`, `support_agent`, `finance_admin` and `analyst` get
+none of it, and a unit test asserts that boundary in both directions.
+
+**Reads were missing too, which was a bug on its own.** Most of those tables are
+readable by `anon` for an **active** vendor and by members otherwise — so
+`/admin/vendors/<id>` was rendering an em dash next to Categories and Service
+areas for precisely the draft businesses an admin is most likely to be looking
+at. `for all` fixes reading and writing together.
+
+**An implicit coupling, now asserted.** `saveVendorProfile` writes the `vendors`
+row as well as the listing, and that row is governed by `vendors: admin
+moderate` (0008), which asks for `vendor.verify`. Nothing breaks because all
+three roles holding `listing.moderate` hold `vendor.verify` too — an assumption
+invisible in either file. `tests/admin-listing-editing.test.ts` walks the
+catalogue and fails if a role is ever given one without the other.
+
+**A photograph an admin uploads enters `approved`, not `pending`.** Media goes
+through moderation because a vendor's upload has not been looked at yet; a
+moderator choosing the file has looked at it. Leaving it pending would mean an
+admin adding a photograph to a live business watched nothing happen —
+`admin_decide_vendor` only sweeps pending media on an approve decision, and an
+already-active business is not going through one. The test that matters is the
+distinction: it keys on "not this business's own team", so an admin who is also
+a member of the business they are editing is treated as the business.
+
+**Submit is off for an admin**, with the reason on screen rather than a disabled
+button. Submitting sends the listing to the queue that admin works, and records
+the event as the vendor's; they publish from the Decision panel, which records
+it under their own name.
+
+The create form's success screen now leads with **Add photos and finish the
+listing** — the moment an admin has just typed the details is the moment they
+still have the photographs to hand.
+
+**Files.** New: `supabase/migrations/0041_admin_edits_the_listing.sql`,
+`app/admin/vendors/[vendorId]/listing/page.tsx`,
+`tests/admin-listing-editing.test.ts`. Edited: `lib/permissions/index.ts`
+(`assertListingCapability`, `isListingModerator`),
+`server/services/{listings,vendor-onboarding}.ts`,
+`components/vendor/{wizard-shell,listing-form,wizard-steps}.tsx` (a `canSubmit`
+prop, defaulting to the vendor's behaviour),
+`components/admin/vendor-create-form.tsx`, `app/admin/vendors/[vendorId]/page.tsx`.
+
+**Checks.** Lint clean, typecheck clean, **260 unit tests passing** (251 before —
+9 new), build compiles and `/admin/vendors/[vendorId]/listing` renders.
+
+### Remaining issue — unchanged, and now two migrations deep
+
+Still no `.env.local` here, so `0035`–`0041` have been read and none executed
+from this working copy. `0041` needs no earlier migration to apply cleanly, but
+until it is applied **every control on the new page refuses**, and the page
+itself will show a draft business with empty categories and service areas.
+
+### Exact next task
+
+1. Apply `0040` and `0041` (and check `0035`–`0039` first):
+
+   ```bash
+   PGPASSWORD='...' node --env-file=.env.local scripts/apply-migrations.mjs --only 0041
+   ```
+
+2. `PGPASSWORD='...' npm run db:types`, then delete the three temporary casts
+   named in the 2026-08-28 entry.
+3. RLS probes, which now cover two migrations and are the largest outstanding
+   gap. On top of the `vendor_bank_accounts` list in the previous entry:
+   a `support_agent` and a `content_admin` must fail to insert `vendor_media`,
+   `vendor_categories` and `vendor_packages` for any business; a
+   `vendor_verifier` must succeed on all three; a `vendor_editor` must still be
+   confined to their own business. Per ADR-035, every write-refusal assertion
+   reads the target table with the service role.
+4. Walk it in a browser as `super_admin`: create a business from
+   `/admin/vendors/new`, follow **Add photos and finish the listing**, upload
+   three photographs, set categories and service areas, then approve from the
+   Decision panel and confirm the photographs are public.
+5. Still outstanding from 2026-08-28: *Krishna Vatika* has
+   `vendor_listings.status = 'pending'` with `vendors.status = 'draft'`, and the
+   9 existing `draft` vendors have not been triaged.
+
 ## Notes
 
 - All seed and demo data is fictional (PRD 2.3, Epic G). `npm run seed:demo -- --clean` removes the demo vendors.

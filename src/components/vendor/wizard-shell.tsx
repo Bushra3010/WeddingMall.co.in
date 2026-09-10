@@ -19,6 +19,7 @@ export function WizardShell({
   vendorId,
   canManageBank,
   showHeader = true,
+  canSubmit = true,
 }: {
   vendor: VendorWorkspace
   documents: VerificationDocument[]
@@ -29,6 +30,12 @@ export function WizardShell({
   canManageBank: boolean
   /** False from `/vendor-dashboard/listing`, which has its own heading. */
   showHeader?: boolean
+  /**
+   * False for an admin editing somebody else's listing. Submitting sends it to
+   * the queue they themselves work; they publish from the decision panel, which
+   * records the decision under their own name.
+   */
+  canSubmit?: boolean
 }) {
   return (
     <SinglePageListingForm
@@ -39,6 +46,7 @@ export function WizardShell({
       vendorId={vendorId}
       canManageBank={canManageBank}
       showHeader={showHeader}
+      canSubmit={canSubmit}
     />
   )
 }

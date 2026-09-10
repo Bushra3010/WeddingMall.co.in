@@ -680,6 +680,38 @@ export function WizardSubmitStep({
   const [state, action] = useAction(submitForReviewAction)
   const blocked = vendor.completion.missingRequired
 
+  /*
+   * An admin editing somebody else's listing (0041). A disabled button with no
+   * sentence beside it reads as a fault; the reason it is disabled is also the
+   * instruction for what to do instead, so it belongs on the screen.
+   */
+  if (!canSubmit) {
+    return (
+      <div className={STEP_SECTION}>
+        <p className="text-sand-600 text-sm">
+          Submitting for review sends this to the moderation queue. You decide on that queue, so
+          publish it from the <span className="text-sand-900 font-medium">Decision</span> panel on
+          the business page instead — that records the decision under your name.
+        </p>
+
+        {blocked.length > 0 ? (
+          <div className="border-sand-200 bg-sand-50 mt-4 rounded-[var(--radius-card)] border p-4 text-sm">
+            <p className="text-sand-900 font-medium">Still missing before it can go live:</p>
+            <ul className="text-sand-700 mt-1 list-inside list-disc">
+              {blocked.map((field) => (
+                <li key={field.key}>{field.label}</li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="text-sand-700 border-sand-200 bg-sand-50 mt-4 rounded-[var(--radius-card)] border p-4 text-sm">
+            Everything required is filled in.
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className={STEP_SECTION}>
       <p className="text-sand-600 text-sm">

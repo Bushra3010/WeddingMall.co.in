@@ -5,7 +5,13 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ServiceError } from '@/lib/action-result'
-import { assertPermission, assertVendorCapability, type Actor } from '@/lib/permissions'
+import {
+  assertListingCapability,
+  assertPermission,
+  assertVendorCapability,
+  isListingModerator,
+  type Actor,
+} from '@/lib/permissions'
 import { logError } from '@/lib/observability/logger'
 import { parseMajor } from '@/lib/money'
 import {
@@ -87,7 +93,7 @@ function toMinor(value: number | undefined, currency: string): number | null {
 }
 
 export async function savePackage(actor: Actor, vendorId: string, input: PackageInput) {
-  assertVendorCapability(actor, vendorId, 'package.manage')
+  assertListingCapability(actor, vendorId, 'package.manage')
   const supabase = await createClient()
 
   const row = {
@@ -122,7 +128,7 @@ export async function savePackage(actor: Actor, vendorId: string, input: Package
 }
 
 export async function deletePackage(actor: Actor, vendorId: string, packageId: string) {
-  assertVendorCapability(actor, vendorId, 'package.manage')
+  assertListingCapability(actor, vendorId, 'package.manage')
   const supabase = await createClient()
 
   const { error } = await supabase
@@ -153,7 +159,7 @@ export async function uploadMedia(
   file: File,
   altText: string | undefined,
 ) {
-  assertVendorCapability(actor, vendorId, 'media.manage')
+  assertListingCapability(actor, vendorId, 'media.manage')
 
   if (file.size === 0) throw new ServiceError('invalid_file', 'That file is empty.')
   if (file.size > MAX_IMAGE_BYTES) {
@@ -199,7 +205,18 @@ export async function uploadMedia(
     sort_order: count ?? 0,
     // The first image a vendor uploads becomes the cover.
     is_cover: (count ?? 0) === 0,
-    moderation_status: 'pending',
+    /*
+     * Pending, unless the person uploading is the person who would approve it
+     * (migration 0041).
+     *
+     * Media enters moderation because a vendor's upload has not been looked at
+     * yet. An admin holding `listing.moderate` has looked at it — they chose the
+     * file — and leaving it pending would mean an admin adding a photograph to a
+     * live business watched nothing happen, with no queue entry to explain why:
+     * `admin_decide_vendor` only sweeps pending media on an approve decision,
+     * and an already-active vendor is not going through one.
+     */
+    moderation_status: isListingModerator(actor, vendorId) ? 'approved' : 'pending',
     size_bytes: file.size,
   })
 
@@ -218,7 +235,7 @@ export async function updateMediaAlt(
   mediaId: string,
   altText: string | undefined,
 ) {
-  assertVendorCapability(actor, vendorId, 'media.manage')
+  assertListingCapability(actor, vendorId, 'media.manage')
   const supabase = await createClient()
 
   const { error } = await supabase
@@ -233,7 +250,7 @@ export async function updateMediaAlt(
 /** Exactly one cover per vendor is enforced by a partial unique index, so the
  * previous cover must be cleared before the new one is set. */
 export async function setCoverMedia(actor: Actor, vendorId: string, mediaId: string) {
-  assertVendorCapability(actor, vendorId, 'media.manage')
+  assertListingCapability(actor, vendorId, 'media.manage')
   const supabase = await createClient()
 
   const { error: clearError } = await supabase
@@ -253,7 +270,7 @@ export async function setCoverMedia(actor: Actor, vendorId: string, mediaId: str
 }
 
 export async function deleteMedia(actor: Actor, vendorId: string, mediaId: string) {
-  assertVendorCapability(actor, vendorId, 'media.manage')
+  assertListingCapability(actor, vendorId, 'media.manage')
   const supabase = await createClient()
 
   const { data: media } = await supabase
@@ -291,7 +308,7 @@ export async function deleteMedia(actor: Actor, vendorId: string, mediaId: strin
 }
 
 export async function reorderMedia(actor: Actor, vendorId: string, orderedIds: string[]) {
-  assertVendorCapability(actor, vendorId, 'media.manage')
+  assertListingCapability(actor, vendorId, 'media.manage')
   const supabase = await createClient()
 
   for (const [index, id] of orderedIds.entries()) {
@@ -314,7 +331,7 @@ export async function saveAvailability(
   vendorId: string,
   input: { startDate: string; endDate: string; status: AvailabilityStatus; note?: string },
 ) {
-  assertVendorCapability(actor, vendorId, 'availability.manage')
+  assertListingCapability(actor, vendorId, 'availability.manage')
   const supabase = await createClient()
 
   const { error } = await supabase.from('vendor_availability').insert({
@@ -330,7 +347,7 @@ export async function saveAvailability(
 }
 
 export async function deleteAvailability(actor: Actor, vendorId: string, entryId: string) {
-  assertVendorCapability(actor, vendorId, 'availability.manage')
+  assertListingCapability(actor, vendorId, 'availability.manage')
   const supabase = await createClient()
 
   const { error } = await supabase
