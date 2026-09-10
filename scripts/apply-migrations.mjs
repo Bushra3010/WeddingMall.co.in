@@ -19,6 +19,7 @@
  */
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 
 /** Project ref comes from NEXT_PUBLIC_SUPABASE_URL so this repo is not tied to one project. */
@@ -31,7 +32,22 @@ function projectRef() {
 }
 
 const REF = projectRef()
-const ROOT = '/Users/bushrakhan/Downloads/Wedding Mall/supabase'
+
+/*
+ * Resolved from this file's own location, not from `process.cwd()` and not from
+ * an absolute path.
+ *
+ * It was `/Users/bushrakhan/Downloads/Wedding Mall/supabase` — one particular
+ * machine — so on any other clone the script died with ENOENT before it opened
+ * a connection. That is a confusing failure to meet: the error names a
+ * directory that has nothing to do with the repository you are standing in, and
+ * it happens whether or not `PGPASSWORD` is right.
+ *
+ * `import.meta.url` also means it works from any working directory, so
+ * `node scripts/apply-migrations.mjs` and `node ./apply-migrations.mjs` from
+ * inside `scripts/` behave the same.
+ */
+const ROOT = fileURLToPath(new URL('../supabase', import.meta.url))
 const password = process.env.PGPASSWORD
 if (!password) throw new Error('PGPASSWORD not set')
 
