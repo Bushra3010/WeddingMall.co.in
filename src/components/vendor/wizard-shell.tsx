@@ -17,12 +17,15 @@ export function WizardShell({
   categories,
   cities,
   vendorId,
+  showHeader = true,
 }: {
   vendor: VendorWorkspace
   documents: VerificationDocument[]
   categories: CategoryRow[]
   cities: CityRow[]
   vendorId: string
+  /** False from `/vendor-dashboard/listing`, which has its own heading. */
+  showHeader?: boolean
 }) {
   return (
     <SinglePageListingForm
@@ -31,6 +34,7 @@ export function WizardShell({
       categories={categories}
       cities={cities}
       vendorId={vendorId}
+      showHeader={showHeader}
     />
   )
 }

@@ -64,12 +64,15 @@ export function SinglePageListingForm({
   categories,
   cities,
   vendorId,
+  showHeader = true,
 }: {
   vendor: VendorWorkspace
   documents: VerificationDocument[]
   categories: CategoryRow[]
   cities: CityRow[]
   vendorId: string
+  /** False where the page already has a heading — see the header below. */
+  showHeader?: boolean
 }) {
   const complete = useCallback((step: StepKey) => isStepComplete(step, vendor), [vendor])
   const unlocked = useCallback((step: StepKey) => isStepUnlocked(step, vendor), [vendor])
@@ -115,12 +118,29 @@ export function SinglePageListingForm({
 
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="font-display text-sand-900 text-2xl sm:text-3xl">Complete your listing</h1>
-        <p className="text-sand-600 mt-1 max-w-prose text-sm">
-          Nothing is public until you submit for review and our team approves it.
-        </p>
-      </header>
+      {/*
+        Omitted where the page supplies its own.
+
+        `/vendor-dashboard/listing` has a heading of its own, so this rendered a
+        second `<h1>` directly beneath the first — two titles and two
+        introductions stacked, which on a phone is most of the first screen
+        before any field appears.
+      */}
+      {showHeader ? (
+        <header>
+          <h1 className="font-display text-sand-900 text-2xl sm:text-3xl">Complete your listing</h1>
+          <p className="text-sand-600 mt-1 max-w-prose text-sm">
+            {/*
+              A published vendor was being told "nothing is public", which is
+              plainly untrue while their profile is live and taking enquiries —
+              and it sat directly under the page's own line saying the opposite.
+            */}
+            {vendor.status === 'active'
+              ? 'Your listing is live. Changes are reviewed before they replace what couples see.'
+              : 'Nothing is public until you submit for review and our team approves it.'}
+          </p>
+        </header>
+      ) : null}
 
       <div className="border-sand-200 overflow-hidden rounded-[var(--radius-card)] border bg-white">
         <div className="flex flex-col lg:flex-row">
