@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 
 import { fieldError, FormMessage, useAction } from '@/components/shared/action-form'
 import { SubmitButton } from '@/components/shared/submit-button'
@@ -14,7 +14,7 @@ import {
   deleteDocumentAction,
   submitForReviewAction,
 } from '@/features/vendors/actions'
-import { uploadMediaAction } from '@/features/listings/actions'
+import { PhotoUploader } from '@/components/vendor/photo-uploader'
 import type { VendorWorkspace, VerificationDocument } from '@/server/dal/vendor-workspace'
 import type { CategoryRow, CityRow } from '@/server/dal/taxonomy'
 
@@ -486,26 +486,18 @@ export function WizardMediaStep({
   vendorId: string
 }) {
   /*
-   * The upload state was discarded here — `const [, upload]`. Every failure was
-   * therefore silent: a vendor picked a photo, pressed Upload, and nothing
-   * visible happened, whether the file was rejected, too large, or the request
-   * never left the browser. The Portfolio screen has always rendered this; the
-   * wizard, where a vendor first meets it, did not.
-   */
-  const [uploadState, upload] = useAction(uploadMediaAction)
-
-  /*
-   * Total bytes, checked before submitting.
+   * The whole hand-rolled form that used to live here is gone, replaced by
+   * `PhotoUploader` — the same component the Portfolio screen now uses.
    *
-   * Server Actions send the whole form as one request body, and Next caps that
-   * (12 MB here — see next.config.ts). So "up to 20 images at a time" is only
-   * true for small ones, and going over the cap fails at the framework
-   * boundary with nothing useful to show. Counting first turns that into a
-   * sentence the vendor can act on.
+   * What it replaced was a single `<form>` carrying every selected photo in one
+   * Server Action body. That body is capped at 12 MB, so the step counted the
+   * bytes first and refused anything larger with "Those 2 photos come to 13.4
+   * MB… select fewer and upload again". Accurate, and no help at all: two
+   * pictures off a phone are 13 MB, and there is no smaller number than two.
+   *
+   * The uploader downscales each photo in the browser and sends them one per
+   * request, so the batch total is no longer a limit that exists.
    */
-  const [tooLarge, setTooLarge] = useState<string | null>(null)
-  const MAX_BATCH_BYTES = 11 * 1024 * 1024
-
   return (
     <div className={STEP_SECTION}>
       <p className="text-sand-600 text-sm">
@@ -524,68 +516,9 @@ export function WizardMediaStep({
       )}
 
       {!readOnly ? (
-        <form action={upload} className="border-sand-200 mt-4 space-y-3 border-t pt-4">
-          <input type="hidden" name="vendorId" value={vendorId} />
-          <FormMessage state={uploadState} successMessage="Photos uploaded." />
-          {tooLarge ? (
-            <p
-              role="alert"
-              className="rounded-lg bg-[color-mix(in_oklch,var(--color-danger)_10%,white)] px-3 py-2 text-sm text-[var(--color-danger)]"
-            >
-              {tooLarge}
-            </p>
-          ) : null}
-
-          <div>
-            <label className="text-sand-800 block text-sm font-medium">
-              Photos <span className="text-[var(--color-danger)]">*</span>
-            </label>
-            <p className="text-sand-500 mt-0.5 text-xs">
-              JPG, PNG, WebP or AVIF, up to 10 MB each and about 11 MB per upload — so a few at a
-              time for large photos.
-            </p>
-            <input
-              type="file"
-              name="files"
-              accept="image/jpeg,image/png,image/webp,image/avif"
-              multiple
-              onChange={(event) => {
-                const files = Array.from(event.target.files ?? [])
-                const total = files.reduce((sum, file) => sum + file.size, 0)
-                const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1)
-
-                const oversize = files.find((file) => file.size > 10 * 1024 * 1024)
-                if (oversize) {
-                  setTooLarge(`${oversize.name} is ${mb(oversize.size)} MB. Each photo must be under 10 MB.`)
-                } else if (total > MAX_BATCH_BYTES) {
-                  setTooLarge(
-                    `Those ${files.length} photos come to ${mb(total)} MB, which is more than one upload can carry. Select fewer and upload again.`,
-                  )
-                } else {
-                  setTooLarge(null)
-                }
-              }}
-              className="border-sand-300 mt-1.5 block w-full rounded-lg border bg-white p-2 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="text-sand-800 block text-sm font-medium">Alt text</label>
-            <p className="text-sand-500 mt-0.5 text-xs">
-              Describe the image for accessibility (optional).
-            </p>
-            <input
-              type="text"
-              name="altText"
-              className="border-sand-300 mt-1.5 h-11 w-full rounded-lg border bg-white px-3 text-sm"
-              placeholder="e.g. Wedding ceremony setup with floral arch"
-            />
-          </div>
-
-          <SubmitButton pendingLabel="Uploading…" disabled={tooLarge !== null}>
-            Upload photos
-          </SubmitButton>
-        </form>
+        <div className="border-sand-200 mt-4 border-t pt-4">
+          <PhotoUploader vendorId={vendorId} />
+        </div>
       ) : null}
 
       <div className="mt-4 text-right">

@@ -125,6 +125,50 @@ export async function uploadMediaAction(
   return result
 }
 
+/**
+ * One photo, one request.
+ *
+ * `uploadMediaAction` above takes the whole selection in a single form, which is
+ * how a plain `<form action=…>` submits — and that is exactly what broke.
+ * A Server Action's body is capped at 12 MB (`next.config.ts`), so two photos
+ * off a phone exceeded it before `uploadMedia` was ever reached, and the vendor
+ * was told to "select fewer and upload again" about the two pictures they had
+ * chosen.
+ *
+ * `PhotoUploader` calls this once per file instead, after downscaling each one
+ * in the browser. The body then carries a single ~500 KB image no matter how
+ * many were picked, so batch size stops being a limit — and a failure names the
+ * photo that failed rather than the request that carried it.
+ *
+ * Takes `FormData` directly rather than the `(prev, form)` shape: it is invoked
+ * from a loop in a click handler, not bound to a form.
+ */
+export async function uploadPhotoAction(form: FormData): Promise<ActionResult<{ path: string }>> {
+  const result = await runAction('listing.uploadPhoto', async () => {
+    const actor = await getActor()
+    const file = form.get('file')
+    if (!(file instanceof File) || file.size === 0) {
+      throw new ServiceError('invalid_file', 'Choose an image to upload.')
+    }
+
+    const altText = str(form, 'altText') || undefined
+    return uploadMedia(actor, vendorId(form), file, altText)
+  })
+
+  if (result.ok) {
+    revalidatePath('/vendor-dashboard/portfolio')
+    revalidatePath('/vendor-dashboard/list')
+    /*
+     * The wizard renders on `/listing` as well as `/list`, and the Media step's
+     * Continue gate reads `vendor.mediaCount` from the server. Without this the
+     * count on that page stays where it was, so a vendor who has just uploaded
+     * three photos is still told to "add at least 3 photographs to continue".
+     */
+    revalidatePath('/vendor-dashboard/listing')
+  }
+  return result
+}
+
 export async function updateMediaAltAction(
   _prev: unknown,
   form: FormData,

@@ -1,17 +1,16 @@
 'use client'
 
 import Image from 'next/image'
-import { ImagePlus, Star, Trash2 } from 'lucide-react'
+import { Star, Trash2 } from 'lucide-react'
 
 import { fieldError, FormMessage, useAction } from '@/components/shared/action-form'
-import { SubmitButton } from '@/components/shared/submit-button'
+import { PhotoUploader } from '@/components/vendor/photo-uploader'
 import { Button } from '@/components/ui/button'
 import { Field, Input } from '@/components/ui/field'
 import {
   deleteMediaAction,
   setCoverAction,
   updateMediaAltAction,
-  uploadMediaAction,
 } from '@/features/listings/actions'
 import { storagePublicUrl } from '@/lib/supabase/storage'
 import { cn } from '@/lib/utils'
@@ -31,7 +30,6 @@ export function PortfolioManager({
   media: VendorMediaRow[]
   readOnly: boolean
 }) {
-  const [uploadState, upload] = useAction(uploadMediaAction)
   const [altState, saveAlt] = useAction(updateMediaAltAction)
   const [coverState, setCover] = useAction(setCoverAction)
   const [deleteState, remove] = useAction(deleteMediaAction)
@@ -40,7 +38,6 @@ export function PortfolioManager({
 
   return (
     <div className="space-y-6">
-      <FormMessage state={uploadState} successMessage="Images uploaded." />
       <FormMessage state={altState} successMessage="Description saved." />
       <FormMessage state={coverState} successMessage="Cover image updated." />
       <FormMessage state={deleteState} successMessage="Image removed." />
@@ -155,43 +152,17 @@ export function PortfolioManager({
       )}
 
       {!readOnly ? (
-        <form
-          action={upload}
-          className="border-sand-200 space-y-4 rounded-[var(--radius-card)] border bg-white p-5"
-        >
+        <section className="border-sand-200 space-y-4 rounded-[var(--radius-card)] border bg-white p-5">
           <h2 className="font-display text-sand-900 text-lg">Add photos</h2>
-          <input type="hidden" name="vendorId" value={vendorId} />
-
-          <Field label="Images" hint="JPEG, PNG, WebP, or AVIF. Up to 10 MB each." required>
-            {({ id }) => (
-              <input
-                id={id}
-                name="files"
-                type="file"
-                multiple
-                accept="image/jpeg,image/png,image/webp,image/avif"
-                required
-                className="text-sand-700 file:bg-sand-100 block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:px-4 file:py-2 file:text-sm file:font-medium"
-              />
-            )}
-          </Field>
-
-          <Field
-            label="Description for these images"
-            hint="Optional now — you can write a specific one for each image after uploading."
-          >
-            {({ id }) => <Input id={id} name="altText" />}
-          </Field>
-
-          <SubmitButton pendingLabel="Uploading…">
-            <ImagePlus aria-hidden="true" />
-            Upload
-          </SubmitButton>
-
-          <p className="text-sand-500 text-xs">
-            New images are reviewed before they appear on your public profile.
-          </p>
-        </form>
+          {/*
+            Shared with the listing wizard's Media step. Both screens used to
+            carry their own copy of this form, and both sent every selected
+            photo in one Server Action body — which is capped at 12 MB, so two
+            phone photos were refused before the upload started. `PhotoUploader`
+            downscales in the browser and sends one photo per request.
+          */}
+          <PhotoUploader vendorId={vendorId} />
+        </section>
       ) : null}
     </div>
   )
