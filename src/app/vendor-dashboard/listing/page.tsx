@@ -102,6 +102,7 @@ export default async function ListingPage() {
             categories={categories}
             cities={cities}
             vendorId={vendorId}
+            canManageBank={canVendor(actor, vendorId, 'billing.manage')}
             showHeader={false}
           />
         </div>

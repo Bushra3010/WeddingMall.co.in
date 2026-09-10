@@ -5,6 +5,7 @@ import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { logError } from '@/lib/observability/logger'
 import { calculateCompletion, type CompletionResult } from '@/features/vendors/completion'
+import { getBankAccountSummary, type BankAccountSummary } from '@/server/dal/vendor-bank'
 
 /**
  * Vendor workspace reads. These use the request-scoped (session) client, so RLS
@@ -41,6 +42,16 @@ export interface VendorWorkspace {
   packageCount: number
   mediaCount: number
   documentCount: number
+  /**
+   * Payout details, masked — never the account number itself.
+   *
+   * `null` both when none have been entered and when the viewer may not see
+   * them: RLS restricts the row to `billing.manage`, which is the owner alone,
+   * so a manager opening the wizard gets `null` for a business that has details
+   * on file. That is the correct answer to give them, and it is why the Bank
+   * step is optional rather than something the wizard nags about.
+   */
+  bankAccount: BankAccountSummary | null
   completion: CompletionResult
 }
 
@@ -60,54 +71,60 @@ export const getVendorWorkspace = cache(
       if (error) throw error
       if (!vendor) return null
 
-      const [listing, address, categories, areas, packages, media, documents] = await Promise.all([
-        supabase
-          .from('vendor_listings')
-          .select('status, about, experience_years, languages')
-          .eq('vendor_id', vendorId)
-          .maybeSingle()
-          .then((r) => r.data),
-        /*
-         * `maps_url` arrives with migration 0036 and is not in the generated
-         * types until `npm run db:types` runs. Selected with `*` so this read
-         * does not name the column — the cast below is the only place that
-         * knows about it, and it disappears when the types are refreshed.
-         */
-        supabase
-          .from('vendor_addresses')
-          .select('*')
-          .eq('vendor_id', vendorId)
-          .eq('type', 'business')
-          .maybeSingle()
-          .then((r) => r.data as ({ line1: string | null; maps_url?: string | null } | null)),
-        supabase
-          .from('vendor_categories')
-          .select('category_id, is_primary')
-          .eq('vendor_id', vendorId)
-          .then((r) => r.data ?? []),
-        supabase
-          .from('vendor_service_areas')
-          .select('city_id')
-          .eq('vendor_id', vendorId)
-          .then((r) => r.data ?? []),
-        supabase
-          .from('vendor_packages')
-          .select('id', { count: 'exact', head: true })
-          .eq('vendor_id', vendorId)
-          .then((r) => r.count ?? 0),
-        supabase
-          .from('vendor_media')
-          .select('id', { count: 'exact', head: true })
-          .eq('vendor_id', vendorId)
-          .then((r) => r.count ?? 0),
-        supabase
-          .from('vendor_verifications')
-          .select('vendor_documents(id)')
-          .eq('vendor_id', vendorId)
-          .then((r) =>
-            (r.data ?? []).reduce((n, row) => n + (row.vendor_documents?.length ?? 0), 0),
-          ),
-      ])
+      const [listing, address, categories, areas, packages, media, documents, bankAccount] =
+        await Promise.all([
+          supabase
+            .from('vendor_listings')
+            .select('status, about, experience_years, languages')
+            .eq('vendor_id', vendorId)
+            .maybeSingle()
+            .then((r) => r.data),
+          /*
+           * `maps_url` arrives with migration 0036 and is not in the generated
+           * types until `npm run db:types` runs. Selected with `*` so this read
+           * does not name the column — the cast below is the only place that
+           * knows about it, and it disappears when the types are refreshed.
+           */
+          supabase
+            .from('vendor_addresses')
+            .select('*')
+            .eq('vendor_id', vendorId)
+            .eq('type', 'business')
+            .maybeSingle()
+            .then((r) => r.data as { line1: string | null; maps_url?: string | null } | null),
+          supabase
+            .from('vendor_categories')
+            .select('category_id, is_primary')
+            .eq('vendor_id', vendorId)
+            .then((r) => r.data ?? []),
+          supabase
+            .from('vendor_service_areas')
+            .select('city_id')
+            .eq('vendor_id', vendorId)
+            .then((r) => r.data ?? []),
+          supabase
+            .from('vendor_packages')
+            .select('id', { count: 'exact', head: true })
+            .eq('vendor_id', vendorId)
+            .then((r) => r.count ?? 0),
+          supabase
+            .from('vendor_media')
+            .select('id', { count: 'exact', head: true })
+            .eq('vendor_id', vendorId)
+            .then((r) => r.count ?? 0),
+          supabase
+            .from('vendor_verifications')
+            .select('vendor_documents(id)')
+            .eq('vendor_id', vendorId)
+            .then((r) =>
+              (r.data ?? []).reduce((n, row) => n + (row.vendor_documents?.length ?? 0), 0),
+            ),
+          // Masked in the DAL, so the account number is not a prop of any page
+          // that renders this workspace. Never throws — a vendor with no row, a
+          // viewer without `billing.manage`, and a database still waiting for
+          // migration 0038 all resolve to `null`.
+          getBankAccountSummary(vendorId),
+        ])
 
       const completion = calculateCompletion({
         displayName: vendor.display_name,
@@ -152,6 +169,7 @@ export const getVendorWorkspace = cache(
         packageCount: packages,
         mediaCount: media,
         documentCount: documents,
+        bankAccount,
         completion,
       }
     } catch (error) {
@@ -234,6 +252,36 @@ export async function getVerificationDocuments(vendorId: string): Promise<Verifi
   } catch (error) {
     logError('dal.getVerificationDocuments', error, { vendorId })
     return []
+  }
+}
+
+/**
+ * The `vendor_documents` row for a storage path just uploaded.
+ *
+ * `uploadVerificationDocument()` returns the object path rather than the row id,
+ * and attaching a cancelled cheque to a payout account needs the id. The path
+ * carries a UUID generated at upload time and the bucket refuses `upsert`, so it
+ * identifies exactly one row.
+ *
+ * Read through the session client, so RLS scopes it to documents the caller may
+ * already see. Returns `null` rather than throwing: the caller has a file safely
+ * stored either way, and failing the whole upload because the row could not be
+ * looked up would lose it.
+ */
+export async function getDocumentIdByStoragePath(storagePath: string): Promise<string | null> {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('vendor_documents')
+      .select('id')
+      .eq('storage_path', storagePath)
+      .maybeSingle()
+
+    if (error) throw error
+    return data?.id ?? null
+  } catch (error) {
+    logError('dal.getDocumentIdByStoragePath', error, { storagePath })
+    return null
   }
 }
 

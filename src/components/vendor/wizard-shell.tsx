@@ -17,6 +17,7 @@ export function WizardShell({
   categories,
   cities,
   vendorId,
+  canManageBank,
   showHeader = true,
 }: {
   vendor: VendorWorkspace
@@ -24,6 +25,8 @@ export function WizardShell({
   categories: CategoryRow[]
   cities: CityRow[]
   vendorId: string
+  /** `billing.manage` — the owner alone. Decided on the server. */
+  canManageBank: boolean
   /** False from `/vendor-dashboard/listing`, which has its own heading. */
   showHeader?: boolean
 }) {
@@ -34,6 +37,7 @@ export function WizardShell({
       categories={categories}
       cities={cities}
       vendorId={vendorId}
+      canManageBank={canManageBank}
       showHeader={showHeader}
     />
   )

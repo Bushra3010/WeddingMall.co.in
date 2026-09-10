@@ -15,6 +15,7 @@ import {
   submitForReviewAction,
 } from '@/features/vendors/actions'
 import { PhotoUploader } from '@/components/vendor/photo-uploader'
+import { BankDetailsForm } from '@/components/vendor/bank-details-form'
 import type { VendorWorkspace, VerificationDocument } from '@/server/dal/vendor-workspace'
 import type { CategoryRow, CityRow } from '@/server/dal/taxonomy'
 
@@ -624,6 +625,45 @@ export function WizardDocumentsStep({
           <SubmitButton pendingLabel="Uploading…">Upload document</SubmitButton>
         </form>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * Payout details.
+ *
+ * Optional to submitting — a listing goes live without it — so this step never
+ * blocks Continue. It sits after Documents because both ask for private
+ * paperwork, and before Submit because the review screen should be able to say
+ * whether it was filled in.
+ *
+ * The form itself is `BankDetailsForm`, shared with the vendor Settings screen
+ * so there is one implementation of "type the account number twice".
+ */
+export function WizardBankStep({
+  vendor,
+  readOnly,
+  vendorId,
+  canManageBank,
+}: {
+  vendor: VendorWorkspace
+  readOnly: boolean
+  vendorId: string
+  canManageBank: boolean
+}) {
+  return (
+    <div className={STEP_SECTION}>
+      <BankDetailsForm
+        vendorId={vendorId}
+        account={vendor.bankAccount}
+        // `readOnly` is the wizard's own view-only mode; `canManageBank` is the
+        // capability. Either one closes the form, and the server re-checks
+        // regardless of what this decided.
+        canManage={canManageBank && !readOnly}
+      />
+      <p className="text-sand-500 text-xs">
+        You can skip this and add it later — it does not hold up your listing going live.
+      </p>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { BankReveal } from '@/components/admin/bank-reveal'
 import { DecisionForm } from '@/components/admin/decision-form'
 import { DocumentLink } from '@/components/admin/document-link'
 import { VendorDeletePanel } from '@/components/admin/vendor-delete-panel'
@@ -10,6 +11,7 @@ import { can } from '@/lib/permissions'
 import { formatDateTime } from '@/lib/dates'
 import { requireElevatedAdmin } from '@/server/policies/require'
 import { getAdminVendor, getAuditTrail } from '@/server/dal/admin'
+import { getBankAccountSummary } from '@/server/dal/vendor-bank'
 import { listCities } from '@/server/dal/taxonomy'
 
 export const metadata = { title: 'Vendor detail', ...NOINDEX }
@@ -23,12 +25,19 @@ export default async function AdminVendorDetailPage({
   const actor = await requireElevatedAdmin('vendor.read')
   const { vendorId } = await params
 
-  const [vendor, audit, cities] = await Promise.all([
+  // Mirrors the `vendor_bank_accounts: owner read` policy in 0038. Checked here
+  // as well so the query is not even issued for an admin RLS would refuse —
+  // and so the section is absent rather than empty, which would read as "this
+  // business has no payout details" to someone simply not allowed to see them.
+  const canSeeBank = can(actor, 'billing.manage') || can(actor, 'vendor.verify')
+
+  const [vendor, audit, cities, bank] = await Promise.all([
     getAdminVendor(vendorId),
     getAuditTrail(vendorId),
     // 200 rather than the public default of 24: an admin correcting a business
     // must be able to reach any city, not just the ones on the homepage.
     listCities(200),
+    canSeeBank ? getBankAccountSummary(vendorId) : Promise.resolve(null),
   ])
   if (!vendor) notFound()
 
@@ -166,6 +175,69 @@ export default async function AdminVendorDetailPage({
               Documents open through a link that expires after two minutes. Opening one is recorded.
             </p>
           </section>
+
+          {/*
+            Payout details.
+
+            Gated twice, on purpose. RLS (0038) restricts the row to
+            `billing.manage` or `vendor.verify` — an analyst, a content admin or
+            a support agent reads nothing — and this section is not rendered for
+            anyone else either, so the page does not show an empty panel that
+            looks like "this business has not entered any".
+
+            The account number is never in this HTML. `getBankAccountSummary`
+            masks it in the DAL; the full value comes from `BankReveal`, which
+            audits first.
+          */}
+          {canSeeBank ? (
+            <section className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-5">
+              <h2 className="font-display text-sand-900 text-lg">Payout details</h2>
+              {bank ? (
+                <>
+                  <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                    {[
+                      ['Account holder', bank.accountHolderName],
+                      ['Account number', bank.accountNumberMasked],
+                      ['IFSC', bank.ifsc],
+                      ['Account type', bank.accountType],
+                      ['Bank', bank.bankName],
+                      ['Branch', bank.branchName],
+                      ['UPI', bank.upiId],
+                      [
+                        'Verified',
+                        bank.verifiedAt ? formatDateTime(bank.verifiedAt) : 'Not checked yet',
+                      ],
+                    ].map(([label, value]) => (
+                      <div key={label as string}>
+                        <dt className="text-sand-500 text-xs tracking-wide uppercase">{label}</dt>
+                        <dd className="text-sand-900 text-sm">{value || '—'}</dd>
+                      </div>
+                    ))}
+                  </dl>
+
+                  <div className="border-sand-200 mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+                    <BankReveal vendorId={vendor.id} />
+                    {bank.chequeDocumentId ? (
+                      <span className="flex items-center gap-2 text-sm">
+                        <span className="text-sand-700">Cancelled cheque</span>
+                        <DocumentLink documentId={bank.chequeDocumentId} />
+                      </span>
+                    ) : (
+                      <span className="text-sand-500 text-xs">No cancelled cheque uploaded.</span>
+                    )}
+                  </div>
+
+                  <p className="text-sand-500 mt-3 text-xs">
+                    Revealing the account number is recorded against your account.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sand-600 mt-2 text-sm">
+                  No payout details on file. Only the business owner can add them.
+                </p>
+              )}
+            </section>
+          ) : null}
 
           <section className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-5">
             <h2 className="font-display text-sand-900 text-lg">Audit trail</h2>

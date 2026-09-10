@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { STEPS, isStepComplete, isStepUnlocked } from '@/components/vendor/wizard-config'
+import {
+  STEPS,
+  initialStep,
+  isStepComplete,
+  isStepUnlocked,
+} from '@/components/vendor/wizard-config'
+import type { BankAccountSummary } from '@/server/dal/vendor-bank'
 import type { VendorWorkspace } from '@/server/dal/vendor-workspace'
 
 /**
@@ -21,10 +27,27 @@ function vendor(overrides: Partial<VendorWorkspace> = {}): VendorWorkspace {
     about: null,
     mediaCount: 0,
     documentCount: 0,
+    bankAccount: null,
     completion: { canSubmit: false, fields: [], score: 0, missingRequired: [] },
   }
   return { ...base, ...overrides } as unknown as VendorWorkspace
 }
+
+/** Enough of a payout account for the Bank step to count as filled. */
+const BANK = {
+  vendorId: 'v1',
+  accountHolderName: 'Marigold Courtyard',
+  accountNumberMasked: '••••••3456',
+  ifsc: 'HDFC0001234',
+  bankName: null,
+  branchName: null,
+  accountType: 'current',
+  upiId: null,
+  chequeDocumentId: null,
+  verifiedAt: null,
+  verificationNote: null,
+  updatedAt: '2026-09-10T00:00:00Z',
+} satisfies BankAccountSummary
 
 /** A vendor that has filled everything the wizard treats as a step. */
 function finished(overrides: Partial<VendorWorkspace> = {}): VendorWorkspace {
@@ -89,6 +112,19 @@ describe('isStepComplete', () => {
     expect(isStepComplete('media', vendor({ mediaCount: 2 }))).toBe(false)
     expect(isStepComplete('media', vendor({ mediaCount: 3 }))).toBe(true)
   })
+
+  it('does not tick Bank for a vendor with no payout details', () => {
+    /*
+     * `undefined`, not just `null`. The first version of this check was
+     * `bankAccount !== null`, which is true for a key that is simply absent —
+     * so a brand-new vendor read as having payout details on file and Bank
+     * unlocked ahead of every step before it. The strict comparison looks like
+     * the careful one and is the wrong tool for an optional field.
+     */
+    expect(isStepComplete('bank', vendor())).toBe(false)
+    expect(isStepComplete('bank', vendor({ bankAccount: undefined }))).toBe(false)
+    expect(isStepComplete('bank', vendor({ bankAccount: BANK }))).toBe(true)
+  })
 })
 
 describe('isStepUnlocked', () => {
@@ -114,8 +150,12 @@ describe('isStepUnlocked', () => {
      */
     const cases = [
       vendor(),
+      // Bank is optional too, and filling it early must not open a step ahead
+      // of the ones still outstanding.
+      vendor({ bankAccount: BANK }),
       finished({ mediaCount: 0, documentCount: 0 }),
       finished({ mediaCount: 3, documentCount: 0 }),
+      finished({ bankAccount: BANK }),
       finished(),
     ]
 
@@ -128,5 +168,41 @@ describe('isStepUnlocked', () => {
         `steps after the first lock must stay locked: ${unlocked.join(',')}`,
       ).toBe(true)
     }
+  })
+})
+
+describe('initialStep', () => {
+  it('opens on the first unfinished required step', () => {
+    expect(initialStep(vendor())).toBe('business')
+    expect(initialStep(vendor({ displayName: 'Marigold', primaryCityId: 'c1' }))).toBe('about')
+  })
+
+  it('does not open on Bank while required steps are outstanding', () => {
+    /*
+     * Bank sits second-to-last and most vendors never fill it. Choosing the
+     * first unfinished step without regard for `optional` would send a vendor
+     * who has finished everything else to a screen they have already decided
+     * not to use — every time they open the listing editor — instead of the
+     * sections they came to edit.
+     */
+    const halfway = vendor({ displayName: 'Marigold', primaryCityId: 'c1' })
+    expect(initialStep(halfway)).not.toBe('bank')
+  })
+
+  it('opens on Submit while the listing is complete but not yet sent', () => {
+    // Bank is skipped even here: the outstanding *required* step is the call to
+    // action, and payout details are not what is holding the listing up.
+    expect(initialStep(finished())).toBe('submit')
+  })
+
+  it('offers Bank once everything required has been done', () => {
+    const submitted = finished({ submittedAt: '2026-08-26T10:00:00Z' })
+    expect(isStepComplete('submit', submitted)).toBe(true)
+    expect(initialStep(submitted)).toBe('bank')
+  })
+
+  it('falls back to the beginning when nothing at all is outstanding', () => {
+    const done = finished({ submittedAt: '2026-08-26T10:00:00Z', bankAccount: BANK })
+    expect(initialStep(done)).toBe('business')
   })
 })

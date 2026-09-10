@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Check, Pencil } from 'lucide-react'
 import {
   WizardAboutStep,
   WizardAreasStep,
+  WizardBankStep,
   WizardBusinessStep,
   WizardCategoriesStep,
   WizardDocumentsStep,
@@ -13,6 +14,7 @@ import {
   WizardSubmitStep,
 } from '@/components/vendor/wizard-steps'
 import {
+  initialStep,
   isStepComplete,
   isStepUnlocked,
   STEPS,
@@ -64,6 +66,7 @@ export function SinglePageListingForm({
   categories,
   cities,
   vendorId,
+  canManageBank,
   showHeader = true,
 }: {
   vendor: VendorWorkspace
@@ -71,6 +74,12 @@ export function SinglePageListingForm({
   categories: CategoryRow[]
   cities: CityRow[]
   vendorId: string
+  /**
+   * Whether this member holds `billing.manage` — the owner alone. Resolved on
+   * the server and passed down rather than inferred here, and re-checked by
+   * both the Server Action and RLS regardless of what it says.
+   */
+  canManageBank: boolean
   /** False where the page already has a heading — see the header below. */
   showHeader?: boolean
 }) {
@@ -78,10 +87,10 @@ export function SinglePageListingForm({
   const unlocked = useCallback((step: StepKey) => isStepUnlocked(step, vendor), [vendor])
 
   // Open on the first unfinished step: returning vendors resume where they
-  // stopped rather than at a screen they already filled in.
-  const [current, setCurrent] = useState<StepKey>(
-    () => STEPS.find((s) => !isStepComplete(s.id, vendor))?.id ?? 'business',
-  )
+  // stopped rather than at a screen they already filled in. `initialStep` skips
+  // optional steps while anything required is outstanding — otherwise a
+  // complete, live listing would open on Bank every time.
+  const [current, setCurrent] = useState<StepKey>(() => initialStep(vendor))
   const [blocked, setBlocked] = useState<string | null>(null)
 
   const index = STEP_INDEX[current]
@@ -187,6 +196,8 @@ export function SinglePageListingForm({
                   <WizardMediaStep {...stepProps} />
                 ) : current === 'documents' ? (
                   <WizardDocumentsStep {...stepProps} documents={documents} />
+                ) : current === 'bank' ? (
+                  <WizardBankStep {...stepProps} canManageBank={canManageBank} />
                 ) : (
                   <ReviewStep vendor={vendor} vendorId={vendorId} onEdit={goTo} />
                 )}
@@ -290,7 +301,13 @@ function ReviewStep({
               <span className="min-w-0 flex-1">
                 <span className="text-sand-900 block text-sm font-medium">{s.label}</span>
                 <span className={cn('block text-xs', done ? 'text-sand-500' : 'text-sand-400')}>
-                  {done ? 'Completed' : 'Not finished yet'}
+                  {/*
+                    An optional step that is empty is not an outstanding task.
+                    Reading "Not finished yet" beside Bank on the screen whose
+                    job is to say whether you can submit tells a vendor they are
+                    blocked by something that blocks nothing.
+                  */}
+                  {done ? 'Completed' : s.optional ? 'Optional — not added' : 'Not finished yet'}
                 </span>
               </span>
               <button

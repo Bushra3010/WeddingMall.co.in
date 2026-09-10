@@ -9,6 +9,7 @@ import {
 import { listCategories, listCities } from '@/server/dal/taxonomy'
 import { createVendorForUser } from '@/server/services/vendor-onboarding'
 import { getActor } from '@/server/dal/actor'
+import { VENDOR_ROLE_CAPABILITIES, type VendorRole } from '@/lib/permissions'
 
 import { buildMetadata } from '@/lib/seo'
 
@@ -33,9 +34,27 @@ export default async function ListingWizardPage() {
    * /vendor/join, so a new vendor bounced straight back out of the wizard they
    * had just signed up for.
    */
-  const vendorId = mine.length > 0 ? mine[0].vendor.id : await createVendorForUser(actor)
+  const existing = mine.length > 0 ? mine[0] : null
+  const vendorId = existing ? existing.vendor.id : await createVendorForUser(actor)
 
   if (!vendorId) redirect('/vendor/join')
+
+  /*
+   * Not `canVendor(actor, vendorId, …)`.
+   *
+   * `getActor()` is wrapped in React `cache()` and was resolved at the top of
+   * this request — before `createVendorForUser` wrote the membership. So for a
+   * brand-new vendor `actor.vendorRoles` is empty, and asking it would tell the
+   * person who just created the business that they are not its owner. Same
+   * memoisation that once made this page redirect new vendors straight back
+   * out of the wizard (see the note above).
+   *
+   * `createVendorForUser` inserts a `vendor_owner` membership, so a vendor
+   * created on this request is owned by the actor by construction.
+   */
+  const canManageBank = existing
+    ? VENDOR_ROLE_CAPABILITIES[existing.role as VendorRole]?.includes('billing.manage') === true
+    : true
   const [vendor, documents, categories, cities] = await Promise.all([
     getVendorWorkspace(vendorId),
     getVerificationDocuments(vendorId),
@@ -52,6 +71,7 @@ export default async function ListingWizardPage() {
       categories={categories}
       cities={cities}
       vendorId={vendorId}
+      canManageBank={canManageBank}
     />
   )
 }
