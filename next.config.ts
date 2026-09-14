@@ -54,6 +54,13 @@ const nextConfig: NextConfig = {
 
   images: {
     formats: ['image/avif', 'image/webp'],
+    /*
+     * Next 16 refuses any `quality` not listed here with a 400 — the default
+     * allows 75 alone, so `<Image quality={90}>` does not render a softer
+     * image, it renders no image. 90 is here for the hero, where the artwork is
+     * already being upscaled and compression softness compounds with it.
+     */
+    qualities: [75, 90],
     remotePatterns: supabaseHost
       ? [{ protocol: 'https', hostname: supabaseHost, pathname: '/storage/v1/object/public/**' }]
       : [],

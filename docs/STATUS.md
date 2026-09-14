@@ -1481,6 +1481,35 @@ Verified: `npm run verify` — lint 0 warnings, typecheck clean, **214 unit test
 passed** (4 new), build clean.
 
 
+## Hero artwork: static, desktop-only, and under-resolved (2026-09-15)
+
+Three asked-for changes and one defect found while making them.
+
+- **Static.** `slow-zoom` scaled the hero to 1.08 on a loop. Removed.
+- **Desktop only.** The photograph renders from `lg`; the phone keeps the
+  gradient. The mobile top-down scrim went with it — there is no longer a
+  photograph for it to hold text off, and the gradient is already dark.
+- **`quality={90}` returned HTTP 400.** Next 16 refuses any quality not listed
+  in `images.qualities`, and the default allows 75 alone — so the prop did not
+  produce a softer image, it produced *no* image. Caught by asking the optimiser
+  directly rather than trusting the page to look right. `next.config.ts` now
+  lists `[75, 90]`.
+
+### The artwork is too small, and no code change fixes it
+
+`public/Images/hero.png` is **512 x 288**. The hero spans the viewport, so at
+1440px on a 2x display the browser paints those 512 pixels across 2880 device
+pixels — a **5.6x upscale**, and more on a larger monitor. Next never upscales:
+`/_next/image?...&w=3840` returns 512 x 288 whatever width is asked for, which
+was verified by fetching it rather than inferred.
+
+**A hero at 2560 x 1440 or better is the fix.** Nothing else will make it sharp.
+
+The nine category images are also 512px on the long edge, and those are fine —
+the cards are 224 CSS px wide, so 512 covers a 2x display with room to spare.
+Only the full-bleed hero is starved.
+
+
 ## Notes
 
 - All seed and demo data is fictional (PRD 2.3, Epic G). `npm run seed:demo -- --clean` removes the demo vendors.

@@ -55,46 +55,51 @@ export function Hero({
         className="absolute inset-0 -z-10 overflow-hidden rounded-b-[2rem] lg:rounded-none"
       >
         <div className="from-brand-950 via-brand-800 to-brand-600 absolute inset-0 bg-gradient-to-br" />
-        <Image
-          src={image}
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover motion-safe:animate-[slow-zoom_24s_ease-in-out_infinite_alternate]"
-        />
 
         {/*
-          Scrim (PRD 7.3). Two of them, because the two layouts put the text in
-          different places, and one gradient cannot serve both.
+          Desktop only. The phone keeps the gradient, which is also why the
+          mobile scrim below `lg` could go: there is no photograph left for it
+          to hold text off.
+
+          `sizes="100vw"` still applies inside the hidden wrapper, so a phone
+          preloads a ~384px variant rather than the desktop one — a few
+          kilobytes for markup it will not paint, and the price of keeping the
+          optimiser rather than hand-rolling a `<picture>`.
+
+          Not animated. `slow-zoom` scaled this to 1.08, which on an image
+          already being upscaled is magnification on top of magnification.
+        */}
+        <div className="absolute inset-0 hidden lg:block">
+          <Image
+            src={image}
+            alt=""
+            fill
+            priority
+            quality={90}
+            sizes="100vw"
+            className="object-cover"
+          />
+        </div>
+
+        {/*
+          Scrim (PRD 7.3), and only one now — the phone has no photograph to
+          hold text off, so the base gradient is its whole backdrop.
 
           From `lg` the headline occupies the left half of a wide canvas, so the
-          scrim is strong there and gone by 60% of the width — the right-hand
-          two-fifths of the photograph render at full strength. The version
-          before this ran `/95` to `/70` edge to edge: contrast to spare, and
-          the whole image turned into a maroon wash, scrimming the photograph it
-          exists to show.
+          scrim is strong there and gone by 60% of the width: the right-hand
+          two-fifths of the artwork render at full strength. The version before
+          this ran `/95` to `/70` edge to edge — contrast to spare, and the whole
+          image turned into a maroon wash, scrimming the photograph it exists to
+          show.
 
-          Below `lg` the hero is a compact card whose text spans its full width,
-          so that same left-to-right fade leaves the end of the headline on open
-          sky. Top-down instead.
-
-          Measured, not judged by eye — the artwork is brightest exactly where a
-          horizontal scrim is thinnest, so the worst case is the *end* of the
-          headline. Sampling the composited layers across each text box:
-
-            1440px   headline 4.38:1   paragraph and statistics 5.96:1
-             375px   headline 9.16:1   paragraph 6.80:1
-
-          against the 3:1 WCAG AA asks of this display size and 4.5:1 of the
-          smaller text. The phone figures are what the top-down scrim bought:
-          the horizontal one measured 1.54:1 and 2.22:1 there, which is white on
-          a sunset. Lightening either further starts to fail, and both numbers
-          belong to this photograph — re-measure if the artwork is swapped.
+          Measured, not judged by eye. The artwork is brightest exactly where
+          the scrim is thinnest, so the worst case is the *end* of the headline,
+          not its start. Sampling the composited layers across each text box at
+          1440px: headline 4.38:1 against the 3:1 WCAG AA asks of this display
+          size, paragraph and statistics 5.96:1 against 4.5:1. Lightening it
+          further starts to fail, and those numbers belong to this photograph —
+          re-measure if the artwork is swapped.
         */}
-        <div className="from-brand-950/88 via-brand-950/72 to-brand-950/45 absolute inset-0 bg-gradient-to-b lg:hidden" />
-        {/* From `lg` the headline occupies the left half and the photograph
-            carries the rest. */}
         <div className="from-brand-950/92 via-brand-950/45 absolute inset-0 hidden bg-gradient-to-r via-40% to-transparent lg:block" />
         {/* Foot only: the search card overhangs this edge and needs to land on
             something darker than a sunlit aisle. */}
