@@ -45,7 +45,12 @@ export function Hero({
   imagePath?: string | null
   eyebrow?: string | null
 }) {
-  const image = storagePublicUrl('vendor-media', imagePath) ?? '/Images/hero.png'
+  // An admin-configured hero (ADR-024) replaces both; the shipped artwork is
+  // per-breakpoint because the two crops are different pictures, not one
+  // picture at two sizes.
+  const configured = storagePublicUrl('vendor-media', imagePath)
+  const image = configured ?? '/Images/hero.png'
+  const mobileImage = configured ?? '/Images/hero-mobile.png'
 
   return (
     <section className="relative isolate">
@@ -57,18 +62,33 @@ export function Hero({
         <div className="from-brand-950 via-brand-800 to-brand-600 absolute inset-0 bg-gradient-to-br" />
 
         {/*
-          Desktop only. The phone keeps the gradient, which is also why the
-          mobile scrim below `lg` could go: there is no photograph left for it
-          to hold text off.
+          One landscape crop for the wide layout, one portrait crop for the
+          phone — `object-cover` on a 16:9 original would throw away most of a
+          phone's frame, and vice versa.
 
-          `sizes="100vw"` still applies inside the hidden wrapper, so a phone
-          preloads a ~384px variant rather than the desktop one — a few
-          kilobytes for markup it will not paint, and the price of keeping the
-          optimiser rather than hand-rolling a `<picture>`.
+          Both are in the markup and CSS picks one, so `sizes` is what stops
+          each visitor paying for the other: at `lg` and up the phone artwork is
+          declared 1px wide, so the optimiser is asked for its smallest variant
+          rather than a full-width one nobody will paint. Cheaper than
+          hand-rolling a `<picture>` and keeps the optimiser.
 
-          Not animated. `slow-zoom` scaled this to 1.08, which on an image
-          already being upscaled is magnification on top of magnification.
+          Neither is animated. `slow-zoom` scaled these to 1.08, which on
+          artwork already being upscaled is magnification on magnification.
         */}
+        <div className="absolute inset-0 lg:hidden">
+          <Image
+            src={mobileImage}
+            alt=""
+            fill
+            priority
+            quality={90}
+            sizes="(min-width: 1024px) 1px, 100vw"
+            // The compact card shows a band about three-fifths of this
+            // portrait crop. Centred, that band is canopy and aisle; nudged
+            // down it is the mandap and the sunset, which is the picture.
+            className="object-cover object-[50%_58%]"
+          />
+        </div>
         <div className="absolute inset-0 hidden lg:block">
           <Image
             src={image}
@@ -76,30 +96,37 @@ export function Hero({
             fill
             priority
             quality={90}
-            sizes="100vw"
+            sizes="(max-width: 1023px) 1px, 100vw"
             className="object-cover"
           />
         </div>
 
         {/*
-          Scrim (PRD 7.3), and only one now — the phone has no photograph to
-          hold text off, so the base gradient is its whole backdrop.
+          Scrim (PRD 7.3). One per breakpoint, because the two layouts put the
+          text in different places and one gradient cannot serve both.
 
           From `lg` the headline occupies the left half of a wide canvas, so the
-          scrim is strong there and gone by 60% of the width: the right-hand
-          two-fifths of the artwork render at full strength. The version before
-          this ran `/95` to `/70` edge to edge — contrast to spare, and the whole
-          image turned into a maroon wash, scrimming the photograph it exists to
-          show.
+          scrim runs left to right and is gone by 60% of the width: the
+          right-hand two-fifths of the artwork render at full strength. The
+          version before this ran `/95` to `/70` edge to edge — contrast to
+          spare, and the whole image turned into a maroon wash.
 
-          Measured, not judged by eye. The artwork is brightest exactly where
-          the scrim is thinnest, so the worst case is the *end* of the headline,
-          not its start. Sampling the composited layers across each text box at
-          1440px: headline 4.38:1 against the 3:1 WCAG AA asks of this display
-          size, paragraph and statistics 5.96:1 against 4.5:1. Lightening it
-          further starts to fail, and those numbers belong to this photograph —
-          re-measure if the artwork is swapped.
+          Below `lg` the text spans the card's full width, so that same fade
+          would leave the end of the headline on open sky. Top-down instead.
+
+          Measured, not judged by eye. Sampling the composited layers across
+          each text box:
+
+            1440px   headline 4.38:1   paragraph and statistics 5.96:1
+             375px   headline 8.24:1   paragraph 4.84:1
+
+          against the 3:1 WCAG AA asks of this display size and 4.5:1 of the
+          smaller text. The phone paragraph is the tight one: it sits over the
+          brightest part of the sunset, and a first pass at `/80 /52 /28` put it
+          at 3.43:1. These numbers belong to this artwork — re-measure if either
+          picture is swapped.
         */}
+        <div className="from-brand-950/82 via-brand-950/66 to-brand-950/38 absolute inset-0 bg-gradient-to-b lg:hidden" />
         <div className="from-brand-950/92 via-brand-950/45 absolute inset-0 hidden bg-gradient-to-r via-40% to-transparent lg:block" />
         {/* Foot only: the search card overhangs this edge and needs to land on
             something darker than a sunlit aisle. */}

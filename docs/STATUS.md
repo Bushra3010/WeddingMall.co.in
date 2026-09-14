@@ -1481,6 +1481,30 @@ Verified: `npm run verify` — lint 0 warnings, typecheck clean, **214 unit test
 passed** (4 new), build clean.
 
 
+## The phone hero gets its own artwork (2026-09-15)
+
+`public/Images/hero-mobile.png` (512 x 909, portrait) renders below `lg`;
+`hero.png` renders from `lg`. Two crops rather than one picture at two sizes —
+`object-cover` on a 16:9 original throws away most of a phone's frame.
+
+Both sit in the markup with CSS choosing one, so `sizes` is what stops each
+visitor paying for the other: the phone artwork is declared `1px` from `lg` up,
+and the desktop artwork `1px` below it, so the optimiser is asked for the
+smallest variant of whichever will not be painted. Confirmed at 1440px — the
+hidden phone image requests `w=640`, not `w=3840`.
+
+`object-[50%_58%]` on the phone: the card shows roughly three-fifths of the
+portrait crop, and centred that band is canopy and aisle rather than the mandap.
+
+Contrast, measured across each text box: 375px headline 8.24:1, paragraph
+4.84:1. The paragraph is the tight one — it sits over the brightest part of the
+sunset, and a first pass at `/80 /52 /28` measured 3.43:1 against the 4.5:1 it
+needs. Desktop is unchanged at 4.38:1 and 5.96:1.
+
+This reverses the desktop-only decision below, which was made when the only
+artwork was a landscape crop.
+
+
 ## Hero artwork: static, desktop-only, and under-resolved (2026-09-15)
 
 Three asked-for changes and one defect found while making them.
