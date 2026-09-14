@@ -1481,6 +1481,36 @@ Verified: `npm run verify` — lint 0 warnings, typecheck clean, **214 unit test
 passed** (4 new), build clean.
 
 
+## The hero section is sized from its artwork (2026-09-15)
+
+`min-h-[177.54vw] lg:min-h-[56.25vw]` on the section — 512:909 for
+`hero-mobile.png`, 16:9 for `hero.jpg` — so `object-cover` has nothing left to
+crop and the whole picture is visible. At 1440px the section measures exactly
+1440 x 810. `object-[50%_58%]` went with it: there is no crop left to position.
+
+`min-h` rather than `aspect-[]` because the content still has to fit. Below
+about 1100px wide the text needs more height than 16:9 gives, and there the
+image crops again — a hard aspect ratio would clip the text instead, which is
+the worse failure. The inner container is now a flex column so the search card
+stays on the section's bottom edge rather than floating wherever the text ends.
+
+**The phone hero is now 666px tall** (was ~390). The search card still clears
+the fold at 812px — measured, its bottom sits at 707 — but the categories no
+longer do. That reverses part of the 2026-08-02 mobile decision, which wanted
+the promise, the search and the top of the category list on one screen. Kept
+because the request was explicit; say the word and the phone can go back to a
+compact card with a cropped image.
+
+Contrast re-measured, because uncropping changes what sits behind the text:
+
+    1440px   headline 3.93:1   paragraph 5.91:1   statistics 6.31:1
+     375px   headline 9.55:1   paragraph 6.85:1
+
+The desktop headline is the tight one and got tighter — 4.38:1 before, 3.93:1
+now, since more open sky is behind the end of it. Still above the 3:1 this
+display size needs.
+
+
 ## Hero resampled so the browser stops stretching it (2026-09-15)
 
 Nothing was zooming the desktop hero — `slow-zoom` went two commits ago and
