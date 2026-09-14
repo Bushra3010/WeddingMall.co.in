@@ -11,9 +11,10 @@ import { cn } from '@/lib/utils'
 /**
  * Compact save control for a vendor card (PRD 6.5).
  *
- * Distinct from `ShortlistButton`, which is the labelled full-width control on
- * a vendor's own page. This one is a bare icon floating over card artwork, so
- * it has to carry its whole meaning in `aria-label`.
+ * Distinct from `ShortlistButton`, which is the full-width control on a
+ * vendor's own page. This one floats over card artwork. It carries a visible
+ * label as well as an `aria-label`: a lone heart over a photograph is read as
+ * "like" as often as "save", and the word costs a card nothing.
  *
  * Signed-out visitors get a link to sign in rather than a button that submits
  * and fails: an authentication error surfacing as a red message under a heart
@@ -44,16 +45,17 @@ export function SaveButton({
   const failed = state !== null && !state.ok
 
   const shell =
-    'inline-flex size-9 items-center justify-center rounded-full bg-white/95 shadow-[var(--shadow-soft)] backdrop-blur transition-transform duration-200 hover:scale-110 active:scale-95'
+    'inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-medium shadow-[var(--shadow-soft)] backdrop-blur transition-transform duration-200 hover:scale-105 active:scale-95'
 
   if (!signedIn) {
     return (
       <Link
         href={`/auth/sign-in?next=${encodeURIComponent(`/vendor/${vendorSlug}`)}`}
         aria-label={`Sign in to save ${vendorName}`}
-        className={cn(shell, 'text-sand-500 hover:text-blush-600', className)}
+        className={cn(shell, 'text-sand-700 hover:text-blush-600', className)}
       >
-        <Heart aria-hidden="true" className="size-4" />
+        <Heart aria-hidden="true" className="size-3.5" />
+        Shortlist
       </Link>
     )
   }
@@ -73,12 +75,13 @@ export function SaveButton({
           className,
           saved ? 'text-blush-600' : 'text-sand-500 hover:text-blush-600',
           pending && 'opacity-60',
-          // An icon-only control cannot fail silently; the ring is the sighted
-          // cue and the live region below is the assistive one.
+          // The ring is the sighted cue for a failed toggle; the live region
+          // below is the assistive one.
           failed && 'ring-2 ring-[var(--color-danger)]',
         )}
       >
-        <Heart aria-hidden="true" className={cn('size-4', saved && 'fill-current')} />
+        <Heart aria-hidden="true" className={cn('size-3.5', saved && 'fill-current')} />
+        {saved ? 'Saved' : 'Shortlist'}
       </button>
       {failed ? (
         <span role="alert" className="sr-only">

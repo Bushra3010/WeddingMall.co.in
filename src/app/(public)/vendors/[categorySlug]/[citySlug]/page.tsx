@@ -3,13 +3,14 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 
-import { AttributeFilters } from '@/components/public/attribute-filters'
+import { FilterBar } from '@/components/public/filter-bar'
 import { SearchResults } from '@/components/public/search-results'
 import { CardSkeleton } from '@/components/ui/states'
 import { parseSearchParams } from '@/features/search/filters'
 import { breadcrumbSchema, buildMetadata } from '@/lib/seo'
 import {
   getCategoryBySlug,
+  listCities,
   getCityBySlug,
   resolveSlugRedirect,
   listFilterableAttributes,
@@ -70,10 +71,12 @@ export default async function CategoryCityPage({
   searchParams: SearchParams
 }) {
   const { categorySlug, citySlug } = await params
-  const [category, city, attributeFilters] = await Promise.all([
+  const [category, city, attributeFilters, cities] = await Promise.all([
     getCategoryBySlug(categorySlug),
     getCityBySlug(citySlug),
     listFilterableAttributes(categorySlug),
+    // Feeds the Location pill, so someone on one city page can reach another.
+    listCities(12),
   ])
   if (!category || !city) {
     await redirectRenamedSlugs(categorySlug, citySlug)
@@ -134,11 +137,16 @@ export default async function CategoryCityPage({
         />
       ) : null}
 
-      {attributeFilters.length > 0 ? (
-        <div className="border-sand-200 mt-6 rounded-[var(--radius-card)] border bg-white p-4">
-          <AttributeFilters attributes={attributeFilters} filters={filters} basePath={basePath} />
-        </div>
-      ) : null}
+      {/* Same control as the category page above it: two filter designs on
+          pages one click apart is a worse inconsistency than either design. */}
+      <FilterBar
+        filters={filters}
+        basePath={basePath}
+        cities={cities}
+        attributes={attributeFilters}
+        categorySlug={category.slug}
+        className="mt-6"
+      />
 
       <div className="mt-8">
         <Suspense fallback={<ResultsSkeleton />}>

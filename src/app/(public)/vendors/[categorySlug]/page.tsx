@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 
-import { AttributeFilters } from '@/components/public/attribute-filters'
+import { FilterBar } from '@/components/public/filter-bar'
 import { SearchResults } from '@/components/public/search-results'
 import { CardSkeleton } from '@/components/ui/states'
 import { parseSearchParams } from '@/features/search/filters'
@@ -73,7 +73,7 @@ export default async function CategoryPage({
   const basePath = `/vendors/${category.slug}`
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+    <div>
       <script
         type="application/ld+json"
         // Breadcrumb data mirrors the visible trail (PRD 6.3, 11.2).
@@ -88,65 +88,63 @@ export default async function CategoryPage({
         }}
       />
 
-      <nav aria-label="Breadcrumb" className="text-sand-500 text-xs">
-        <ol className="flex gap-1.5">
-          <li>
-            <Link href="/" className="hover:text-brand-700">
-              Home
-            </Link>
-          </li>
-          <li aria-hidden="true">/</li>
-          <li>
-            <Link href="/vendors" className="hover:text-brand-700">
-              Vendors
-            </Link>
-          </li>
-          <li aria-hidden="true">/</li>
-          <li aria-current="page" className="text-sand-700">
-            {category.name}
-          </li>
-        </ol>
-      </nav>
-
-      <h1 className="font-display text-sand-900 mt-3 text-3xl">{category.name} for weddings</h1>
-
-      {/* Editable unique intro copy — required for an indexable page (PRD 11.2). */}
-      {category.intro_html ? (
-        <div
-          className="prose prose-sm text-sand-700 mt-3 max-w-prose"
-          dangerouslySetInnerHTML={{ __html: category.intro_html }}
-        />
-      ) : category.description ? (
-        <p className="text-sand-600 mt-3 max-w-prose text-sm">{category.description}</p>
-      ) : null}
-
-      {cities.length > 0 ? (
-        <nav aria-label="Cities" className="mt-6">
-          <ul className="flex flex-wrap gap-2">
-            {cities.map((city) => (
-              <li key={city.id}>
-                <Link
-                  href={`/vendors/${category.slug}/${city.slug}`}
-                  className="border-sand-300 text-sand-700 hover:border-brand-300 inline-flex rounded-full border bg-white px-3 py-1.5 text-xs"
-                >
-                  {category.name} in {city.name}
+      {/*
+        Centred banner. The subtitle is the category's own copy where it has
+        any — a generic line repeated across every category page is exactly the
+        thin, duplicated content PRD 11.2 wants these pages to avoid, and the
+        description is the only text on the page that differs between them.
+      */}
+      <header className="from-blush-100 via-blush-50 to-sand-50 bg-gradient-to-b">
+        <div className="mx-auto max-w-7xl px-4 py-12 text-center sm:px-6 sm:py-16">
+          <nav aria-label="Breadcrumb" className="text-sand-500 mb-4 text-xs">
+            <ol className="flex justify-center gap-1.5">
+              <li>
+                <Link href="/" className="hover:text-brand-700">
+                  Home
                 </Link>
               </li>
-            ))}
-          </ul>
-        </nav>
-      ) : null}
+              <li aria-hidden="true">/</li>
+              <li>
+                <Link href="/vendors" className="hover:text-brand-700">
+                  Vendors
+                </Link>
+              </li>
+              <li aria-hidden="true">/</li>
+              <li aria-current="page" className="text-sand-700">
+                {category.name}
+              </li>
+            </ol>
+          </nav>
 
-      {attributeFilters.length > 0 ? (
-        <div className="border-sand-200 mt-6 rounded-[var(--radius-card)] border bg-white p-4">
-          <AttributeFilters attributes={attributeFilters} filters={filters} basePath={basePath} />
+          <h1 className="font-display text-sand-900 text-3xl sm:text-4xl">{category.name}</h1>
+
+          {category.intro_html ? (
+            <div
+              className="prose prose-sm text-sand-600 mx-auto mt-3 max-w-2xl"
+              dangerouslySetInnerHTML={{ __html: category.intro_html }}
+            />
+          ) : (
+            <p className="text-sand-600 mx-auto mt-3 max-w-2xl text-sm sm:text-base">
+              {category.description ?? 'Discover the perfect service for your special day.'}
+            </p>
+          )}
         </div>
-      ) : null}
+      </header>
 
-      <div className="mt-8">
-        <Suspense fallback={<ResultsSkeleton />}>
-          <SearchResults filters={filters} basePath={basePath} />
-        </Suspense>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <FilterBar
+          filters={filters}
+          basePath={basePath}
+          cities={cities}
+          attributes={attributeFilters}
+          categorySlug={category.slug}
+        />
+
+        <div className="mt-8">
+          <Suspense fallback={<ResultsSkeleton />}>
+            <SearchResults filters={filters} basePath={basePath} />
+          </Suspense>
+        </div>
       </div>
     </div>
   )

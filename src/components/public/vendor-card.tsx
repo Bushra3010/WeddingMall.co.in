@@ -69,6 +69,12 @@ export function VendorCard({
                 Sponsored
               </span>
             ) : null}
+            {vendor.verificationStatus === 'verified' ? (
+              <span className="text-sand-900 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase shadow-[var(--shadow-soft)] backdrop-blur">
+                <BadgeCheck aria-hidden="true" className="text-brand-600 size-3" />
+                Verified
+              </span>
+            ) : null}
             {vendor.ratingCount > 0 ? (
               <span className="text-sand-900 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold shadow-[var(--shadow-soft)] backdrop-blur">
                 <Star aria-hidden="true" className="fill-gold-500 text-gold-500 size-3" />
@@ -90,14 +96,9 @@ export function VendorCard({
         </div>
 
         <div className="p-4 sm:p-5">
-          <h3 className="text-sand-900 group-hover:text-brand-700 flex items-center gap-1 font-medium transition-colors">
+          {/* Verification is badged on the artwork above, not repeated here. */}
+          <h3 className="text-sand-900 group-hover:text-brand-700 font-medium transition-colors">
             <span className="line-clamp-1">{vendor.displayName}</span>
-            {vendor.verificationStatus === 'verified' ? (
-              <BadgeCheck
-                aria-label="Verified business"
-                className="text-brand-600 size-4 shrink-0"
-              />
-            ) : null}
           </h3>
 
           {vendor.cityName ? (

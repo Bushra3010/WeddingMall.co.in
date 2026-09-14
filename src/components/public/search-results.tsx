@@ -52,9 +52,9 @@ export async function SearchResults({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sand-600 text-sm" aria-live="polite">
-          {page.total} {page.total === 1 ? 'vendor' : 'vendors'}
+      <div className="border-sand-200 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+        <p className="text-sand-800 text-sm font-medium" aria-live="polite">
+          {page.total} {page.total === 1 ? 'business' : 'businesses'} available
         </p>
 
         <nav aria-label="Sort results" className="flex flex-wrap gap-1">
@@ -79,13 +79,31 @@ export async function SearchResults({
         </nav>
       </div>
 
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {page.results.map((vendor) => (
-          <li key={vendor.vendorId}>
-            <VendorCard vendor={vendor} />
-          </li>
-        ))}
-      </ul>
+      <section aria-labelledby="results-heading">
+        {/*
+          The heading names the ordering rather than asserting anything about
+          the businesses under it. "Most preferred" is true of the recommended
+          ranking and of nothing else, so sorting by price or by date says so
+          instead — a fixed banner over a re-sorted list would be a claim the
+          page cannot support (PRD 6.1).
+        */}
+        <h2
+          id="results-heading"
+          className="border-brand-600 text-sand-900 border-l-4 pl-3 text-base font-semibold tracking-wide uppercase"
+        >
+          {filters.sort === 'recommended'
+            ? 'Most preferred'
+            : SORT_OPTIONS.find((option) => option.value === filters.sort)?.label}
+        </h2>
+
+        <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {page.results.map((vendor) => (
+            <li key={vendor.vendorId}>
+              <VendorCard vendor={vendor} save />
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {totalPages > 1 ? (
         <nav aria-label="Pagination" className="flex items-center justify-center gap-2">

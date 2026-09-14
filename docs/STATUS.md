@@ -1607,6 +1607,56 @@ the cards are 224 CSS px wide, so 512 covers a 2x display with room to spare.
 Only the full-bleed hero is starved.
 
 
+## Category page rebuilt around a filter row (2026-09-15)
+
+`/vendors/[category]` and `/vendors/[category]/[city]` now open with a centred
+banner, a row of filter pills, a result count and a ranked section heading,
+per the supplied design.
+
+Files: `components/public/filter-bar.tsx` (new),
+`app/(public)/vendors/[categorySlug]/page.tsx`,
+`app/(public)/vendors/[categorySlug]/[citySlug]/page.tsx`,
+`components/public/search-results.tsx`, `components/public/vendor-card.tsx`,
+`components/public/save-button.tsx`.
+
+- **The filters are `<details>` disclosures, not a scripted menu.** Every option
+  stays a plain link, so the page keeps working with no client JavaScript —
+  the contract the filters already had as a list (PRD 6.2, 14.1). The cost is
+  that a disclosure cannot close on an outside click.
+- **The stacked panel is gone.** Eight labelled groups ran down the page and
+  pushed the first result off the screen. Budget, Location, Ratings and the
+  category's attributes are now four pills, each showing its applied value or a
+  count so the state of a search is legible without opening anything.
+- **The Location pill links to the dedicated city pages**, not `?city=`. Those
+  pages carry their own copy and metadata and are what search engines index
+  (PRD 11.2); a query parameter would quietly strand them.
+- **The banner subtitle is the category's own copy.** The reference design uses
+  one generic line on every category page, which is the thin duplicated content
+  PRD 11.2 exists to prevent — the description is the only text that differs
+  between these pages. The generic line is the fallback when a category has no
+  description.
+- **"Most preferred" names the ordering, not the businesses.** It is true of the
+  recommended ranking and nothing else, so sorting by price or date shows that
+  sort's name instead. A fixed banner over a re-sorted list would be a claim the
+  page cannot support (PRD 6.1).
+- Verification moved onto the card artwork as a VERIFIED pill and is no longer
+  repeated beside the name; the save control gained a visible "Shortlist" label,
+  since a lone heart over a photograph reads as "like" as often as "save".
+
+The city page took the same bar rather than keeping the old panel: two filter
+designs on pages one click apart is a worse inconsistency than either design.
+
+Verified in a browser at 1440px and 375px. The Services pill was exercised end
+to end — selecting "Resort" gives `?attr_venue_type=Resort`, the pill reads
+"1 selected" and the option is checked. **It returns nothing**, correctly: no
+vendor has answered `venue_type`, which is the same empty
+`vendor_attribute_values` noted above. Every pill will stay decorative until
+those answers exist.
+
+Verified: `npm run verify` — lint 0 warnings, typecheck clean, 286 unit tests,
+build clean.
+
+
 ## Notes
 
 - All seed and demo data is fictional (PRD 2.3, Epic G). `npm run seed:demo -- --clean` removes the demo vendors.
