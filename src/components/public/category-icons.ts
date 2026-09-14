@@ -35,6 +35,33 @@ export function categoryIcon(slug: string): LucideIcon {
   return CATEGORY_ICONS[slug] ?? Sparkles
 }
 
+/**
+ * Commissioned artwork per category, in `public/Images`, named for the slug it
+ * illustrates — so adding a category's picture is dropping in `<slug>.png`, no
+ * code change and no mapping table to forget.
+ *
+ * This wins over `CategoryTile.imagePath`, which borrows a real vendor's
+ * approved cover. That fallback still matters for a category nobody has drawn
+ * yet, but where art exists it is the more consistent choice: a row mixing one
+ * photograph of an actual banquet hall with eight illustrations reads as a
+ * mistake, and the borrowed cover changes whenever that vendor re-uploads.
+ */
+const CATEGORY_IMAGES = new Set([
+  'car',
+  'caterers',
+  'decorators',
+  'makeup-artists',
+  'mehendi-artists',
+  'music-and-dj',
+  'photographers',
+  'planners',
+  'venues',
+])
+
+export function categoryImage(slug: string): string | null {
+  return CATEGORY_IMAGES.has(slug) ? `/Images/${slug}.png` : null
+}
+
 /** Rotating gradient tints so a row of tiles is not monotone. */
 export const CATEGORY_TINTS = [
   'from-brand-500 to-rose-500',

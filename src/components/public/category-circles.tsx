@@ -1,7 +1,12 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
-import { categoryIcon, categoryTint, vendorCountLabel } from '@/components/public/category-icons'
+import {
+  categoryIcon,
+  categoryImage,
+  categoryTint,
+  vendorCountLabel,
+} from '@/components/public/category-icons'
 import { storagePublicUrl } from '@/lib/supabase/storage'
 import { cn } from '@/lib/utils'
 import type { CategoryTile } from '@/server/dal/homepage'
@@ -14,9 +19,11 @@ import type { CategoryTile } from '@/server/dal/homepage'
  * desktop carousel still renders above `lg`; this is a different layout of the
  * same data, not a second source of truth.
  *
- * Tiles are square-cropped photographs when a vendor in the category has an
- * approved cover, and a gradient icon otherwise. Both paths reserve identical
- * space, so filling the site with real imagery later cannot shift the layout.
+ * Tiles are round crops of the category's own artwork, falling back to a real
+ * vendor's approved cover and then to a gradient icon — the same order the
+ * desktop carousel uses, so a category cannot be drawn one way here and
+ * another there. Every path reserves identical space, so filling the site with
+ * imagery later cannot shift the layout.
  */
 export function CategoryCircles({
   categories,
@@ -31,7 +38,7 @@ export function CategoryCircles({
     <ul className={cn('grid grid-cols-4 gap-x-3 gap-y-6', className)}>
       {categories.map((category, index) => {
         const Icon = categoryIcon(category.slug)
-        const image = storagePublicUrl('vendor-media', category.imagePath)
+        const image = categoryImage(category.slug) ?? storagePublicUrl('vendor-media', category.imagePath)
 
         return (
           <li key={category.id}>
