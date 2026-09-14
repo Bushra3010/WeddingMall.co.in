@@ -1481,6 +1481,29 @@ Verified: `npm run verify` — lint 0 warnings, typecheck clean, **214 unit test
 passed** (4 new), build clean.
 
 
+## The phone hero goes back to a compact card (2026-09-15)
+
+Reverting the mobile half of the section-sized-from-artwork change below. The
+desktop half stands.
+
+`min-h-[177.54vw]` is off the section; `lg:min-h-[56.25vw]` stays, so from `lg`
+the hero is still exactly the artwork's 16:9 (1440 x 810 at 1440px) and nothing
+is cropped there. The phone is content-sized again and crops its artwork, with
+`object-[50%_58%]` back to pick the mandap out of the band rather than canopy
+and aisle. `mt-auto` on the search card became `lg:mt-auto` — there is no slack
+to take up when content sets the height.
+
+Measured: the phone hero is 347px again, down from 666, and **Browse by
+category starts at y=456 on an 812px screen** — back above the fold, which is
+what the 2026-08-02 compact card exists for.
+
+Contrast re-measured, since the crop is back: 375px headline 7.88:1, paragraph
+5.05:1. Desktop is untouched at 3.93 / 5.91 / 6.31.
+
+Still in place on the phone, and not part of this revert: `hero-mobile.png`
+itself, and the top-down scrim that holds text off it.
+
+
 ## The hero section is sized from its artwork (2026-09-15)
 
 `min-h-[177.54vw] lg:min-h-[56.25vw]` on the section — 512:909 for

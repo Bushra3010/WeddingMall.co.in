@@ -53,18 +53,23 @@ export function Hero({
   const mobileImage = configured ?? '/Images/hero-mobile.png'
 
   /*
-   * The section is sized from the artwork, not the other way round: its minimum
-   * height is the image's own aspect ratio expressed against the viewport
-   * width, so `object-cover` has nothing left to crop. 56.25vw is 16:9
-   * (hero.jpg, 2560x1440); 177.54vw is 512:909 (hero-mobile.png). Swap either
-   * picture for one of a different shape and these numbers change with it.
+   * From `lg` the section is sized from the artwork rather than the other way
+   * round: 56.25vw is `hero.jpg`'s own 16:9 against the viewport width, so
+   * `object-cover` has nothing left to crop. Swap that picture for one of a
+   * different shape and the number changes with it.
    *
-   * `min-h` rather than `aspect-[]` because the content still has to fit: on a
-   * narrow-but-short window the text is what sets the height, and a hard aspect
-   * ratio would clip it.
+   * `min-h` rather than `aspect-[]` because the content still has to fit. Below
+   * about 1100px the text needs more height than 16:9 gives and the image crops
+   * again there; a hard ratio would clip the text instead, the worse failure.
+   *
+   * The phone deliberately does NOT do this. Sized to `hero-mobile.png`'s
+   * 512:909 the card came out 666px tall, which pushed the category list off
+   * the first screen — and showing the promise, the search and the top of that
+   * list together is the whole point of the compact card (2026-08-02). The
+   * phone crops its artwork instead.
    */
   return (
-    <section className="relative isolate flex min-h-[177.54vw] flex-col lg:min-h-[56.25vw]">
+    <section className="relative isolate flex flex-col lg:min-h-[56.25vw]">
       {/* Backdrop */}
       <div
         aria-hidden="true"
@@ -102,7 +107,10 @@ export function Hero({
             priority
             quality={90}
             sizes="(min-width: 1024px) 1px, 100vw"
-            className="object-cover"
+            // The compact card shows a band about three-fifths of this portrait
+            // crop. Centred, that band is canopy and aisle; nudged down it is
+            // the mandap and the sunset, which is the picture.
+            className="object-cover object-[50%_58%]"
           />
         </div>
         <div className="absolute inset-0 hidden lg:block">
@@ -134,14 +142,14 @@ export function Hero({
           each text box:
 
             1440px   headline 3.93:1   paragraph 5.91:1   statistics 6.31:1
-             375px   headline 9.55:1   paragraph 6.85:1
+             375px   headline 7.88:1   paragraph 5.05:1
 
           against the 3:1 WCAG AA asks of this display size and 4.5:1 of the
-          smaller text. The desktop headline is the tight one and got tighter
+          smaller text. The desktop headline is the tight one, and got tighter
           when the section was sized to the artwork: uncropping the frame put
           more open sky behind the end of it, 4.38:1 before, 3.93:1 now. These
-          numbers belong to this artwork and this section ratio — re-measure if
-          either picture is swapped.
+          numbers belong to this artwork, this crop and this section height —
+          re-measure if any of the three changes.
         */}
         <div className="from-brand-950/82 via-brand-950/66 to-brand-950/38 absolute inset-0 bg-gradient-to-b lg:hidden" />
         <div className="from-brand-950/92 via-brand-950/45 absolute inset-0 hidden bg-gradient-to-r via-40% to-transparent lg:block" />
@@ -205,11 +213,13 @@ export function Hero({
           The page below compensates with matching top padding, so nothing is
           overlapped — see the categories section in the homepage.
 
-          `mt-auto` keeps it on that edge now the section is taller than its
-          content: without it the card floats wherever the text happens to end
-          and the overhang stops meaning anything.
+          `lg:mt-auto` keeps it on that edge where the section is taller than
+          its content, which from `lg` it now is: without it the card floats
+          wherever the text happens to end and the overhang stops meaning
+          anything. On the phone the content sets the height, so there is no
+          slack to take up.
         */}
-        <div className="relative z-10 mt-auto pt-6 -mb-14 motion-safe:animate-[reveal_0.7s_cubic-bezier(0.22,1,0.36,1)_0.15s_both] lg:pt-16 lg:mb-0">
+        <div className="relative z-10 mt-6 -mb-14 motion-safe:animate-[reveal_0.7s_cubic-bezier(0.22,1,0.36,1)_0.15s_both] lg:mt-auto lg:pt-16 lg:mb-0">
           <HeroSearch categories={categories} cities={cities} popular={popular} />
         </div>
       </div>
