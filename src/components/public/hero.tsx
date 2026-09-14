@@ -13,7 +13,7 @@ import type { CategoryRow, CityRow } from '@/server/dal/taxonomy'
  * Two sources, in order. `homepage_sections` with code `hero` may carry
  * `{"imagePath": "<bucket path>"}`, and that still wins — ADR-024 exists so the
  * hero can be changed without a deploy. Failing that, the shipped artwork in
- * `public/Images/hero.png` is the default.
+ * `public/Images/hero.jpg` is the default.
  *
  * The gradient is no longer an either/or: it renders underneath the photograph
  * always, so the headline sits on a known colour for the frame before the image
@@ -49,7 +49,7 @@ export function Hero({
   // per-breakpoint because the two crops are different pictures, not one
   // picture at two sizes.
   const configured = storagePublicUrl('vendor-media', imagePath)
-  const image = configured ?? '/Images/hero.png'
+  const image = configured ?? '/Images/hero.jpg'
   const mobileImage = configured ?? '/Images/hero-mobile.png'
 
   return (
@@ -74,6 +74,14 @@ export function Hero({
 
           Neither is animated. `slow-zoom` scaled these to 1.08, which on
           artwork already being upscaled is magnification on magnification.
+
+          `hero.jpg` is the 512x288 original resampled to 2560x1440 with
+          Lanczos and a mild unsharp mask. That invents no detail — it cannot —
+          but it takes the browser's job from a 5.6x stretch down to 1.1x, and
+          a good filter with edge contrast restored beats the cheap one a
+          browser reaches for at that magnification. A genuinely high-resolution
+          original would still be better; this is the most that can be done
+          without one.
         */}
         <div className="absolute inset-0 lg:hidden">
           <Image

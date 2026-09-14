@@ -1481,6 +1481,26 @@ Verified: `npm run verify` — lint 0 warnings, typecheck clean, **214 unit test
 passed** (4 new), build clean.
 
 
+## Hero resampled so the browser stops stretching it (2026-09-15)
+
+Nothing was zooming the desktop hero — `slow-zoom` went two commits ago and
+there is no transform on it. The softness was the 512 x 288 source being
+stretched across the viewport.
+
+`public/Images/hero.jpg` is that original resampled to **2560 x 1440** with
+Lanczos and a mild unsharp mask (radius 2, 55%, threshold 3), replacing
+`hero.png`. This adds no detail — it cannot — but it moves the browser's work
+from a 5.6x stretch to 1.125x at 1440px on a 2x display, and a good filter with
+edge contrast restored beats the cheap one a browser uses at high
+magnification. Confirmed by fetching the optimiser directly:
+`/_next/image?url=%2FImages%2Fhero.jpg&w=3840&q=90` returns 2560 x 1440, where
+the PNG returned 512 x 288 for the same request.
+
+A genuinely high-resolution original would still be better and is still worth
+supplying. `hero-mobile.png` has not had the same treatment — the request was
+about desktop — and is still 512 x 909.
+
+
 ## The phone hero gets its own artwork (2026-09-15)
 
 `public/Images/hero-mobile.png` (512 x 909, portrait) renders below `lg`;
