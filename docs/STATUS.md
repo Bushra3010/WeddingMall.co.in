@@ -1657,6 +1657,41 @@ Verified: `npm run verify` — lint 0 warnings, typecheck clean, 286 unit tests,
 build clean.
 
 
+## The app header sat under the status bar (2026-09-15)
+
+Reported from the installed app: the wordmark overlapping the clock and
+"Sign in" overlapping the wifi and battery icons.
+
+`viewportFit: 'cover'` has been set in the root layout since the shell was
+built, with a comment saying the layouts read `env(safe-area-inset-*)`. Only
+the **bottom** was ever read — three uses of `safe-area-inset-bottom` in
+`bottom-nav.tsx`, none of `-top`. So every standalone window drew the header
+under the notch.
+
+`--safe-top` is now a `:root` variable in `globals.css` rather than `env()`
+repeated per use, because three rules have to agree about the same number:
+
+1. `site-header.tsx` pads itself by it — padding, not offset, so the bar's
+   background still reaches the top of the screen instead of leaving the status
+   bar on a transparent strip with the page scrolling behind it.
+2. `(public)/page.tsx` pulls the hero up by `calc(4.5rem + var(--safe-top))`.
+   That negative margin exists to cancel the header exactly; when only the
+   header grew, an ivory band appeared between the two — which is how this was
+   caught.
+3. `hero.tsx` adds it to the hero's top padding, or the headline ends up under
+   the now-taller header.
+
+`vendor-dashboard` and `admin` have their own top headers and got the same
+padding. The Capacitor shell points at the live site, so those routes are
+reachable in the app too.
+
+Naming it also made it testable, which `env()` is not: a browser reports 0, so
+simulating a device is one `setProperty('--safe-top', '47px')`. Measured at that
+inset: header 120px, background starting at y=0, logo at y=67 (clear of the
+notch), hero still flush to the top with no band, headline clear of the header.
+At 0 the page is byte-identical to before — header 73px, hero at y=1.
+
+
 ## Notes
 
 - All seed and demo data is fictional (PRD 2.3, Epic G). `npm run seed:demo -- --clean` removes the demo vendors.

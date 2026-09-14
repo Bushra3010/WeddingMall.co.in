@@ -37,7 +37,7 @@ export default async function VendorDashboardLayout({ children }: { children: Re
 
   return (
     <div className="bg-sand-100 flex min-h-dvh flex-col">
-      <header className="border-sand-200 border-b bg-white">
+      <header className="border-sand-200 border-b bg-white pt-[var(--safe-top)]">
         <div className="mx-auto flex h-14 max-w-[100rem] items-center gap-3 px-4 sm:px-6">
           {/* White bar, so the artwork needs no inversion here. */}
           <Link href="/" aria-label={`${site.name} — home`} className="inline-flex">

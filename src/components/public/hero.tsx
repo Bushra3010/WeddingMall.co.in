@@ -163,7 +163,7 @@ export function Hero({
         <div className="absolute top-1/3 -right-24 size-[28rem] rounded-full bg-rose-400/10 blur-3xl motion-safe:animate-[drift_18s_ease-in-out_infinite_alternate-reverse]" />
       </div>
 
-      <div className="mx-auto flex w-full max-w-[90rem] flex-1 flex-col px-4 pt-20 pb-4 sm:px-6 sm:pt-24 lg:px-10 lg:pt-28 lg:pb-10">
+      <div className="mx-auto flex w-full max-w-[90rem] flex-1 flex-col px-4 pt-[calc(5rem+var(--safe-top))] pb-4 sm:px-6 sm:pt-[calc(6rem+var(--safe-top))] lg:px-10 lg:pt-[calc(7rem+var(--safe-top))] lg:pb-10">
         <div className="max-w-3xl">
           {eyebrow ? (
             <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-[11px] font-medium text-white backdrop-blur sm:text-xs lg:mb-6 lg:px-4">

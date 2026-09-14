@@ -139,6 +139,20 @@
 
 @layer base {
   :root {
+    /*
+     * The notch, as a variable rather than `env()` repeated at each use.
+     *
+     * `viewportFit: 'cover'` lets a standalone window extend under the status
+     * bar, and three things have to agree about how far: the header's own
+     * padding, the homepage's negative margin that pulls the hero up behind the
+     * header, and the hero's top padding that keeps its text clear of it. Get
+     * one wrong and you get a band of empty page above the artwork, or a
+     * wordmark on top of the clock.
+     *
+     * Naming it also makes the arrangement testable — a browser reports 0 here,
+     * so simulating a device means overriding one value.
+     */
+    --safe-top: env(safe-area-inset-top);
     --surface: var(--color-sand-50);
     --surface-raised: white;
     --surface-sunken: var(--color-sand-100);

@@ -238,7 +238,7 @@ export function VendorGallery({ images, className }: { images: GalleryImage[]; c
           role="dialog"
           aria-modal="true"
           aria-label={`All ${count} photos`}
-          className="bg-sand-950/90 fixed inset-0 z-50 overflow-y-auto p-4 backdrop-blur-sm sm:p-8"
+          className="bg-sand-950/90 fixed inset-0 z-50 overflow-y-auto p-4 pt-[calc(1rem+env(safe-area-inset-top))] backdrop-blur-sm sm:p-8 sm:pt-[calc(2rem+env(safe-area-inset-top))]"
         >
           <div className="mx-auto max-w-5xl">
             <div className="sticky top-0 z-10 flex items-center justify-between py-2">

@@ -64,7 +64,19 @@ export function SiteHeader({
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 transition-all duration-300',
+        /*
+         * `viewportFit: 'cover'` in the root layout lets a standalone window
+         * extend under the notch, so the bar has to inset itself or the
+         * wordmark lands on the clock and "Sign in" lands on the battery.
+         * Padding rather than offset: the background still has to reach the top
+         * of the screen, or the status bar sits on a transparent strip with the
+         * page scrolling behind it.
+         *
+         * The bottom bar has done this since it was built; the top never did.
+         * In a browser `--safe-top` is 0 and nothing moves. Two other rules are
+         * tied to this one — see `--safe-top` in globals.css.
+         */
+        'sticky top-0 z-50 pt-[var(--safe-top)] transition-all duration-300',
         solid
           ? 'glass-panel border-sand-200/70 border-b shadow-[var(--shadow-soft)]'
           : 'border-b border-transparent bg-transparent',

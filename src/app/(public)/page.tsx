@@ -99,7 +99,12 @@ export default async function HomePage() {
   return (
     <>
       {/* Pulled up behind the sticky header so the bar floats over the hero. */}
-      <div className="-mt-18">
+      {/*
+        Cancels the header exactly so the hero sits behind it. `h-18` is the
+        header's row; `--safe-top` is the notch it now pads itself by. If these
+        stop matching, an ivory band appears between the two.
+      */}
+      <div className="-mt-[calc(4.5rem+var(--safe-top))]">
         <Hero
           stats={stats}
           categories={categories}

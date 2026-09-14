@@ -41,7 +41,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="bg-sand-950 text-sand-100 flex min-h-dvh flex-col">
-      <header className="border-sand-800 border-b">
+      <header className="border-sand-800 border-b pt-[var(--safe-top)]">
         <div className="mx-auto flex h-14 max-w-[100rem] items-center gap-3 px-4 sm:px-6">
           {/* Dark bar, so the logo takes the same flat-white treatment as the
               footer and the header over the hero. */}
