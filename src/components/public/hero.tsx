@@ -64,13 +64,46 @@ export function Hero({
           className="object-cover motion-safe:animate-[slow-zoom_24s_ease-in-out_infinite_alternate]"
         />
 
-        {/* Dark scrim so the headline always clears contrast (PRD 7.3). */}
-        <div className="from-brand-950/95 via-brand-950/70 absolute inset-0 bg-gradient-to-r to-transparent" />
-        <div className="from-brand-950/80 absolute inset-0 bg-gradient-to-t via-transparent to-transparent" />
+        {/*
+          Scrim (PRD 7.3). Two of them, because the two layouts put the text in
+          different places, and one gradient cannot serve both.
 
-        {/* Floating decorative blooms; purely ornamental. */}
-        <div className="bg-blush-500/20 absolute -top-24 -left-16 size-96 rounded-full blur-3xl motion-safe:animate-[drift_14s_ease-in-out_infinite_alternate]" />
-        <div className="absolute top-1/3 -right-24 size-[28rem] rounded-full bg-rose-400/20 blur-3xl motion-safe:animate-[drift_18s_ease-in-out_infinite_alternate-reverse]" />
+          From `lg` the headline occupies the left half of a wide canvas, so the
+          scrim is strong there and gone by 60% of the width — the right-hand
+          two-fifths of the photograph render at full strength. The version
+          before this ran `/95` to `/70` edge to edge: contrast to spare, and
+          the whole image turned into a maroon wash, scrimming the photograph it
+          exists to show.
+
+          Below `lg` the hero is a compact card whose text spans its full width,
+          so that same left-to-right fade leaves the end of the headline on open
+          sky. Top-down instead.
+
+          Measured, not judged by eye — the artwork is brightest exactly where a
+          horizontal scrim is thinnest, so the worst case is the *end* of the
+          headline. Sampling the composited layers across each text box:
+
+            1440px   headline 4.38:1   paragraph and statistics 5.96:1
+             375px   headline 9.16:1   paragraph 6.80:1
+
+          against the 3:1 WCAG AA asks of this display size and 4.5:1 of the
+          smaller text. The phone figures are what the top-down scrim bought:
+          the horizontal one measured 1.54:1 and 2.22:1 there, which is white on
+          a sunset. Lightening either further starts to fail, and both numbers
+          belong to this photograph — re-measure if the artwork is swapped.
+        */}
+        <div className="from-brand-950/88 via-brand-950/72 to-brand-950/45 absolute inset-0 bg-gradient-to-b lg:hidden" />
+        {/* From `lg` the headline occupies the left half and the photograph
+            carries the rest. */}
+        <div className="from-brand-950/92 via-brand-950/45 absolute inset-0 hidden bg-gradient-to-r via-40% to-transparent lg:block" />
+        {/* Foot only: the search card overhangs this edge and needs to land on
+            something darker than a sunlit aisle. */}
+        <div className="from-brand-950/70 absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t to-transparent" />
+
+        {/* Floating decorative blooms; purely ornamental, and kept faint enough
+            not to tint the artwork. */}
+        <div className="bg-blush-500/10 absolute -top-24 -left-16 size-96 rounded-full blur-3xl motion-safe:animate-[drift_14s_ease-in-out_infinite_alternate]" />
+        <div className="absolute top-1/3 -right-24 size-[28rem] rounded-full bg-rose-400/10 blur-3xl motion-safe:animate-[drift_18s_ease-in-out_infinite_alternate-reverse]" />
       </div>
 
       <div className="mx-auto max-w-[90rem] px-4 pt-20 pb-4 sm:px-6 sm:pt-24 lg:px-10 lg:pt-28 lg:pb-10">
