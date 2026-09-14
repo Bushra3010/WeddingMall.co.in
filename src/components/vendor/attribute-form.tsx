@@ -16,18 +16,33 @@ export function AttributeForm({
   attributes,
   values,
   readOnly,
+  /**
+   * Which Server Action saves. The vendor's own form uses the default; the
+   * admin editor passes its own, which asserts `listing.moderate` instead of
+   * org membership. The component never decides who may write — both actions
+   * re-check, and RLS refuses anyone neither policy covers.
+   */
+  saveAction = saveAttributeValuesAction,
+  /** Revalidates the public page after an admin edit; unused by the vendor. */
+  vendorSlug,
+  emptyMessage = 'No questions have been set up for your categories yet.',
+  successMessage = 'Your answers were saved.',
 }: {
   vendorId: string
   attributes: AttributeDefinition[]
   values: Record<string, unknown>
   readOnly: boolean
+  saveAction?: typeof saveAttributeValuesAction
+  vendorSlug?: string
+  emptyMessage?: string
+  successMessage?: string
 }) {
-  const [state, action] = useAction(saveAttributeValuesAction)
+  const [state, action] = useAction(saveAction)
 
   if (attributes.length === 0) {
     return (
       <p className="border-sand-300 text-sand-600 rounded-[var(--radius-card)] border border-dashed bg-white p-6 text-center text-sm">
-        No questions have been set up for your categories yet.
+        {emptyMessage}
       </p>
     )
   }
@@ -38,7 +53,8 @@ export function AttributeForm({
       className="border-sand-200 space-y-5 rounded-[var(--radius-card)] border bg-white p-5"
     >
       <input type="hidden" name="vendorId" value={vendorId} />
-      <FormMessage state={state} successMessage="Your answers were saved." />
+      {vendorSlug ? <input type="hidden" name="vendorSlug" value={vendorSlug} /> : null}
+      <FormMessage state={state} successMessage={successMessage} />
 
       {attributes.map((attribute) => {
         const field = `attr__${attribute.id}`
@@ -72,6 +88,13 @@ export function AttributeForm({
           const selected = Array.isArray(value) ? (value as string[]) : []
           return (
             <fieldset key={attribute.id} disabled={readOnly}>
+              {/*
+                Marks the field as submitted, so un-ticking every option clears
+                the answer — while an attribute this form never rendered (one
+                belonging to a category the vendor is not in) is left alone
+                rather than wiped by a save it was not part of.
+              */}
+              <input type="hidden" name={`${field}__present`} value="1" />
               <legend className="text-sand-800 text-sm font-medium">{label}</legend>
               {attribute.helpText ? (
                 <p className="text-sand-500 mt-0.5 text-xs">{attribute.helpText}</p>

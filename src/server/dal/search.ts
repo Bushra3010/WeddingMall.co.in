@@ -11,6 +11,14 @@ import { searchFiltersSchema, type SearchFilters } from '@/features/search/filte
  * external engine later means reimplementing this function only.
  */
 
+/** One numeric fact worth a chip on a card: "1,000 guests", "100 cars". */
+export interface VendorHighlight {
+  code: string
+  value: number
+  /** The attribute's unit where it has one, else its label. */
+  noun: string
+}
+
 export interface VendorSearchResult {
   vendorId: string
   slug: string
@@ -25,6 +33,80 @@ export interface VendorSearchResult {
   currency: string
   coverPath: string | null
   rankScore: number
+  /** Approved photographs. 0 when the vendor has only the cover, or none. */
+  photoCount: number
+  /** At most two, see `enrichResults`. */
+  highlights: VendorHighlight[]
+}
+
+/**
+ * Which numeric attributes earn a chip, when a vendor has answered more than
+ * two. A presentation hint like the icon map, not a contract: a code missing
+ * from here is not excluded, it just queues behind these by the attribute's own
+ * `sort_order`, which an admin controls at /admin/attributes.
+ */
+const HIGHLIGHT_PRIORITY = ['capacity', 'parking', 'rooms', 'halls']
+
+/**
+ * Photo counts and headline numbers for one page of results.
+ *
+ * Deliberately two follow-up queries rather than columns on `search_vendors`:
+ * that function is the search contract and swapping in an external engine later
+ * should not mean re-teaching it about amenities. Both queries are bounded by
+ * the page size, and neither runs for an empty page.
+ */
+async function enrichResults(
+  supabase: ReturnType<typeof createPublicClient>,
+  results: VendorSearchResult[],
+): Promise<VendorSearchResult[]> {
+  if (results.length === 0) return results
+  const ids = results.map((r) => r.vendorId)
+
+  const [media, answers] = await Promise.all([
+    supabase
+      .from('vendor_media')
+      .select('vendor_id')
+      .in('vendor_id', ids)
+      .eq('moderation_status', 'approved')
+      .then((result) => result.data ?? []),
+    supabase
+      .from('vendor_attribute_values')
+      .select('vendor_id, value_json, category_attributes(code, label, unit, data_type, sort_order)')
+      .in('vendor_id', ids)
+      .then((result) => result.data ?? []),
+  ])
+
+  const photos = new Map<string, number>()
+  for (const row of media) photos.set(row.vendor_id, (photos.get(row.vendor_id) ?? 0) + 1)
+
+  const highlights = new Map<string, (VendorHighlight & { rank: number; order: number })[]>()
+  for (const row of answers) {
+    const definition = row.category_attributes
+    if (!definition || definition.data_type !== 'number') continue
+    // Money is a price, not a facility — the card prints that separately.
+    if (definition.unit === 'INR') continue
+    if (typeof row.value_json !== 'number') continue
+
+    const priority = HIGHLIGHT_PRIORITY.indexOf(definition.code)
+    const list = highlights.get(row.vendor_id) ?? []
+    list.push({
+      code: definition.code,
+      value: row.value_json,
+      noun: definition.unit ?? definition.label,
+      rank: priority === -1 ? HIGHLIGHT_PRIORITY.length : priority,
+      order: definition.sort_order,
+    })
+    highlights.set(row.vendor_id, list)
+  }
+
+  return results.map((result) => ({
+    ...result,
+    photoCount: photos.get(result.vendorId) ?? 0,
+    highlights: (highlights.get(result.vendorId) ?? [])
+      .sort((a, b) => a.rank - b.rank || a.order - b.order)
+      .slice(0, 2)
+      .map(({ code, value, noun }) => ({ code, value, noun })),
+  }))
 }
 
 export interface SearchPage {
@@ -76,8 +158,9 @@ export async function searchVendors(input: Partial<SearchFilters>): Promise<Sear
 
     const rows = (data ?? []) as unknown as SearchRow[]
 
-    return {
-      results: rows.map((row) => ({
+    const results = await enrichResults(
+      supabase,
+      rows.map((row) => ({
         vendorId: row.vendor_id,
         slug: row.slug,
         displayName: row.display_name,
@@ -92,7 +175,13 @@ export async function searchVendors(input: Partial<SearchFilters>): Promise<Sear
         currency: row.currency,
         coverPath: row.cover_path,
         rankScore: Number(row.rank_score),
+        photoCount: 0,
+        highlights: [],
       })),
+    )
+
+    return {
+      results,
       total: rows.length > 0 ? Number(rows[0].total_count) : 0,
       limit: filters.limit,
       offset: (filters.page - 1) * filters.limit,

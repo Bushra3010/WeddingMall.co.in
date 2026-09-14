@@ -33,6 +33,71 @@ export interface PublicVendorMedia {
   height: number | null
 }
 
+/**
+ * One answered attribute, ready to render. `value` is whatever the vendor
+ * stored: a number, a boolean, a string, or an array of strings.
+ */
+export interface PublicVendorAttribute {
+  id: string
+  code: string
+  label: string
+  inputType: string
+  unit: string | null
+  sortOrder: number
+  value: unknown
+}
+
+/** Blank, unanswered, or empty. An explicit `false` or `0` is an answer. */
+function isUnanswered(value: unknown): boolean {
+  if (value === null || value === undefined) return true
+  if (typeof value === 'string') return value.trim() === ''
+  if (Array.isArray(value)) return value.length === 0
+  return false
+}
+
+interface AttributeValueRow {
+  value_json: unknown
+  category_attributes: {
+    id: string
+    code: string
+    label: string
+    input_type: string
+    unit: string | null
+    sort_order: number
+  } | null
+}
+
+/**
+ * Which answers reach the public page, and in what order.
+ *
+ * Exported because it is the whole rule: an unanswered attribute is absent, an
+ * explicit "no" is not, and money is left to Packages — "1200 INR" in a
+ * facilities grid is ugly and ambiguous about the unit. PostgREST cannot order
+ * parent rows by an embedded column, so the sort happens here too.
+ */
+export function selectPublicAttributes(rows: AttributeValueRow[]): PublicVendorAttribute[] {
+  return rows
+    .flatMap((row) => {
+      const definition = row.category_attributes
+      if (!definition) return []
+      if (definition.unit === 'INR') return []
+      if (isUnanswered(row.value_json)) return []
+
+      return [
+        {
+          id: definition.id,
+          code: definition.code,
+          label: definition.label,
+          inputType: definition.input_type,
+          unit: definition.unit,
+          sortOrder: definition.sort_order,
+          value: row.value_json,
+        } satisfies PublicVendorAttribute,
+      ]
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label))
+}
+
 export interface PublicVendorReview {
   id: string
   overall_rating: number
@@ -74,7 +139,7 @@ export const getPublicVendor = cache(async (slug: string) => {
       return null
     }
 
-    const [city, categories, media, packages, serviceAreas] = await Promise.all([
+    const [city, categories, media, packages, serviceAreas, attributes] = await Promise.all([
       vendor.primary_city_id
         ? supabase
             .from('cities')
@@ -110,6 +175,13 @@ export const getPublicVendor = cache(async (slug: string) => {
         .select('travel_available, cities(id, name, slug)')
         .eq('vendor_id', id)
         .then((result) => result.data ?? []),
+      // The vendor's answers to their categories' attributes (PRD 6.2) — the
+      // same rows the search filters match against, shown as facilities.
+      supabase
+        .from('vendor_attribute_values')
+        .select('value_json, category_attributes(id, code, label, input_type, unit, sort_order)')
+        .eq('vendor_id', id)
+        .then((result) => selectPublicAttributes(result.data ?? [])),
     ])
 
     return {
@@ -124,6 +196,7 @@ export const getPublicVendor = cache(async (slug: string) => {
       media,
       packages,
       serviceAreas,
+      attributes,
     }
   } catch (error) {
     logError('dal.getPublicVendor', error, { slug })
