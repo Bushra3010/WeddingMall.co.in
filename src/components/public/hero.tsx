@@ -10,10 +10,15 @@ import type { CategoryRow, CityRow } from '@/server/dal/taxonomy'
 /**
  * Hero (PRD 6.1.2).
  *
- * The background image is admin-configured, not shipped: `homepage_sections`
- * with code `hero` may carry `{"imagePath": "<bucket path>"}`. Until one is
- * set, a layered gradient stands in — the site should look finished from the
- * first deploy without inventing a stock photograph of real people.
+ * Two sources, in order. `homepage_sections` with code `hero` may carry
+ * `{"imagePath": "<bucket path>"}`, and that still wins — ADR-024 exists so the
+ * hero can be changed without a deploy. Failing that, the shipped artwork in
+ * `public/Images/hero.png` is the default.
+ *
+ * The gradient is no longer an either/or: it renders underneath the photograph
+ * always, so the headline sits on a known colour for the frame before the image
+ * decodes, and a missing or broken file degrades to what the site shipped with
+ * rather than to white text on white.
  *
  * Explicit dimensions and `priority` keep LCP honest and CLS at zero
  * (PRD 6.1 acceptance, 14.1).
@@ -40,7 +45,7 @@ export function Hero({
   imagePath?: string | null
   eyebrow?: string | null
 }) {
-  const image = storagePublicUrl('vendor-media', imagePath)
+  const image = storagePublicUrl('vendor-media', imagePath) ?? '/Images/hero.png'
 
   return (
     <section className="relative isolate">
@@ -49,18 +54,15 @@ export function Hero({
         aria-hidden="true"
         className="absolute inset-0 -z-10 overflow-hidden rounded-b-[2rem] lg:rounded-none"
       >
-        {image ? (
-          <Image
-            src={image}
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover motion-safe:animate-[slow-zoom_24s_ease-in-out_infinite_alternate]"
-          />
-        ) : (
-          <div className="from-brand-950 via-brand-800 to-brand-600 absolute inset-0 bg-gradient-to-br" />
-        )}
+        <div className="from-brand-950 via-brand-800 to-brand-600 absolute inset-0 bg-gradient-to-br" />
+        <Image
+          src={image}
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover motion-safe:animate-[slow-zoom_24s_ease-in-out_infinite_alternate]"
+        />
 
         {/* Dark scrim so the headline always clears contrast (PRD 7.3). */}
         <div className="from-brand-950/95 via-brand-950/70 absolute inset-0 bg-gradient-to-r to-transparent" />
