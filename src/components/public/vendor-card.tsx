@@ -1,6 +1,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { BadgeCheck, MapPin, Star } from 'lucide-react'
+import { BadgeCheck, Images, MapPin, Star } from 'lucide-react'
+
+import { highlightIcon } from '@/components/public/amenity-icons'
 
 import { SaveButton } from '@/components/public/save-button'
 import { formatStartingPrice, money } from '@/lib/money'
@@ -74,6 +76,17 @@ export function VendorCard({
               </span>
             ) : null}
           </div>
+
+          {/* How much there is to look at, which is the first thing anyone
+              scanning a grid of venues wants to know. Exact, not "31+": the
+              count is known, and a "+" would imply more than there are. */}
+          {vendor.photoCount > 1 ? (
+            <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+              <Images aria-hidden="true" className="size-3" />
+              {vendor.photoCount}
+              <span className="sr-only">photos</span>
+            </span>
+          ) : null}
         </div>
 
         <div className="p-4 sm:p-5">
@@ -92,6 +105,28 @@ export function VendorCard({
               <MapPin aria-hidden="true" className="size-3" />
               {vendor.cityName}
             </p>
+          ) : null}
+
+          {/* Headline facts from the vendor's own answers (PRD 6.2). Absent
+              until they answer — a card never claims a capacity nobody gave. */}
+          {vendor.highlights.length > 0 ? (
+            <ul className="mt-3 flex flex-wrap gap-1.5">
+              {vendor.highlights.map((highlight) => {
+                const Icon = highlightIcon(highlight.code)
+                return (
+                  <li
+                    key={highlight.code}
+                    className="border-sand-200 text-sand-700 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px]"
+                  >
+                    <Icon aria-hidden="true" className="text-sand-400 size-3" />
+                    <span className="font-medium tabular-nums">
+                      {new Intl.NumberFormat('en-IN').format(highlight.value)}
+                    </span>
+                    {highlight.noun}
+                  </li>
+                )
+              })}
+            </ul>
           ) : null}
 
           <div className="border-sand-100 mt-4 flex items-end justify-between border-t pt-4">

@@ -1,4 +1,3 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { notFound, permanentRedirect } from 'next/navigation'
 import type { Metadata } from 'next'
@@ -15,6 +14,8 @@ import { ShortlistButton } from '@/components/customer/shortlist-button'
 import { getActor } from '@/server/dal/actor'
 import { isShortlisted } from '@/server/dal/enquiries'
 import { ViewBeacon } from '@/components/public/view-beacon'
+import { VendorGallery } from '@/components/public/vendor-gallery'
+import { VendorAmenities } from '@/components/public/vendor-amenities'
 import { getPublicVendor, getRatingDistribution, getVendorReviews } from '@/server/dal/vendors'
 import { resolveSlugRedirect } from '@/server/dal/taxonomy'
 
@@ -74,8 +75,24 @@ export default async function VendorProfilePage({ params }: { params: Params }) 
   ])
 
   const cover = vendor.media.find((item) => item.is_cover) ?? vendor.media[0]
-  const gallery = vendor.media.filter((item) => item.id !== cover?.id).slice(0, 8)
   const primaryCategory = vendor.categories.find((row) => row.is_primary)?.categories ?? null
+
+  /*
+   * One gallery, every approved photograph — the cover is simply the first
+   * slide. Alt text is the vendor's own caption, so it is shown as one; when a
+   * row has none the alt falls back to a position, which describes the image
+   * for assistive technology without inventing a caption to print.
+   */
+  const galleryImages = vendor.media
+    .map((item, position) => ({
+      id: item.id,
+      src: storagePublicUrl('vendor-media', item.storage_path),
+      alt: item.alt_text ?? `${vendor.display_name} — photo ${position + 1}`,
+      caption: item.alt_text,
+    }))
+    .filter((item): item is { id: string; src: string; alt: string; caption: string | null } =>
+      Boolean(item.src),
+    )
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -114,19 +131,7 @@ export default async function VendorProfilePage({ params }: { params: Params }) 
         }}
       />
 
-      {/* Cover */}
-      <div className="bg-sand-100 relative aspect-16/7 overflow-hidden rounded-[var(--radius-card)]">
-        {cover ? (
-          <Image
-            src={storagePublicUrl('vendor-media', cover.storage_path)!}
-            alt={cover.alt_text ?? `Work by ${vendor.display_name}`}
-            fill
-            priority
-            sizes="(max-width: 1024px) 100vw, 1024px"
-            className="object-cover"
-          />
-        ) : null}
-      </div>
+      <VendorGallery images={galleryImages} />
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_20rem]">
         <div className="space-y-10">
@@ -179,29 +184,7 @@ export default async function VendorProfilePage({ params }: { params: Params }) 
             </section>
           ) : null}
 
-          {gallery.length > 0 ? (
-            <section aria-labelledby="vendor-portfolio">
-              <h2 id="vendor-portfolio" className="font-display text-sand-900 text-xl">
-                Portfolio
-              </h2>
-              <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {gallery.map((item) => (
-                  <li
-                    key={item.id}
-                    className="bg-sand-100 relative aspect-square overflow-hidden rounded-lg"
-                  >
-                    <Image
-                      src={storagePublicUrl('vendor-media', item.storage_path)!}
-                      alt={item.alt_text ?? ''}
-                      fill
-                      sizes="(max-width: 640px) 50vw, 25vw"
-                      className="object-cover"
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+          <VendorAmenities attributes={vendor.attributes} headingId="vendor-amenities" />
 
           {vendor.packages.length > 0 ? (
             <section aria-labelledby="vendor-packages">

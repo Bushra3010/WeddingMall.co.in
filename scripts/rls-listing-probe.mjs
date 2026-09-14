@@ -414,7 +414,81 @@ record(
 )
 
 // ---------------------------------------------------------------------------
+console.log('\nattribute answers (migration 0041):')
+
+/*
+ * Before 0041 the only write policy on `vendor_attribute_values` was vendor
+ * membership, so an amenity added to the taxonomy could never be answered for
+ * a business the admin is not a member of. These four fail against a database
+ * that has not applied 0041 — that is the point.
+ */
+const venueCategory = (await rest('categories?select=id&slug=eq.venues&limit=1', SVC)).body?.[0]
+const anyAttribute = venueCategory
+  ? (await rest(`category_attributes?select=id&category_id=eq.${venueCategory.id}&limit=1`, SVC))
+      .body?.[0]
+  : null
+
+if (!anyAttribute) {
+  record('a venue attribute exists to answer', false, 'no category_attributes row for venues')
+} else {
+  const answer = {
+    vendor_id: vendor.id,
+    category_attribute_id: anyAttribute.id,
+    value_json: true,
+  }
+
+  const analystWrite = await rest('vendor_attribute_values', ANON, {
+    method: 'POST',
+    body: JSON.stringify(answer),
+  }, analyst.jwt)
+  record(
+    'an admin without listing.moderate cannot answer',
+    analystWrite.status >= 400,
+    `status ${analystWrite.status}`,
+  )
+
+  const moderatorWrite = await rest('vendor_attribute_values', ANON, {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates' },
+    body: JSON.stringify(answer),
+  }, moderator.jwt)
+  record(
+    'an admin with listing.moderate can answer',
+    moderatorWrite.status < 400,
+    `status ${moderatorWrite.status}`,
+  )
+
+  const moderatorClear = await rest(
+    `vendor_attribute_values?vendor_id=eq.${vendor.id}&category_attribute_id=eq.${anyAttribute.id}`,
+    ANON,
+    { method: 'DELETE' },
+    moderator.jwt,
+  )
+  record(
+    'an admin with listing.moderate can clear an answer',
+    moderatorClear.status < 400,
+    `status ${moderatorClear.status}`,
+  )
+
+  const analystDelete = await rest(
+    `vendor_attribute_values?vendor_id=eq.${vendor.id}`,
+    ANON,
+    { method: 'DELETE' },
+    analyst.jwt,
+  )
+  const survivors = (
+    await rest(`vendor_attribute_values?select=category_attribute_id&vendor_id=eq.${vendor.id}`, SVC)
+  ).body
+  record(
+    'an admin without listing.moderate cannot clear answers',
+    analystDelete.status >= 400 || (Array.isArray(survivors) && survivors.length === 0),
+    `status ${analystDelete.status}`,
+  )
+}
+
+// ---------------------------------------------------------------------------
 console.log('\ncleaning up…')
+await rest(`vendor_attribute_values?vendor_id=eq.${vendor.id}`, SVC, { method: 'DELETE' })
 await rest(`slug_redirects?entity_id=eq.${vendor.id}`, SVC, { method: 'DELETE' })
 await rest(`audit_logs?entity_id=eq.${vendor.id}`, SVC, { method: 'DELETE' })
 await rest(`vendors?id=eq.${vendor.id}`, SVC, { method: 'DELETE' })

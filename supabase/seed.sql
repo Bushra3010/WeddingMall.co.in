@@ -99,6 +99,18 @@ join (values
   ('venues', 'catering_policy', 'Catering policy', 'select', 'string', null, true,
    '["In-house only","Outside catering allowed","Both"]', 4),
   ('venues', 'parking', 'Parking capacity', 'number', 'number', 'cars', false, '[]', 5),
+  -- Facilities, shown as the amenities grid on the public page and as filters.
+  -- Kept in step with migration 0042, which adds the same rows to a database
+  -- that was seeded before they existed.
+  ('venues', 'halls', 'Banquet halls', 'number', 'number', 'halls', true, '[]', 6),
+  ('venues', 'ac_rooms', 'Air-conditioned rooms', 'number', 'number', 'rooms', false, '[]', 7),
+  ('venues', 'lawns', 'Lawns', 'number', 'number', 'lawns', true, '[]', 8),
+  ('venues', 'bridal_room', 'Bridal room', 'boolean', 'boolean', null, true, '[]', 9),
+  ('venues', 'garden', 'Garden', 'boolean', 'boolean', null, true, '[]', 10),
+  ('venues', 'swimming_pool', 'Swimming pool', 'boolean', 'boolean', null, true, '[]', 11),
+  ('venues', 'dining_area', 'Dining area', 'boolean', 'boolean', null, false, '[]', 12),
+  ('venues', 'power_backup', 'Power backup', 'boolean', 'boolean', null, true, '[]', 13),
+  ('venues', 'wifi', 'Wi-Fi', 'boolean', 'boolean', null, true, '[]', 14),
 
   ('photographers', 'starting_price', 'Starting price', 'number', 'number', 'INR', true, '[]', 1),
   ('photographers', 'deliverables', 'Deliverables', 'multiselect', 'array', null, true,

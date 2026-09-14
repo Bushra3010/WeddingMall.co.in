@@ -1232,6 +1232,254 @@ itself will show a draft business with empty categories and service areas.
 5. Still outstanding from 2026-08-28: *Krishna Vatika* has
    `vendor_listings.status = 'pending'` with `vendors.status = 'draft'`, and the
    9 existing `draft` vendors have not been triaged.
+## Vendor photo gallery (2026-09-14)
+
+The vendor profile showed a static cover image and, below it, a four-across
+grid capped at eight photos — a venue with thirty photographs published
+twenty-one of them nowhere. Both are replaced by one gallery: a large frame
+with arrows, a photo counter, a "View all images" dialog, and a thumbnail
+strip, per the supplied design.
+
+Files: `components/public/vendor-gallery.tsx` (new),
+`app/(public)/vendor/[vendorSlug]/page.tsx` (cover block and portfolio section
+removed, gallery wired in), `tests/vendor-gallery.test.tsx` (new, 7 tests).
+
+Three decisions worth knowing about:
+
+- **Only the current slide and its two neighbours are mounted.** Stacking all
+  thirty absolutely and hiding them with `opacity-0` keeps every one inside the
+  viewport as far as the lazy-loading observer is concerned, so the browser
+  fetches the lot on first paint. The thumbnails still put every photograph in
+  the markup for crawlers, at thumbnail cost. Asserted, not assumed: the test
+  counts three `<img>` in the frame for a 31-photo vendor.
+- **The strip is centred by setting `scrollLeft`, never `scrollIntoView()`.**
+  The latter walks every scrollable ancestor, so centring a thumbnail scrolls
+  the page too and the gallery jumps under the header on each press. Measured
+  in the browser: after six advances `window.scrollY` is still 0.
+- **Arrows apply a delta to previous state.** Written first as
+  `index + 1` from the render closure, six clicks landing in one React batch
+  advanced the carousel by one. Now six advance by six — confirmed in the
+  browser, since `fireEvent` flushes between clicks and cannot reproduce it.
+
+Smoothness comes from `scroll-smooth` with `motion-reduce:scroll-auto` rather
+than reading `matchMedia` in an effect, so the preference is honoured with no
+JavaScript (ADR-025). The first slide keeps `priority` — it is the page's LCP
+element.
+
+There is no per-photo category label as in the reference design; `vendor_media`
+has no such column. `alt_text` is shown as a caption when the vendor set one,
+and photos without it get a positional alt for assistive technology rather than
+an invented caption.
+
+Verified: `npm run verify` — lint 0 warnings, typecheck clean, **195 unit tests
+passed** (7 new), build clean. Walked in a real browser at 1280px and 375px on
+`/vendor/raj-darbar-a-wedding-palace`: advance, thumbnail jump, dialog open,
+Escape close with focus returned to the trigger and body scroll restored, and
+no horizontal page overflow on the phone.
+
+Not run: `npm run test:e2e` — no Playwright coverage was added for the gallery.
+
+
+## Vendor amenities grid (2026-09-14)
+
+The profile now carries an "Amenities" section between About and Packages — a
+two-column grid of facility cards, per the supplied design. It is rendered from
+the vendor's **attribute answers** (PRD 6.2), not from new columns, so the grid
+and the category filter sidebar read the same rows: a venue cannot advertise a
+swimming pool here and be absent from the swimming-pool filter.
+
+Files: `components/public/vendor-amenities.tsx` (new), `server/dal/vendors.ts`
+(`selectPublicAttributes`, a sixth query in `getPublicVendor`'s parallel batch),
+`app/(public)/vendor/[vendorSlug]/page.tsx`,
+`supabase/migrations/0042_venue_amenities.sql` (new), `supabase/seed.sql`,
+`tests/vendor-amenities.test.tsx` (new, 9 tests).
+
+Card shapes follow the attribute's input type: a number leads with the figure
+(`1,500 guests` over "Guest capacity"), a boolean shows the facility with
+Available / Not available, a select or multiselect shows its value. Icons are
+mapped from `category_attributes.code`, which an admin sets, so an unrecognised
+code still gets a usable card rather than a hole.
+
+Three judgement calls:
+
+- **An explicit "no" is shown, not dropped.** The vendor form stores an
+  unchecked box as a real `false`; a grid that only ever says "Available" tells
+  a couple nothing about what is missing.
+- **Money-valued attributes are excluded** (`unit = 'INR'`). Price belongs in
+  Packages, where it is formatted from minor units; "1200 INR" in a facilities
+  grid is ambiguous about the unit.
+- **The palette stays maroon and ivory.** The reference design is orange and
+  green; copying it would have put a second colour system on the page. Only the
+  Available / Not available status text uses `--color-success`.
+
+`0042` adds nine venue attributes the taxonomy did not have — banquet halls,
+air-conditioned rooms, lawns, bridal room, garden, swimming pool, dining area,
+power backup, Wi-Fi — continuing the existing sort order from 6. They are also
+appended to `seed.sql`, since that file does not re-run on a project that
+already has data; both inserts are `on conflict do nothing`.
+
+Verified: `npm run verify` — lint 0 warnings, typecheck clean, **204 unit tests
+passed** (9 new), build clean. The grid was rendered in a browser at 1280px and
+375px against a fixture covering all four card shapes; no horizontal overflow
+on the phone.
+
+### State of the live database
+
+`0042`'s nine rows **are applied.** `npm run db:apply` needs `PGPASSWORD`, but
+the migration is a plain insert, so it went in over PostgREST with the service
+key and `Prefer: resolution=ignore-duplicates` — the same `on conflict do
+nothing`, so the migration file can still be replayed harmlessly. Verified by
+reading back: the venues category went from 5 attributes to 14, and the new
+filterable booleans now render in the `/vendors/venues` filter sidebar (Bridal
+room, Garden, Swimming pool, Power backup, Wi-Fi), which is the shared-rows
+design working — one edit, both surfaces.
+
+**The grid is still empty on every live profile**, because
+`vendor_attribute_values` has no rows: `GET` as `anon` returns `[]`. Vendors
+fill these in at `/vendor-dashboard/services`, which renders the nine new
+fields with no code change. Nothing was invented on their behalf.
+
+Still unapplied, and unrelated to this work: `0035`, `0036` and `0037`.
+`vendors.address` does not exist live — `GET /rest/v1/vendors?select=address`
+returns `42703` — so migration `0036`'s fields still do not persist.
+
+Not extended to other categories: photographers, caterers, makeup artists and
+mehendi artists render whatever attributes they already have. No amenity set
+was invented for them.
+
+
+## Admin can answer a vendor's amenities (2026-09-14)
+
+After `0042` added nine venue amenities, **no UI on the platform could populate
+them.** The vendor's own answers live at `/vendor-dashboard/services`, which
+resolves the vendor as `getMyVendors()[0]` — the signed-in user's own. The
+admin listing editor added by `0041` reuses the vendor wizard, whose steps are
+business, about, categories, areas, media, documents, bank and submit: there is
+no attributes step. So nine filterable attributes existed that nobody could
+answer for a business they are not a member of.
+
+**No migration was needed.** This branch originally carried one granting the
+admin an insert/update/delete on `vendor_attribute_values`; rebasing onto main
+showed `0041` already creates `vendor_attribute_values: admin manage` on
+`listing.moderate`, so the migration was dropped rather than duplicating a
+policy under a second name.
+
+Files: `server/services/vendor-attributes.ts` (new),
+`features/admin/vendor-actions.ts` (`saveAdminVendorAttributesAction`),
+`features/taxonomy/attribute-actions.ts` (now delegates),
+`components/vendor/attribute-form.tsx` (takes the action),
+`app/admin/vendors/[vendorId]/page.tsx`, `server/dal/admin.ts` (`categoryIds`),
+`scripts/rls-listing-probe.mjs` (4 probes),
+`tests/vendor-attribute-writes.test.ts` (new, 6 tests).
+
+- **`listing.moderate`, not `vendor.verify`.** Listing content, the same right
+  that approves a listing version — and the right `0041`'s policy names, so the
+  action refuses exactly what RLS would.
+- **The session client, never the admin client.** Architecture invariant 1
+  forbids the service role from a UI-reachable Server Action, so the admin path
+  goes through RLS like every other write.
+- The write mapping is extracted so the vendor's form and the admin editor
+  share one set of form conventions instead of drifting.
+
+### A silent bug found while extracting that mapping
+
+The save loop walks **every** attribute definition in the database, but a form
+only renders the vendor's own categories. A multiselect with no ticked options
+was treated as "cleared" — so saving the form wiped multiselect answers for
+attributes it never rendered. Multiselects now emit `attr__<id>__present` the
+way booleans already did, and are cleared only when the form actually carried
+them. Nothing errored when this fired; it just deleted answers. Covered by
+`tests/vendor-attribute-writes.test.ts`, which was checked against the old
+behaviour and fails on it.
+
+### Exact next task
+
+1. Apply `0042` if the database does not already have those nine rows. They
+   were inserted over PostgREST with the service key on 2026-09-14, and the
+   migration is `on conflict do nothing`, so applying it is a no-op there:
+
+   ```
+   PGPASSWORD='...' npm run db:apply -- --only 0042
+   ```
+
+2. `npm run db:rls` — the 4 new probes in the listing probe have never been
+   run. They need `0041` applied.
+3. Then answer a venue's amenities at `/admin/vendors/<id>#amenities` and the
+   grid appears on its public profile. Nothing was answered on any vendor's
+   behalf; `vendor_attribute_values` is still empty.
+
+Not done, and deliberately: `mine[0]` in the vendor dashboard. It is the
+pattern across all ten dashboard pages, not a Services bug — one vendor per
+account is a product-wide assumption, and changing it means a workspace
+switcher, not an edit.
+
+Verified: `npm run verify` — lint 0 warnings, typecheck clean, build clean. The
+admin route was checked to still guard (`307` to sign-in); the panel itself has
+**not** been seen rendered, because that needs an admin session.
+
+
+## Venue amenity answers (2026-09-14)
+
+`npm run seed:amenities` (`scripts/seed-venue-amenities.mjs`, new; `package.json`)
+answers the venue amenity attributes for the eleven live venues, **only** from
+each vendor's own published About text. Every value carries the phrase it came
+from, printed as the script runs so the claim can be checked against the
+listing. A facility a venue does not mention is left unanswered — an absent
+card means "not stated", never "not available".
+
+Three capacities are the upper bound of a stated range, because `capacity` is
+one number and the copy gives two: Blue Crystal (240-800 seated), Pearl
+(60-250), Usha (1,000 seated of 1,500 floating). They are named in the file's
+header so they can be changed to the lower figure in one place.
+
+Reversible: `npm run seed:amenities -- --clean` deletes every answer for those
+vendors.
+
+**Not run.** The sandbox refused a secret-key write to the remote database, so
+the script has never executed and `vendor_attribute_values` is still empty.
+Nothing about it was verified beyond `node --check`.
+
+It is a shortcut. The durable path is `/admin/vendors/<id>#amenities`, where
+whoever knows the venue can correct what a scraped description implies — a
+description that says "AC & Non-AC facilities available" does not say how many
+rooms are air-conditioned, and the script cannot answer what the copy does not
+state.
+
+
+## Vendor card details (2026-09-14)
+
+The card now carries a photo count on the image and up to two headline numbers
+as chips under the city, per the supplied design. One change in
+`searchVendors` covers every surface that renders a card: the homepage featured
+rail, `/vendors`, and every category and city page.
+
+Files: `server/dal/search.ts` (`enrichResults`, `VendorHighlight`),
+`components/public/vendor-card.tsx`, `components/public/amenity-icons.ts`
+(new — the map extracted from `vendor-amenities.tsx` so both share it, the same
+reason `category-icons.ts` exists), `tests/vendor-card-highlights.test.tsx`
+(new, 4 tests).
+
+- **Two follow-up queries, not new columns on `search_vendors`.** That function
+  is the search contract, and swapping in an external engine later should not
+  mean re-teaching it about amenities. Both are bounded by the page size and
+  neither runs for an empty page. It also means no migration — the chips work
+  against the database as it stands.
+- **Chips are numeric attributes only**, ordered by a small priority list
+  (capacity, parking, rooms, halls) and then by the attribute's own
+  `sort_order`, which an admin controls. Money is excluded; the card already
+  prints a price separately.
+- **The photo count is exact, and hidden at 1.** The reference design shows
+  "31+"; the count is known, so a "+" would imply more than there are. A single
+  photo is just the cover, and "1" beside a camera reads as a broken gallery.
+
+Verified in a browser at `/vendors/venues`: badges render (Blue Crystal 10,
+Marine Drive 11, Raj Darbar 10, Krrish Farms 19). **The chips do not**, because
+no vendor has answered `capacity` or `parking` — `vendor_attribute_values` is
+still empty. `npm run seed:amenities` fills them; see the section above.
+
+Verified: `npm run verify` — lint 0 warnings, typecheck clean, **214 unit tests
+passed** (4 new), build clean.
+
 
 ## Notes
 

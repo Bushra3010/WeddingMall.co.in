@@ -160,6 +160,7 @@ export interface AdminVendorDetail {
   about: string | null
   experienceYears: number | null
   categories: string[]
+  categoryIds: string[]
   serviceAreas: string[]
   documents: { id: string; documentType: string; createdAt: string }[]
   ownerName: string | null
@@ -176,7 +177,7 @@ export async function getAdminVendor(vendorId: string): Promise<AdminVendorDetai
          founded_year, submitted_at, published_at, rejection_reason, suspended_reason,
          primary_city_id, cities(name),
          vendor_listings(about, experience_years),
-         vendor_categories(categories(name)),
+         vendor_categories(categories(id, name)),
          vendor_service_areas(cities(name)),
          vendor_verifications(vendor_documents(id, document_type, created_at)),
          vendor_memberships(role, status, profiles!vendor_memberships_user_id_fkey(full_name))`,
@@ -213,6 +214,11 @@ export async function getAdminVendor(vendorId: string): Promise<AdminVendorDetai
       categories: (data.vendor_categories ?? [])
         .map((c) => c.categories?.name)
         .filter((n): n is string => Boolean(n)),
+      // Ids, not names: the attribute editor asks which questions apply, and
+      // two categories can share a display name across a rename.
+      categoryIds: (data.vendor_categories ?? [])
+        .map((c) => c.categories?.id)
+        .filter((id): id is string => Boolean(id)),
       serviceAreas: (data.vendor_service_areas ?? [])
         .map((a) => a.cities?.name)
         .filter((n): n is string => Boolean(n)),

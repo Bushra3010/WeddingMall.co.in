@@ -4,12 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { runAction, ServiceError, type ActionResult } from '@/lib/action-result'
+import { assertPermission } from '@/lib/permissions'
 import { getActor } from '@/server/dal/actor'
 import {
   createVendorAsAdmin,
   deleteVendorAsAdmin,
   updateVendorAsAdmin,
 } from '@/server/services/admin-vendors'
+import { writeAttributeValues } from '@/server/services/vendor-attributes'
 import { adminCreateVendorSchema, adminVendorSchema } from '@/features/vendors/schema'
 
 /**
@@ -133,6 +135,40 @@ export async function deleteAdminVendorAction(
     // Only ever an in-app admin path, never a value from the form that could
     // point somewhere else.
     if (from === 'detail') redirect('/admin/vendors')
+  }
+  return result
+}
+
+/**
+ * Answer a vendor's category attributes on their behalf (PRD 6.2).
+ *
+ * The same write the vendor's own Services form performs, under a different
+ * right: `listing.moderate`, mirroring `vendor_attribute_values: admin manage`
+ * in migration 0041, so this refuses exactly what RLS would refuse rather than
+ * failing opaquely at the database. The vendor slug is only used to revalidate
+ * the public page, whose
+ * `revalidate = 600` would otherwise hold a stale grid for ten minutes.
+ */
+export async function saveAdminVendorAttributesAction(
+  _prev: unknown,
+  form: FormData,
+): Promise<ActionResult<{ saved: number }>> {
+  const vendorSlug = str(form, 'vendorSlug')
+
+  const result = await runAction('admin.saveVendorAttributes', async () => {
+    const actor = await getActor()
+    const vendorId = str(form, 'vendorId')
+    if (!vendorId) throw new ServiceError('validation_error', 'Missing business.')
+    assertPermission(actor, 'listing.moderate')
+
+    const { saved } = await writeAttributeValues(vendorId, form)
+    return { saved }
+  })
+
+  if (result.ok) {
+    revalidatePath(`/admin/vendors/${str(form, 'vendorId')}`)
+    if (vendorSlug) revalidatePath(`/vendor/${vendorSlug}`)
+    revalidatePath('/vendors')
   }
   return result
 }

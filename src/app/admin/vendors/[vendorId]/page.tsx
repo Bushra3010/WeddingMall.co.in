@@ -9,13 +9,16 @@ import { VendorBankEditor } from '@/components/admin/vendor-bank-editor'
 import { VendorDeletePanel } from '@/components/admin/vendor-delete-panel'
 import { VendorDocumentsManager } from '@/components/admin/vendor-documents-manager'
 import { VendorEditForm } from '@/components/admin/vendor-edit-form'
+import { AttributeForm } from '@/components/vendor/attribute-form'
+import { saveAdminVendorAttributesAction } from '@/features/admin/vendor-actions'
 import { NOINDEX } from '@/lib/seo'
 import { can } from '@/lib/permissions'
 import { formatDateTime } from '@/lib/dates'
 import { requireElevatedAdmin } from '@/server/policies/require'
 import { getAdminVendor, getAuditTrail } from '@/server/dal/admin'
 import { getBankAccountSummary } from '@/server/dal/vendor-bank'
-import { listCities } from '@/server/dal/taxonomy'
+import { listAttributes, listCities } from '@/server/dal/taxonomy'
+import { getVendorAttributeValues } from '@/server/dal/vendor-attributes'
 
 export const metadata = { title: 'Vendor detail', ...NOINDEX }
 export const dynamic = 'force-dynamic'
@@ -36,17 +39,23 @@ export default async function AdminVendorDetailPage({
   // Writing them is the finance desk's, not the verifier's — 0040 mirrors this.
   const canEditBank = can(actor, 'billing.manage')
 
-  const [vendor, audit, cities, bank] = await Promise.all([
+  const [vendor, audit, cities, bank, allAttributes, attributeValues] = await Promise.all([
     getAdminVendor(vendorId),
     getAuditTrail(vendorId),
     // 200 rather than the public default of 24: an admin correcting a business
     // must be able to reach any city, not just the ones on the homepage.
     listCities(200),
     canSeeBank ? getBankAccountSummary(vendorId) : Promise.resolve(null),
+    listAttributes(),
+    getVendorAttributeValues(vendorId),
   ])
   if (!vendor) notFound()
 
   const canEdit = can(actor, 'vendor.verify') || can(actor, 'vendor.suspend')
+  // Listing content, so the same right that approves a listing version —
+  // mirrors `vendor_attribute_values: admin manage` in migration 0041.
+  const canEditAttributes = can(actor, 'listing.moderate')
+  const attributes = allAttributes.filter((a) => vendor.categoryIds.includes(a.categoryId))
 
   return (
     <div className="space-y-6">
@@ -177,6 +186,44 @@ export default async function AdminVendorDetailPage({
                 Editing a business requires the vendor.verify or vendor.suspend permission.
               </p>
             )}
+          </section>
+
+          {/*
+            Amenities.
+
+            `/admin/vendors/<id>/listing` (0041) reuses the vendor's own wizard,
+            and that wizard has no attributes step — its steps are business,
+            about, categories, areas, media, documents, bank, submit. The
+            vendor's own answers live at `/vendor-dashboard/services`, which
+            resolves the vendor as the signed-in user's own. So this panel is
+            still the only place an attribute can be answered for a business the
+            admin is not a member of. The RLS it relies on is already there:
+            `vendor_attribute_values: admin manage` in 0041.
+          */}
+          <section
+            id="amenities"
+            className="border-sand-200 scroll-mt-6 rounded-[var(--radius-card)] border bg-white p-5"
+          >
+            <h2 className="font-display text-sand-900 text-lg">Amenities and services</h2>
+            <p className="text-sand-600 mt-1 mb-4 text-sm">
+              These answers drive both the category filters and the amenities grid on the public
+              profile. Only the questions for {vendor.displayName}&rsquo;s categories are shown.
+            </p>
+            <AttributeForm
+              vendorId={vendor.id}
+              vendorSlug={vendor.slug}
+              attributes={attributes}
+              values={attributeValues}
+              readOnly={!canEditAttributes}
+              saveAction={saveAdminVendorAttributesAction}
+              emptyMessage={`No questions have been set up for ${vendor.displayName}'s categories yet.`}
+              successMessage="Saved. The public profile updates on its next request."
+            />
+            {!canEditAttributes ? (
+              <p className="text-sand-600 mt-2 text-sm">
+                Answering these requires the listing.moderate permission.
+              </p>
+            ) : null}
           </section>
 
           {/*
