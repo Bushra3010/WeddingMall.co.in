@@ -1699,3 +1699,25 @@ At 0 the page is byte-identical to before — header 73px, hero at y=1.
 - Do not add a `loading.tsx` above any route that calls `notFound()` or `redirect()` — see ADR-016.
 - E2E needs `npx playwright install chromium` once.
 - Legal text in `supabase/seed.sql` is placeholder and must go to counsel before launch (PRD 14.3).
+
+## Netlify hosting (2026-10-03)
+
+Site `weddingmallco` (Netlify, team Zencodx) builds from `main` via `netlify.toml` (Node 22). 12 env vars imported from `.env.local`; `NEXT_PUBLIC_APP_URL=https://weddingmall.co.in`. Production live at `weddingmallco.netlify.app` (home, categories, vendors, sign-in 200; `/account` redirects to sign-in).
+
+Remaining: attach `weddingmall.co.in` + `www` in Netlify, repoint Hostinger DNS off Railway (`b9s3d83w.up.railway.app`), add Netlify URLs to Supabase Auth redirect URLs, then remove the Railway service. Blank in env: analytics key, email provider key, Sentry DSN.
+
+## Netlify 503: function quota exhausted (2026-10-09)
+
+`weddingmall.co.in` returns 503: the Free-plan site exceeded its 125k/month function-invocation limit on 2026-10-08 (enforced until the 2026-11-01 reset or a plan upgrade). Cause: the reverted navbar read the session in the `(public)` and `(customer)` layouts, so nearly every public page rendered per request. Owner chose to fix the root cause rather than upgrade. The orphaned Railway service `WeddingMall.co.in` (project `harmonious-simplicity`) was deleted.
+
+Changes — same header UI, session resolved in the browser (ADR-030):
+- `site-header.tsx` reads `useSession()`; sign-out clears the browser session, then calls the Server Action. Both layouts no longer call `getActor()`.
+- `shortlist-button.tsx` reads saved state from `useSession()` and renders the sign-in link itself; the vendor page no longer reads the session. `isShortlisted()` removed from `dal/enquiries.ts` (unused).
+- `vendor/[vendorSlug]` and `blog/[postSlug]` get `generateStaticParams() { return [] }` → ISR (●) instead of per-request (ƒ).
+- `session-provider.tsx` re-reads the cookie on route change. Sign-in/sign-up redirect via a client navigation, so the provider never noticed and the header showed "Sign in" on `/account`. Caught by the E2E sign-up test.
+
+Result: `/`, `/about`, `/blog`, `/categories`, `/cities`, `/contact`, `/help`, `/privacy`, `/terms` static; vendor and blog pages ISR. `/vendors/[category]` stays dynamic (filters are search params).
+
+Tests: 286 unit; E2E journey-1 + mobile-home 12/12 (needs `.env.local` exported into the shell or they skip); typecheck, lint on changed files, build clean. Full `npm run lint` reports noise from `.netlify/` build output, which is not in the ESLint ignores.
+
+Next: push to `main` so Netlify redeploys; the site stays 503 until the quota resets on 2026-11-01 or the plan is upgraded. Then add `.netlify/` to ESLint ignores, and consider moving `/vendors/[category]` filters client-side if it dominates invocations.

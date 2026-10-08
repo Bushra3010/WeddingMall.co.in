@@ -1,5 +1,6 @@
 'use client'
 
+import { usePathname } from 'next/navigation'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 
 import { createClient } from '@/lib/supabase/client'
@@ -109,6 +110,38 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       subscription.subscription.unsubscribe()
     }
   }, [])
+
+  /*
+   * Re-check on every route change.
+   *
+   * Sign-in and sign-up are Server Actions too: they set the auth cookie and
+   * redirect, and that redirect is a client-side navigation. This provider
+   * lives in the root layout, so it is never remounted and nothing above
+   * fires — a freshly signed-in user landed on /account with a header still
+   * offering "Sign in". Reading the cookie is local; the shortlist is only
+   * refetched when signed-in status actually flips.
+   */
+  const pathname = usePathname()
+  const { ready, signedIn: knownSignedIn } = state
+
+  useEffect(() => {
+    if (!ready) return
+    const supabase = createClient()
+    let cancelled = false
+    void supabase.auth.getSession().then(async ({ data }) => {
+      const signedIn = Boolean(data.session)
+      if (cancelled || signedIn === knownSignedIn) return
+      let shortlistedIds: ReadonlySet<string> = EMPTY
+      if (signedIn) {
+        const { data: rows, error } = await supabase.from('shortlists').select('vendor_id')
+        if (!error) shortlistedIds = new Set((rows ?? []).map((row) => row.vendor_id))
+      }
+      if (!cancelled) setState({ signedIn, ready: true, shortlistedIds })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [pathname, ready, knownSignedIn])
 
   return <SessionContext.Provider value={state}>{children}</SessionContext.Provider>
 }

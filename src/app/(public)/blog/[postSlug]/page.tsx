@@ -8,6 +8,11 @@ import { getPost } from '@/server/dal/cms'
 
 export const revalidate = 600
 
+/** Rendered on first request, then cached until `revalidate`. */
+export function generateStaticParams() {
+  return []
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ postSlug: string }> }) {
   const { postSlug } = await params
   const post = await getPost(postSlug)

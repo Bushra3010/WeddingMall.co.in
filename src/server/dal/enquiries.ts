@@ -397,20 +397,6 @@ export async function getShortlistedVendorIds(): Promise<Set<string>> {
   }
 }
 
-export async function isShortlisted(vendorId: string): Promise<boolean> {
-  try {
-    const supabase = await createClient()
-    const { data } = await supabase
-      .from('shortlists')
-      .select('id')
-      .eq('vendor_id', vendorId)
-      .maybeSingle()
-    return Boolean(data)
-  } catch {
-    return false
-  }
-}
-
 export async function getWeddingProfile() {
   try {
     const supabase = await createClient()

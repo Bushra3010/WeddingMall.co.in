@@ -6,6 +6,9 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Heart, LogOut, Menu, UserRound, X } from 'lucide-react'
 
+import { useSession } from '@/components/shared/session-provider'
+import { signOut } from '@/features/auth/actions'
+import { createClient } from '@/lib/supabase/client'
 import { site } from '@/lib/site'
 import { cn } from '@/lib/utils'
 
@@ -31,16 +34,20 @@ const NAV = [
 /** Routes that render a dark full-bleed hero behind the bar. */
 const HERO_ROUTES = new Set(['/'])
 
-export function SiteHeader({
-  signedIn,
-  signOutAction,
-}: {
-  signedIn: boolean
-  signOutAction: () => Promise<void>
-}) {
+export function SiteHeader() {
+  const { signedIn } = useSession()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const pathname = usePathname()
+
+  // Mirrors the shared `SignOutButton`: clear the browser-side session
+  // immediately, then the Server Action clears the cookie and redirects.
+  // Calling the server action alone left the client session intact, so the
+  // header kept offering "Sign out" to someone already signed out.
+  const handleSignOut = async () => {
+    await createClient().auth.signOut()
+    await signOut()
+  }
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -150,7 +157,7 @@ export function SiteHeader({
                 <UserRound aria-hidden="true" className="size-4" />
                 <span className="hidden sm:inline">Account</span>
               </Link>
-              <form action={signOutAction}>
+              <form action={handleSignOut}>
                 <button
                   type="submit"
                   aria-label="Sign out"

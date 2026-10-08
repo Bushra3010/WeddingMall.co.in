@@ -11,8 +11,6 @@ import { breadcrumbSchema, buildMetadata, vendorSchema } from '@/lib/seo'
 import { storagePublicUrl } from '@/lib/supabase/storage'
 import { cn } from '@/lib/utils'
 import { ShortlistButton } from '@/components/customer/shortlist-button'
-import { getActor } from '@/server/dal/actor'
-import { isShortlisted } from '@/server/dal/enquiries'
 import { ViewBeacon } from '@/components/public/view-beacon'
 import { VendorGallery } from '@/components/public/vendor-gallery'
 import { VendorAmenities } from '@/components/public/vendor-amenities'
@@ -36,6 +34,15 @@ async function redirectRenamedSlug(slug: string) {
 }
 
 export const revalidate = 600
+
+/**
+ * Nothing prebuilt at deploy time; each vendor page renders on first request
+ * and is then served from cache until `revalidate`. Without this, a dynamic
+ * segment renders per request even though the page reads no session.
+ */
+export function generateStaticParams() {
+  return []
+}
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { vendorSlug } = await params
@@ -67,11 +74,9 @@ export default async function VendorProfilePage({ params }: { params: Params }) 
     notFound()
   }
 
-  const actor = await getActor()
-  const [reviews, distribution, shortlisted] = await Promise.all([
+  const [reviews, distribution] = await Promise.all([
     getVendorReviews(vendor.id),
     getRatingDistribution(vendor.id),
-    actor.userId ? isShortlisted(vendor.id) : Promise.resolve(false),
   ])
 
   const cover = vendor.media.find((item) => item.is_cover) ?? vendor.media[0]
@@ -341,21 +346,7 @@ export default async function VendorProfilePage({ params }: { params: Params }) 
             >
               Request a quote
             </Link>
-            {actor.userId ? (
-              <ShortlistButton
-                vendorId={vendor.id}
-                vendorSlug={vendor.slug}
-                shortlisted={shortlisted}
-                className="mt-2"
-              />
-            ) : (
-              <Link
-                href={`/auth/sign-in?next=${encodeURIComponent(`/vendor/${vendor.slug}`)}`}
-                className={cn(buttonVariants({ variant: 'outline' }), 'mt-2 w-full')}
-              >
-                Sign in to save
-              </Link>
-            )}
+            <ShortlistButton vendorId={vendor.id} vendorSlug={vendor.slug} className="mt-2" />
 
             {vendor.serviceAreas.length > 0 ? (
               <div className="border-sand-200 mt-5 border-t pt-4">
