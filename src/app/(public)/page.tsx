@@ -111,11 +111,7 @@ export default async function HomePage() {
           cities={cities}
           popular={popular}
           imagePath={typeof hero?.config.imagePath === 'string' ? hero.config.imagePath : null}
-          eyebrow={
-            typeof hero?.config.eyebrow === 'string'
-              ? hero.config.eyebrow
-              : 'Plan with verified wedding professionals'
-          }
+          eyebrow={typeof hero?.config.eyebrow === 'string' ? hero.config.eyebrow : null}
         />
       </div>
 
