@@ -24,13 +24,30 @@ import type { Json } from '@/types/database'
 export async function writeAttributeValues(
   vendorId: string,
   form: FormData,
+  /**
+   * Refuse the save when a `required` question on the form is left empty. The
+   * vendor's own form enforces it; the admin editor does not, so a listing
+   * taken over the phone can be saved with what is known so far.
+   */
+  { enforceRequired = false }: { enforceRequired?: boolean } = {},
 ): Promise<{ saved: number; cleared: number }> {
   const supabase = await createClient()
 
   const { data: definitions, error } = await supabase
     .from('category_attributes')
-    .select('id, code, data_type, input_type')
+    .select('id, code, data_type, input_type, required')
   if (error) throw new ServiceError('internal_error', 'We could not load the questions.')
+
+  if (enforceRequired) {
+    const missing = missingRequiredAttributes(definitions ?? [], form)
+    if (missing.length > 0) {
+      throw new ServiceError(
+        'validation_error',
+        'Please answer every question marked with *.',
+        Object.fromEntries(missing.map((id) => [`attr__${id}`, ['This is required']])),
+      )
+    }
+  }
 
   const rows: { vendor_id: string; category_attribute_id: string; value_json: Json }[] = []
   const clear: string[] = []
@@ -39,7 +56,9 @@ export async function writeAttributeValues(
     const field = `attr__${definition.id}`
 
     if (definition.input_type === 'multiselect') {
-      const values = form.getAll(field).filter((v): v is string => typeof v === 'string' && v !== '')
+      const values = form
+        .getAll(field)
+        .filter((v): v is string => typeof v === 'string' && v !== '')
       if (values.length === 0) {
         if (form.has(`${field}__present`)) clear.push(definition.id)
         continue
@@ -95,4 +114,36 @@ export async function writeAttributeValues(
   }
 
   return { saved: rows.length, cleared: clear.length }
+}
+
+/**
+ * Required questions the submission left empty.
+ *
+ * Only questions this form actually rendered are considered — one belonging to
+ * a category the vendor is not in is never on the form, and must not block the
+ * save. Text, number and select fields are always submitted when rendered; a
+ * multiselect is marked by its `__present` field. A required yes/no question
+ * is always answered (an unticked box is a real "no"), so it is never missing.
+ */
+export function missingRequiredAttributes(
+  definitions: { id: string; input_type: string; data_type: string; required: boolean }[],
+  form: FormData,
+): string[] {
+  const missing: string[] = []
+  for (const definition of definitions) {
+    if (!definition.required || definition.data_type === 'boolean') continue
+    const field = `attr__${definition.id}`
+
+    if (definition.input_type === 'multiselect') {
+      if (!form.has(`${field}__present`)) continue
+      const values = form.getAll(field).filter((v) => typeof v === 'string' && v !== '')
+      if (values.length === 0) missing.push(definition.id)
+      continue
+    }
+
+    if (!form.has(field)) continue
+    const raw = form.get(field)
+    if (typeof raw !== 'string' || raw.trim() === '') missing.push(definition.id)
+  }
+  return missing
 }

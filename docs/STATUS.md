@@ -2,6 +2,14 @@
 
 Updated: 2026-08-26
 
+## Optional web address, car and pandit questions (2026-10-10)
+
+- Admin "Add business": web address is optional; blank derives it from the name and retries `-2`, `-3`… on a taken slug (`admin-vendors.ts`, `vendor-create-form.tsx`, `schema.ts`).
+- Migration `0043`: questions for `car` (7, all required) and `pandit-jee-01` (10, 5 required); new `category_attributes.is_public`, with registration number and date of birth private (anon read policy rewritten).
+- Required questions are enforced on the vendor's save only (`writeAttributeValues` `enforceRequired`); the admin editor may save a partial set. Document kinds added: RC, insurance, permit/fitness, religious certificate.
+- Tests: lint, typecheck, 290 + 3 new tests pass. Build needs `.env.local` (not run locally).
+- **Remaining:** `0043` is NOT applied to the live database yet — run `supabase db query --linked -f supabase/migrations/0043_car_and_pandit_attributes.sql`. Instant booking for cars is not started (scope to be agreed).
+
 ## Pandit category image (2026-10-10)
 
 - Added `public/Images/pandit-jee-01.png`, generated with built-in imagegen; the final prompt is in `design/pandit-image-prompt.md`.

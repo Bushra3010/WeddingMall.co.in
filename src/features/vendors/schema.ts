@@ -83,8 +83,14 @@ export const DOCUMENT_KINDS = [
   { value: 'business_registration', label: 'Business registration' },
   { value: 'gst', label: 'GST certificate' },
   { value: 'pan', label: 'PAN card' },
-  { value: 'identity', label: 'Owner identity document' },
+  { value: 'identity', label: 'Owner identity document (Aadhaar / ID)' },
   { value: 'address_proof', label: 'Address proof' },
+  // Wedding cars (category `car`).
+  { value: 'vehicle_rc', label: 'Vehicle RC copy' },
+  { value: 'vehicle_insurance', label: 'Vehicle insurance copy' },
+  { value: 'vehicle_permit', label: 'Permit / fitness certificate' },
+  // Pandits — optional training or qualification certificate.
+  { value: 'religious_certificate', label: 'Religious qualification certificate' },
   { value: 'other', label: 'Other supporting document' },
 ] as const
 
@@ -172,7 +178,8 @@ export type AdminVendorInput = z.infer<typeof adminVendorSchema>
 export const adminCreateVendorSchema = z
   .object({
     displayName: trimmed(120).min(2, 'Enter the business name'),
-    slug: vendorSlugSchema,
+    /** Blank means "derive it from the name" — the service picks a free one. */
+    slug: vendorSlugSchema.optional().or(z.literal('')),
     primaryCategoryId: z.uuid('Choose a category'),
     primaryCityId: z.uuid('Choose a city'),
     about: trimmed(4000).optional().or(z.literal('')),

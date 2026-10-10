@@ -162,7 +162,7 @@ export async function saveAttributeValuesAction(
     const vendorId = str(form, 'vendorId')
     assertVendorCapability(actor, vendorId, 'listing.edit')
 
-    const { saved } = await writeAttributeValues(vendorId, form)
+    const { saved } = await writeAttributeValues(vendorId, form, { enforceRequired: true })
     return { saved }
   })
 

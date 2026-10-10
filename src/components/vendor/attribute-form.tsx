@@ -1,6 +1,6 @@
 'use client'
 
-import { FormMessage, useAction } from '@/components/shared/action-form'
+import { fieldError, FormMessage, useAction } from '@/components/shared/action-form'
 import { SubmitButton } from '@/components/shared/submit-button'
 import { Field, Input } from '@/components/ui/field'
 import { saveAttributeValuesAction } from '@/features/taxonomy/attribute-actions'
@@ -95,7 +95,14 @@ export function AttributeForm({
                 rather than wiped by a save it was not part of.
               */}
               <input type="hidden" name={`${field}__present`} value="1" />
-              <legend className="text-sand-800 text-sm font-medium">{label}</legend>
+              <legend className="text-sand-800 text-sm font-medium">
+                {label}
+                {attribute.required ? (
+                  <span aria-hidden="true" className="ml-0.5 text-[var(--color-danger)]">
+                    *
+                  </span>
+                ) : null}
+              </legend>
               {attribute.helpText ? (
                 <p className="text-sand-500 mt-0.5 text-xs">{attribute.helpText}</p>
               ) : null}
@@ -113,17 +120,30 @@ export function AttributeForm({
                   </label>
                 ))}
               </div>
+              {fieldError(state, field) ? (
+                <p role="alert" className="mt-1 text-xs text-[var(--color-danger)]">
+                  {fieldError(state, field)}
+                </p>
+              ) : null}
             </fieldset>
           )
         }
 
         if (attribute.inputType === 'select') {
           return (
-            <Field key={attribute.id} label={label} hint={attribute.helpText ?? undefined}>
-              {({ id }) => (
+            <Field
+              key={attribute.id}
+              label={label}
+              hint={attribute.helpText ?? undefined}
+              error={fieldError(state, field)}
+              required={attribute.required}
+            >
+              {({ id, describedBy, invalid }) => (
                 <select
                   id={id}
                   name={field}
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid || undefined}
                   defaultValue={typeof value === 'string' ? value : ''}
                   disabled={readOnly}
                   className="border-sand-300 h-11 w-full rounded-lg border bg-white px-3 text-sm"
@@ -141,11 +161,19 @@ export function AttributeForm({
         }
 
         return (
-          <Field key={attribute.id} label={label} hint={attribute.helpText ?? undefined}>
-            {({ id }) => (
+          <Field
+            key={attribute.id}
+            label={label}
+            hint={attribute.helpText ?? undefined}
+            error={fieldError(state, field)}
+            required={attribute.required}
+          >
+            {({ id, describedBy, invalid }) => (
               <Input
                 id={id}
                 name={field}
+                aria-describedby={describedBy}
+                invalid={invalid}
                 type={attribute.dataType === 'number' ? 'number' : 'text'}
                 min={attribute.dataType === 'number' ? 0 : undefined}
                 defaultValue={

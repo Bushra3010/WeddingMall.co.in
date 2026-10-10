@@ -68,6 +68,12 @@ describe('adminCreateVendorSchema', () => {
     }
   })
 
+  it('accepts a blank or missing slug, which the service derives from the name', () => {
+    expect(adminCreateVendorSchema.safeParse({ ...BASE, slug: '' }).success).toBe(true)
+    const { slug: _omitted, ...withoutSlug } = BASE
+    expect(adminCreateVendorSchema.safeParse(withoutSlug).success).toBe(true)
+  })
+
   it('drops anything that decides verification or placement', () => {
     // Publishing is offered; the badge is not. `verification_status` moves only
     // through `admin_decide_vendor()`, which records who decided it.

@@ -6,7 +6,11 @@ import { assertPermission, can, type Actor } from '@/lib/permissions'
 import { audit } from '@/lib/security/audit'
 import { describeDeleteError } from '@/features/admin/delete-errors'
 import { describeCreateVendorError } from '@/features/admin/vendor-create-errors'
-import type { AdminCreateVendorInput, AdminVendorInput } from '@/features/vendors/schema'
+import {
+  slugify,
+  type AdminCreateVendorInput,
+  type AdminVendorInput,
+} from '@/features/vendors/schema'
 
 /**
  * Admin edit and delete for a business (PRD 6.11, Epic E).
@@ -161,18 +165,40 @@ export async function createVendorAsAdmin(actor: Actor, input: AdminCreateVendor
     }>
   }
 
-  const { data, error } = await client.rpc('admin_create_vendor', {
-    p_display_name: input.displayName,
-    p_slug: input.slug,
-    p_primary_category: input.primaryCategoryId,
-    p_primary_city: input.primaryCityId,
-    p_about: input.about?.trim() || null,
-    p_email: input.email || null,
-    p_phone: input.phone || null,
-    p_website: input.website || null,
-    p_owner_email: input.ownerEmail || null,
-    p_publish: input.publish,
-  })
+  /*
+   * The web address is optional. A slug the admin typed is used as-is, and a
+   * clash is reported against that field. A blank one is derived from the name
+   * and, like vendor sign-up, the unique index decides whether it is free: a
+   * taken candidate moves on to `name-2`, `name-3`, … rather than failing.
+   */
+  const chosen = input.slug?.trim() || ''
+  const root = slugify(input.displayName)
+  const base = chosen || (root.length >= 3 ? root : `${root ? `${root}-` : ''}business`)
+  const attempts = chosen ? 1 : 12
+
+  let data: Awaited<ReturnType<typeof client.rpc>>['data'] = null
+  let error: Awaited<ReturnType<typeof client.rpc>>['error'] = null
+  let slug = base
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    slug = attempt === 0 ? base : `${base.slice(0, 56)}-${attempt + 1}`
+    ;({ data, error } = await client.rpc('admin_create_vendor', {
+      p_display_name: input.displayName,
+      p_slug: slug,
+      p_primary_category: input.primaryCategoryId,
+      p_primary_city: input.primaryCityId,
+      p_about: input.about?.trim() || null,
+      p_email: input.email || null,
+      p_phone: input.phone || null,
+      p_website: input.website || null,
+      p_owner_email: input.ownerEmail || null,
+      p_publish: input.publish,
+    }))
+
+    if (!error) break
+    const failure = describeCreateVendorError(error, '')
+    if (failure.field !== 'slug') break
+  }
 
   if (error) {
     const failure = describeCreateVendorError(error, 'We could not create that business.')
@@ -203,7 +229,7 @@ export async function createVendorAsAdmin(actor: Actor, input: AdminCreateVendor
    */
   return {
     vendorId: data.vendorId,
-    slug: data.slug ?? input.slug,
+    slug: data.slug ?? slug,
     status: data.status ?? (input.publish ? 'active' : 'draft'),
     ownerIsCreator: data.ownerIsCreator ?? !input.ownerEmail,
   }

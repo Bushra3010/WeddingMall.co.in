@@ -155,15 +155,13 @@ export function VendorCreateForm({
 
         <Field
           label="Web address"
-          hint="Appears as /vendor/… — lowercase letters, numbers and hyphens."
+          hint="Optional — appears as /vendor/…. Leave blank to make one from the business name."
           error={fieldError(state, 'slug')}
-          required
         >
           {({ id, describedBy, invalid }) => (
             <Input
               id={id}
               name="slug"
-              required
               value={slug}
               onChange={(event) => {
                 setSlugTouched(true)
