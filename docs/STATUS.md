@@ -8,7 +8,9 @@ Updated: 2026-08-26
 - Migration `0043`: questions for `car` (7, all required) and `pandit-jee-01` (10, 5 required); new `category_attributes.is_public`, with registration number and date of birth private (anon read policy rewritten).
 - Required questions are enforced on the vendor's save only (`writeAttributeValues` `enforceRequired`); the admin editor may save a partial set. Document kinds added: RC, insurance, permit/fitness, religious certificate.
 - Tests: lint, typecheck, 290 + 3 new tests pass. Build needs `.env.local` (not run locally).
-- **Remaining:** `0043` is NOT applied to the live database yet — run `supabase db query --linked -f supabase/migrations/0043_car_and_pandit_attributes.sql`. Instant booking for cars is not started (scope to be agreed).
+- `0043` applied to the live database 2026-10-10 (17 questions present; public-read policy hides private answers).
+- "Book now" replaces "Request a quote" (no payment; rides the enquiry RPC). WhatsApp button ships hidden until `site.whatsappNumber` is set.
+- **Remaining:** set the WhatsApp number; turn off the Netlify badge in the Netlify dashboard; booking does not yet check the vendor's availability calendar.
 
 ## Pandit category image (2026-10-10)
 
