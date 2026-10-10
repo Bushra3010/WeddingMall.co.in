@@ -84,10 +84,10 @@ export default async function ShortlistPage() {
                         <ShortlistNote vendorId={row.vendorId} note={row.note} />
 
                         <Link
-                          href={`/vendor/${row.vendorSlug}/enquire`}
+                          href={`/vendor/${row.vendorSlug}/book`}
                           className={cn(buttonVariants({ size: 'sm' }), 'mt-3')}
                         >
-                          Request a quote
+                          Book now
                         </Link>
                       </div>
                     </li>

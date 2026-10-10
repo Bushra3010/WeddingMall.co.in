@@ -1,6 +1,7 @@
 import { BottomNav } from '@/components/public/bottom-nav'
 import { SiteFooter } from '@/components/public/site-footer'
 import { SiteHeader } from '@/components/public/site-header'
+import { WhatsAppButton } from '@/components/public/whatsapp-button'
 
 /**
  * Public shell.
@@ -20,6 +21,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       </main>
       <SiteFooter />
       <BottomNav />
+      <WhatsAppButton />
     </div>
   )
 }

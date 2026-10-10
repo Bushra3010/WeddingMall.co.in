@@ -27,10 +27,10 @@ export default async function EnquiryDetailPage({
   searchParams,
 }: {
   params: Promise<{ enquiryId: string }>
-  searchParams: Promise<{ sent?: string }>
+  searchParams: Promise<{ sent?: string; booked?: string }>
 }) {
   const { enquiryId } = await params
-  const { sent } = await searchParams
+  const { sent, booked } = await searchParams
 
   const actor = await getActor()
   // Off unless the deployment turns it on; the thread polls either way.
@@ -81,7 +81,15 @@ export default async function EnquiryDetailPage({
         <span className="text-sand-700">{enquiry.vendorName}</span>
       </nav>
 
-      {sent ? (
+      {booked ? (
+        <p
+          role="status"
+          className="flex items-center gap-2 rounded-lg bg-[color-mix(in_oklch,var(--color-success)_12%,white)] px-3 py-2 text-sm text-[var(--color-success)]"
+        >
+          <CheckCircle2 aria-hidden="true" className="size-4" />
+          Booking placed. The vendor will call you to confirm.
+        </p>
+      ) : sent ? (
         <p
           role="status"
           className="flex items-center gap-2 rounded-lg bg-[color-mix(in_oklch,var(--color-success)_12%,white)] px-3 py-2 text-sm text-[var(--color-success)]"

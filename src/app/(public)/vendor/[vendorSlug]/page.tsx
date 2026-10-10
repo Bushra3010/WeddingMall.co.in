@@ -338,13 +338,13 @@ export default async function VendorProfilePage({ params }: { params: Params }) 
           <div className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-5">
             <p className="font-display text-sand-900 text-lg">Interested?</p>
             <p className="text-sand-600 mt-1 text-sm">
-              Send your requirements. You choose whether to share your contact details.
+              Pick your date and book directly — no quote, no payment.
             </p>
             <Link
-              href={`/vendor/${vendor.slug}/enquire`}
+              href={`/vendor/${vendor.slug}/book`}
               className={cn(buttonVariants({ size: 'lg' }), 'mt-4 w-full')}
             >
-              Request a quote
+              Book now
             </Link>
             <ShortlistButton vendorId={vendor.id} vendorSlug={vendor.slug} className="mt-2" />
 

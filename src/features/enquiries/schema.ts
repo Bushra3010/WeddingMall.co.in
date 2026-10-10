@@ -50,6 +50,52 @@ export const enquirySchema = z
 
 export type EnquiryInput = z.infer<typeof enquirySchema>
 
+/**
+ * "Book now" — a direct booking with no quote and no payment.
+ *
+ * Carried on the enquiry pipeline (same RPC, idempotency, thread, vendor inbox)
+ * rather than a table of its own, so it needs no migration. What makes it a
+ * booking is what it asks for: a date is required, and the customer agrees to
+ * share their name and phone so the vendor can call to confirm. That consent is
+ * still an explicit tick the customer makes — it is required to book, never
+ * pre-ticked (PRD 2.3).
+ */
+export const bookingSchema = z.object({
+  vendorId: z.uuid(),
+  categoryId: z.uuid().optional().or(z.literal('')),
+  cityId: z.uuid().optional().or(z.literal('')),
+  eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose the date you want to book'),
+  eventTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, 'Choose a time')
+    .optional()
+    .or(z.literal('')),
+  guestCount: z.coerce.number().int().min(0).max(100000).optional(),
+  note: trimmed(1500).optional().or(z.literal('')),
+  contactConsent: z.literal(true, {
+    error: 'Tick this so the vendor can call you to confirm the booking',
+  }),
+  idempotencyKey: z.uuid(),
+})
+
+export type BookingInput = z.infer<typeof bookingSchema>
+
+/** The thread's opening message — what the vendor reads in their inbox. */
+export function bookingMessage(input: {
+  eventDate: string
+  eventTime?: string
+  guestCount?: number
+  note?: string
+}): string {
+  const lines = [
+    `Booking request for ${input.eventDate}${input.eventTime ? ` at ${input.eventTime}` : ''}.`,
+  ]
+  if (input.guestCount) lines.push(`Guests: ${input.guestCount}.`)
+  if (input.note?.trim()) lines.push(input.note.trim())
+  lines.push('Please call me to confirm.')
+  return lines.join('\n')
+}
+
 export const weddingProfileSchema = z
   .object({
     displayLabel: trimmed(120).optional().or(z.literal('')),

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-import { runAction, type ActionResult } from '@/lib/action-result'
+import { runAction, ServiceError, type ActionResult } from '@/lib/action-result'
 import { getActor } from '@/server/dal/actor'
 import {
   addEnquiryNote,
@@ -17,6 +17,8 @@ import {
   updateShortlistNote,
 } from '@/server/services/enquiries'
 import {
+  bookingMessage,
+  bookingSchema,
   enquiryCrmSchema,
   enquiryNoteSchema,
   enquirySchema,
@@ -74,6 +76,67 @@ export async function submitEnquiryAction(
   if (result.ok && enquiryId) {
     revalidatePath('/account/enquiries')
     redirect(`/account/enquiries/${enquiryId}?sent=1`)
+  }
+  return result
+}
+
+/**
+ * "Book now" — no quote, no payment. Validated as a booking, then submitted
+ * through the same enquiry RPC so the vendor's inbox, notifications and the
+ * thread all work unchanged.
+ */
+export async function submitBookingAction(
+  _prev: unknown,
+  form: FormData,
+): Promise<ActionResult<{ enquiryId: string; duplicate: boolean; duplicateWarning: boolean }>> {
+  let enquiryId: string | null = null
+
+  const result = await runAction('enquiry.book', async () => {
+    const actor = await getActor()
+    const booking = bookingSchema.parse({
+      vendorId: str(form, 'vendorId'),
+      categoryId: str(form, 'categoryId'),
+      cityId: str(form, 'cityId'),
+      eventDate: str(form, 'eventDate'),
+      eventTime: str(form, 'eventTime'),
+      guestCount: num(form, 'guestCount'),
+      note: str(form, 'note'),
+      contactConsent: form.get('contactConsent') === 'on',
+      idempotencyKey: str(form, 'idempotencyKey'),
+    })
+
+    // A booking for a day that has already passed is a typo, not a booking.
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+    if (booking.eventDate < today) {
+      throw new ServiceError('validation_error', 'Choose a date from today onwards.', {
+        eventDate: ['Choose a date from today onwards'],
+      })
+    }
+
+    const input = enquirySchema.parse({
+      vendorId: booking.vendorId,
+      categoryId: booking.categoryId,
+      cityId: booking.cityId,
+      eventDate: booking.eventDate,
+      guestCount: booking.guestCount,
+      message: bookingMessage({
+        eventDate: booking.eventDate,
+        eventTime: booking.eventTime || undefined,
+        guestCount: booking.guestCount,
+        note: booking.note,
+      }),
+      preferredContactMode: 'phone',
+      contactConsent: true,
+      idempotencyKey: booking.idempotencyKey,
+    })
+    const out = await submitEnquiry(actor, input)
+    enquiryId = out.enquiryId
+    return out
+  })
+
+  if (result.ok && enquiryId) {
+    revalidatePath('/account/enquiries')
+    redirect(`/account/enquiries/${enquiryId}?booked=1`)
   }
   return result
 }
