@@ -53,6 +53,7 @@ const CATEGORY_IMAGES = new Set([
   'makeup-artists',
   'mehendi-artists',
   'music-and-dj',
+  'pandit-jee-01',
   'photographers',
   'planners',
   'venues',

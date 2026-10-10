@@ -2,6 +2,13 @@
 
 Updated: 2026-08-26
 
+## Pandit category image (2026-10-10)
+
+- Added `public/Images/pandit-jee-01.png`, generated with built-in imagegen; the final prompt is in `design/pandit-image-prompt.md`.
+- Registered the existing `pandit-jee-01` category in `src/components/public/category-icons.ts`, shared by mobile circles and desktop cards.
+- Verification: lint, typecheck and 290 tests passed. Build could not start because another Next.js build was already running.
+- Next: finish the existing build and deploy the changes to show the image on the live site.
+
 ## Completed
 
 - **Prompt 0 — repository blueprint.** Next.js 16 / React 19 / TS strict / Tailwind v4, structure per PRD 8.2, pinned dependencies, env schema, CI.
