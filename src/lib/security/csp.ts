@@ -63,6 +63,10 @@ export function buildCsp(isDev: boolean, nonce?: string): string {
     'font-src': ["'self'", 'data:'],
     'connect-src': ["'self'", 'https:', 'wss:', ...(isDev ? ['ws:'] : [])],
     'media-src': ["'self'", 'https:'],
+    // Razorpay Checkout renders its payment sheet in an iframe from these hosts
+    // (booking advance, migration 0044). Its script is loaded by our own nonced
+    // bundle, which `'strict-dynamic'` already trusts.
+    'frame-src': ["'self'", 'https://api.razorpay.com', 'https://checkout.razorpay.com'],
     'worker-src': ["'self'", 'blob:'],
     'manifest-src': ["'self'"],
   }

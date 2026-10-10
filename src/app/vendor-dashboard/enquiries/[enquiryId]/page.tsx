@@ -4,6 +4,9 @@ import { notFound } from 'next/navigation'
 import { EnquiryTimeline } from '@/components/customer/enquiry-timeline'
 import { MessageThread } from '@/components/customer/message-thread'
 import { EnquiryActions } from '@/components/customer/enquiry-actions'
+import { AdvancePaymentsList } from '@/components/shared/advance-payments-list'
+import { offersAdvance } from '@/features/payments/advance'
+import { getAdvancePayments } from '@/server/dal/booking-payments'
 import { EnquiryDealFields, EnquiryNotes } from '@/components/vendor/enquiry-crm'
 import { ENQUIRY_STATUS_LABELS } from '@/features/enquiries/status'
 import { formatDate, formatDateTime } from '@/lib/dates'
@@ -52,7 +55,7 @@ export default async function VendorEnquiryPage({
    */
   const parties = await getThreadParties(enquiryId)
 
-  const [messages, timeline, contact, notes] = await Promise.all([
+  const [messages, timeline, contact, notes, advances] = await Promise.all([
     enquiry.conversationId
       ? getMessages(enquiry.conversationId, {
           customerId: parties?.customerId ?? enquiry.customerId,
@@ -68,6 +71,7 @@ export default async function VendorEnquiryPage({
     // RLS returns an empty list for anyone who may not read the team's notes,
     // so this is safe to fetch before the capability check below.
     getEnquiryNotes(enquiryId),
+    offersAdvance(enquiry.categorySlug) ? getAdvancePayments(enquiryId) : Promise.resolve([]),
   ])
 
   const budget = formatRange(
@@ -98,6 +102,13 @@ export default async function VendorEnquiryPage({
 
       <div className="grid gap-6 lg:grid-cols-[1fr_18rem]">
         <div className="space-y-8">
+          {advances.some((a) => a.status === 'paid') ? (
+            <section className="border-sand-200 space-y-3 rounded-[var(--radius-card)] border bg-white p-5">
+              <h2 className="font-display text-sand-900 text-lg">Advance received</h2>
+              <AdvancePaymentsList payments={advances} />
+            </section>
+          ) : null}
+
           <section className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-5">
             <h2 className="font-display text-sand-900 text-lg">Requirements</h2>
             <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">

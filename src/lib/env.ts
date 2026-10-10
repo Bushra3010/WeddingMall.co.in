@@ -27,6 +27,14 @@ const serverSchema = z.object({
   EMAIL_FROM: z.email().optional(),
   PAYMENT_PROVIDER: z.enum(['mock', 'razorpay', 'stripe']).default('mock'),
   PAYMENT_WEBHOOK_SECRET: z.string().optional(),
+  /**
+   * Razorpay, for the optional booking advance (migration 0044). The advance is
+   * offered only when both keys are set; the webhook secret is the one set on
+   * the webhook in the Razorpay dashboard, not the API secret.
+   */
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
   SENTRY_DSN: z.string().optional(),
   FEATURE_PHONE_AUTH: booleanFlag,
   FEATURE_ONLINE_PAYMENTS: booleanFlag,

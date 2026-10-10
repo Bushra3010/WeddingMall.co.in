@@ -118,6 +118,7 @@ export interface EnquiryDetail {
   vendorName: string
   vendorSlug: string
   categoryName: string | null
+  categorySlug: string | null
   cityName: string | null
   conversationId: string | null
   conversationStatus: string | null
@@ -137,7 +138,7 @@ export async function getEnquiry(enquiryId: string): Promise<EnquiryDetail | nul
          preferred_contact_mode, customer_id, vendor_id,
          quote_amount_minor, lost_reason,
          profiles!enquiries_customer_id_fkey(full_name),
-         vendors(display_name, slug), categories(name), cities(name),
+         vendors(display_name, slug), categories(name, slug), cities(name),
          conversations(id, status)`,
       )
       .eq('id', enquiryId)
@@ -169,6 +170,7 @@ export async function getEnquiry(enquiryId: string): Promise<EnquiryDetail | nul
       vendorName: data.vendors?.display_name ?? 'Unknown business',
       vendorSlug: data.vendors?.slug ?? '',
       categoryName: data.categories?.name ?? null,
+      categorySlug: data.categories?.slug ?? null,
       cityName: data.cities?.name ?? null,
       conversationId: conversation?.id ?? null,
       conversationStatus: conversation?.status ?? null,

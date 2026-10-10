@@ -5,6 +5,11 @@ import { CheckCircle2 } from 'lucide-react'
 import { EnquiryTimeline } from '@/components/customer/enquiry-timeline'
 import { MessageThread } from '@/components/customer/message-thread'
 import { EnquiryActions } from '@/components/customer/enquiry-actions'
+import { AdvancePayment } from '@/components/customer/advance-payment'
+import { AdvancePaymentsList } from '@/components/shared/advance-payments-list'
+import { offersAdvance } from '@/features/payments/advance'
+import { razorpayConfigured } from '@/lib/payments/razorpay'
+import { getAdvancePayments } from '@/server/dal/booking-payments'
 import { ENQUIRY_STATUS_LABELS } from '@/features/enquiries/status'
 import { formatDate, formatDateTime } from '@/lib/dates'
 import { formatRange, money } from '@/lib/money'
@@ -53,7 +58,11 @@ export default async function EnquiryDetailPage({
    */
   const parties = await getThreadParties(enquiryId)
 
-  const [messages, timeline] = await Promise.all([
+  // Optional online advance (migration 0044): only in categories that offer it.
+  const advanceOffered = offersAdvance(enquiry.categorySlug)
+  const canPayAdvance = advanceOffered && razorpayConfigured()
+
+  const [messages, timeline, advances] = await Promise.all([
     enquiry.conversationId
       ? getMessages(enquiry.conversationId, {
           customerId: parties?.customerId ?? enquiry.customerId,
@@ -61,6 +70,7 @@ export default async function EnquiryDetailPage({
         })
       : Promise.resolve([]),
     getEnquiryTimeline(enquiryId),
+    advanceOffered ? getAdvancePayments(enquiryId) : Promise.resolve([]),
   ])
 
   // Opening the thread clears the unread badge.
@@ -112,6 +122,14 @@ export default async function EnquiryDetailPage({
 
       <div className="grid gap-6 lg:grid-cols-[1fr_18rem]">
         <div className="space-y-8">
+          {canPayAdvance || advances.some((a) => a.status === 'paid') ? (
+            <section className="border-sand-200 space-y-3 rounded-[var(--radius-card)] border bg-white p-5">
+              <h2 className="font-display text-sand-900 text-lg">Advance payment</h2>
+              <AdvancePaymentsList payments={advances} />
+              {canPayAdvance ? <AdvancePayment enquiryId={enquiry.id} /> : null}
+            </section>
+          ) : null}
+
           <section className="border-sand-200 rounded-[var(--radius-card)] border bg-white p-5">
             <h2 className="font-display text-sand-900 text-lg">What you asked</h2>
             <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">

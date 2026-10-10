@@ -52,7 +52,7 @@ export interface PaymentAdapter {
 }
 
 /** Constant-time compare that tolerates unequal lengths without throwing. */
-function safeEqual(a: string, b: string): boolean {
+export function safeEqual(a: string, b: string): boolean {
   const left = Buffer.from(a)
   const right = Buffer.from(b)
   if (left.length !== right.length) return false
