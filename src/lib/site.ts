@@ -12,7 +12,7 @@ export const site = {
    * WhatsApp for the floating chat button: country code + number, digits only
    * (e.g. '919876543210'). Empty hides the button.
    */
-  whatsappNumber: '',
+  whatsappNumber: '919472416401',
   defaultCurrency: 'INR',
   defaultLocale: 'en-IN',
   defaultTimezone: 'Asia/Kolkata',
