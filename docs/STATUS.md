@@ -2,12 +2,18 @@
 
 Updated: 2026-08-26
 
+## Hosting moved from Netlify to Vercel (2026-10-11)
+
+- Netlify credits ran out (site 503). Project `weddingmallco` now on Vercel (account `alokkumarsoft24-9497`, Hobby plan), region `bom1`, Node 22, 13 env vars copied from Netlify. Git-connected to `main`.
+- `weddingmall.co.in` nameservers moved to `ns1/ns2.vercel-dns.com`; Netlify project and DNS zone deleted. `netlify.toml` removed; `vercel.json` region `hnd1` → `bom1`; `.vercelignore` skips `output/`, `tmp/`.
+- **Remaining:** Hobby plan is non-commercial under Vercel's terms — upgrade to Pro. Add `https://weddingmall.co.in/**` and `https://weddingmallco.vercel.app/**` to Supabase Auth redirect URLs if not already present.
+
 ## Optional Razorpay advance on car bookings (2026-10-10)
 
 - Customer may pay any advance (₹1–₹1,00,000) on a `car` booking from the booking thread; booking still needs no payment. Category list: `ADVANCE_CATEGORY_SLUGS` in `src/features/payments/advance.ts`.
 - Migration `0044` adds `booking_payments` (customer may only insert `created` for own enquiry; no UPDATE policy). `paid` is written only by `POST /api/webhooks/razorpay` after HMAC verification (service role). Vendor sees "Advance received".
 - CSP gains `frame-src` for `api.razorpay.com` / `checkout.razorpay.com`. Tests: 301 pass; lint/typecheck clean.
-- **Remaining:** apply `0044` to live; set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` in Netlify; add webhook `https://www.weddingmall.co.in/api/webhooks/razorpay` (events `payment.captured`, `order.paid`) in Razorpay; rotate the key that was shared in chat. Regenerate DB types and drop the `SupabaseClient` casts.
+- **Remaining:** apply `0044` to live; set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` in Vercel; add webhook `https://www.weddingmall.co.in/api/webhooks/razorpay` (events `payment.captured`, `order.paid`) in Razorpay; rotate the key that was shared in chat. Regenerate DB types and drop the `SupabaseClient` casts.
 
 ## Optional web address, car and pandit questions (2026-10-10)
 
@@ -17,7 +23,7 @@ Updated: 2026-08-26
 - Tests: lint, typecheck, 290 + 3 new tests pass. Build needs `.env.local` (not run locally).
 - `0043` applied to the live database 2026-10-10 (17 questions present; public-read policy hides private answers).
 - "Book now" replaces "Request a quote" (no payment; rides the enquiry RPC). WhatsApp button ships hidden until `site.whatsappNumber` is set.
-- **Remaining:** set the WhatsApp number; turn off the Netlify badge in the Netlify dashboard; booking does not yet check the vendor's availability calendar.
+- **Remaining:** set the WhatsApp number; booking does not yet check the vendor's availability calendar.
 
 ## Pandit category image (2026-10-10)
 
