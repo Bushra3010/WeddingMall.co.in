@@ -14,9 +14,20 @@ const PROTECTED_PREFIXES = ['/account', '/vendor-dashboard', '/admin']
  */
 const DYNAMIC_PREFIXES = ['/account', '/vendor-dashboard', '/admin', '/auth', '/vendors', '/vendor']
 
+/**
+ * Routes whose Server Components read the session. Only these need the
+ * refresh, which costs a call to Supabase Auth for every signed-in request.
+ */
+const SESSION_PREFIXES = ['/account', '/vendor-dashboard', '/admin', '/auth']
+
 export async function proxy(request: NextRequest) {
-  const { response, user } = await updateSession(request)
   const { pathname, search } = request.nextUrl
+  const needsSession = SESSION_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )
+  const { response, user } = needsSession
+    ? await updateSession(request)
+    : { response: NextResponse.next({ request }), user: null }
 
   /*
    * Next extracts the nonce from the *request's* `content-security-policy`
@@ -86,12 +97,21 @@ export async function proxy(request: NextRequest) {
   return response
 }
 
+/*
+ * Only the signed-in workspaces and the per-request public routes. Running the
+ * proxy on every URL — each page view plus every `<Link>` prefetch — exhausted
+ * the Vercel Hobby quota. Prerendered public pages read no session and get
+ * their (nonce-free) CSP from `next.config.ts` instead.
+ *
+ * Keep in sync with `PROXIED_PATHS` in `next.config.ts`.
+ */
 export const config = {
   matcher: [
-    /*
-     * Everything except static assets and image files. Auth cookie refresh has
-     * to run broadly so Server Components always see a fresh session.
-     */
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico)$).*)',
+    '/account/:path*',
+    '/vendor-dashboard/:path*',
+    '/admin/:path*',
+    '/auth/:path*',
+    '/vendors/:path*',
+    '/vendor/:path*',
   ],
 }

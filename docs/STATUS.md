@@ -1,6 +1,21 @@
 # Status
 
-Updated: 2026-08-26
+Updated: 2026-10-15
+
+## Vercel Hobby quota exceeded — proxy narrowed (2026-10-15)
+
+- Proxy ran on every URL (each page view + every `<Link>` prefetch) and called Supabase Auth on each. Matcher now `/account`, `/vendor-dashboard`, `/admin`, `/auth`, `/vendors`, `/vendor` only; session refresh (`getUser`) only on the first four.
+- Prerendered public pages get the nonce-free CSP from `next.config.ts` (`PROXIED_PATHS` must match the proxy matcher). Verified one CSP header per route; nonce still on proxied routes.
+- `robots.ts` also disallows `/vendors/*?` (filter combinations on per-request pages).
+- Tests: typecheck, lint, 301 tests pass; build passes with placeholder env. Not deployed.
+- **Remaining:** check Vercel Usage page for which metric hit; deploy this together with the 2026-10-12 image change.
+
+## Supabase egress quota exceeded — image egress cut (2026-10-12)
+
+- Live site showed no categories/vendors: Supabase returns HTTP 402 `exceed_egress_quota` (free plan); project restricted until upgraded or quota resets.
+- `next.config.ts` images: WebP only (AVIF dropped), `deviceSizes` trimmed (no 750/3840), `minimumCacheTTL` 31 days (was 4h default). `listings.ts` uploads now set `cacheControl: '31536000'` (paths are immutable UUIDs).
+- Tests: typecheck, lint, 301 tests pass. Not deployed.
+- **Remaining:** upgrade Supabase to Pro (or wait for reset); check Supabase Usage page for the egress split (Storage vs DB); deploy this change.
 
 ## Hosting moved from Netlify to Vercel (2026-10-11)
 

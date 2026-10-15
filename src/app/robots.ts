@@ -9,7 +9,7 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: '*',
         allow: '/',
         // Dashboards, auth, and open-ended search combinations (PRD 11.1).
-        disallow: ['/account', '/vendor-dashboard', '/admin', '/auth', '/api', '/vendors?'],
+        disallow: ['/account', '/vendor-dashboard', '/admin', '/auth', '/api', '/vendors?', '/vendors/*?'],
       },
     ],
     sitemap: absoluteUrl('/sitemap.xml'),

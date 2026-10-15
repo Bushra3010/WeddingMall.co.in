@@ -1,5 +1,7 @@
 import type { NextConfig } from 'next'
 
+import { buildCsp } from './src/lib/security/csp'
+
 const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
   : undefined
@@ -22,6 +24,9 @@ const securityHeaders = [
     value: 'max-age=63072000; includeSubDomains; preload',
   },
 ]
+
+/** Path prefixes the proxy handles; `vendor` also covers `vendors` and `vendor-dashboard`. */
+const PROXIED_PATHS = 'account|vendor|admin|auth'
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -53,7 +58,23 @@ const nextConfig: NextConfig = {
   },
 
   images: {
-    formats: ['image/avif', 'image/webp'],
+    /*
+     * Every optimised variant is a separate cache entry, and every cache miss
+     * downloads the full original from Supabase Storage — which is billed
+     * egress. The free-plan egress quota ran out on 2026-10-12 and the project
+     * was restricted, so these settings trade a little per-image weight for far
+     * fewer origin fetches:
+     *
+     * - WebP only. AVIF alongside it doubled the variants (and origin fetches).
+     * - No 750/3840 widths. Stored photos are capped at 2400px
+     *   (`MAX_EDGE_PX`), so 3840 only re-fetched the original to serve it as-is.
+     * - 31-day cache. Storage paths are random UUIDs and never overwritten, so
+     *   a variant cannot go stale; the 4-hour default refetched every original
+     *   six times a day per variant.
+     */
+    formats: ['image/webp'],
+    deviceSizes: [640, 828, 1080, 1200, 1920, 2048],
+    minimumCacheTTL: 2678400,
     /*
      * Next 16 refuses any `quality` not listed here with a 400 — the default
      * allows 75 alone, so `<Image quality={90}>` does not render a softer
@@ -67,7 +88,25 @@ const nextConfig: NextConfig = {
   },
 
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }]
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      /*
+       * The proxy sets the CSP on the routes it matches (with a nonce where
+       * they render per request). Everything else is prerendered and gets the
+       * nonce-free policy here, so the proxy need not run on it.
+       *
+       * Keep `PROXIED_PATHS` in sync with the matcher in `src/proxy.ts`.
+       */
+      {
+        source: `/((?!${PROXIED_PATHS}).*)`,
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: buildCsp(process.env.NODE_ENV !== 'production'),
+          },
+        ],
+      },
+    ]
   },
 }
 

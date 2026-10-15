@@ -190,7 +190,9 @@ export async function uploadMedia(
   const admin = createAdminClient()
   const { error: uploadError } = await admin.storage
     .from(MEDIA_BUCKET)
-    .upload(objectPath, file, { contentType: file.type, upsert: false })
+    // The path is a fresh UUID and never overwritten, so the object is
+    // immutable: let every cache in front of Storage keep it for a year.
+    .upload(objectPath, file, { contentType: file.type, upsert: false, cacheControl: '31536000' })
 
   if (uploadError) {
     logError('service.uploadMedia', uploadError, { vendorId })
