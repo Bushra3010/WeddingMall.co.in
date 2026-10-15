@@ -6,8 +6,11 @@ Updated: 2026-10-15
 
 - Project `weddingmallco` (`prj_hVT1gTH5EVuFgGAn531qAuHzmz8E`) in team `nikhizencodxs-projects` (Hobby), Node 22, live at `https://weddingmallco-in.vercel.app`, deployed by CLI (not Git-connected). Supabase project `cbkggpptjylhkziostbv`.
 - Env set: Supabase URL/publishable/secret, `NEXT_PUBLIC_APP_URL`, new `CRON_SECRET`. Missing: email and Razorpay keys.
-- Local `.vercel/project.json` still points at the old project; deploy with `VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` set to the new ones.
-- **Remaining:** add `https://weddingmallco-in.vercel.app/**` to Supabase Auth redirect URLs; move `weddingmall.co.in` from the old account; add email/Razorpay env vars; revoke the Vercel and Supabase tokens shared in chat.
+- Local `.vercel/project.json` now points at the new project.
+- Domain: nameservers moved back to Hostinger (`atlas`/`hyperion.dns-parking.com`, restores Hostinger mail MX); A `@` 216.198.79.1, CNAME `www` cname.vercel-dns.com, `_vercel` TXT verified. Apex 308 → `www`; production `NEXT_PUBLIC_APP_URL` = `https://www.weddingmall.co.in`. Live and verified 2026-10-15 (HTTPS, data loading).
+- Supabase Auth: Site URL was `http://localhost:3000` with an empty redirect list; now `https://www.weddingmall.co.in` plus apex, `weddingmallco-in.vercel.app` and localhost redirects.
+- Old account (`alokkumarsoft24-9497`) is blocked for fair use; its `weddingmall.co.in` DNS zone could not be deleted and is now unused.
+- **Remaining:** add email/Razorpay env vars (and Razorpay webhook); revoke the two Vercel tokens and the Supabase token shared in chat.
 
 ## Vercel Hobby quota exceeded — proxy narrowed (2026-10-15)
 
