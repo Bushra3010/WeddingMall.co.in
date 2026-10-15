@@ -2,6 +2,13 @@
 
 Updated: 2026-10-15
 
+## Moved to a second Vercel account (2026-10-15)
+
+- Project `weddingmallco` (`prj_hVT1gTH5EVuFgGAn531qAuHzmz8E`) in team `nikhizencodxs-projects` (Hobby), Node 22, live at `https://weddingmallco-in.vercel.app`, deployed by CLI (not Git-connected). Supabase project `cbkggpptjylhkziostbv`.
+- Env set: Supabase URL/publishable/secret, `NEXT_PUBLIC_APP_URL`, new `CRON_SECRET`. Missing: email and Razorpay keys.
+- Local `.vercel/project.json` still points at the old project; deploy with `VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` set to the new ones.
+- **Remaining:** add `https://weddingmallco-in.vercel.app/**` to Supabase Auth redirect URLs; move `weddingmall.co.in` from the old account; add email/Razorpay env vars; revoke the Vercel and Supabase tokens shared in chat.
+
 ## Vercel Hobby quota exceeded — proxy narrowed (2026-10-15)
 
 - Proxy ran on every URL (each page view + every `<Link>` prefetch) and called Supabase Auth on each. Matcher now `/account`, `/vendor-dashboard`, `/admin`, `/auth`, `/vendors`, `/vendor` only; session refresh (`getUser`) only on the first four.
