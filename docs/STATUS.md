@@ -10,6 +10,7 @@ Updated: 2026-10-23
 - Old Vercel account: project `weddingmallco` deleted (HTTP 204) and the `weddingmall.co.in` domain removed from the team (HTTP 200). The second Vercel account's project is still there (no token).
 - The owner had already switched Hostinger's nameservers to `dns1`–`dns4.p04.nsone.net`; Google and Cloudflare resolvers see them, Netlify DNS answers A/MX correctly and the certificate is issued. The "still broken" symptom was a stale local resolver cache (old Hostinger NS → Vercel A record).
 - Netlify primary domain set to `www.weddingmall.co.in` with the apex as alias (via `updateSite` `body`), so apex 301 → www and www 200, matching `NEXT_PUBLIC_APP_URL`, the sitemap and the earlier Vercel setup.
+- Because Hostinger's old nameservers keep answering for resolvers that cached them (24 h NS TTL), the owner also updated the Hostinger zone itself: A `@` → `75.2.60.5`, CNAME `www` → `weddingmallcoin.netlify.app`, `_vercel` TXTs removed. Both `atlas` and `hyperion` now serve the Netlify records, so stale and fresh resolvers land on Netlify. Browsers that had the Vercel deployment's service worker may show the cached "Offline" page once; clearing site data fixes it.
 - **Remaining:** email/Razorpay env; orphan media rows; the second Vercel account's project (needs its token); revoke tokens.
 
 ## Deployed to Netlify `weddingmallcoin` (2026-10-23)
