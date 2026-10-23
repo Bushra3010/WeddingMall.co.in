@@ -1,6 +1,11 @@
 [build]
   command = "npm run build"
   publish = ".next"
+  # A production deploy costs 15 credits on the credit-based Free plan (300 a
+  # month, hard cap, site paused when it runs out). Skip the build when a push
+  # touches only docs, memory or markdown. Auto-builds are also stopped on the
+  # site; deploy on purpose with `netlify deploy --build --prod`.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ':!docs' ':!*.md' ':!AGENTS.md' ':!CLAUDE.md'"
 
 [build.environment]
   NODE_VERSION = "22"

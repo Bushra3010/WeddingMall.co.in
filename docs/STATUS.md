@@ -2,6 +2,13 @@
 
 Updated: 2026-10-23
 
+## Netlify credits: deploys were the burn (2026-10-23, evening)
+
+- Credit-based Free plan: 300 credits/month, hard cap, site paused at zero. Prices: production deploy **15**, bandwidth 20/GB, web requests 2 per 10k, compute 10 per GB-hour; previews and failed builds are free.
+- Today: 5 successful production deploys = 75 credits (25% of the month) — the CLI deploy plus four Git-triggered builds from the STATUS.md pushes. Live chat has nothing to do with it (its polling now hits Supabase, not Netlify).
+- Fix: `build_settings.stop_builds = true` on the site (pushes no longer build), and `netlify.toml` gained an `ignore` rule that skips builds for docs/markdown-only changes if auto-builds are ever re-enabled. Deploy deliberately with `netlify deploy --build --prod`; budget ≈ 15 deploys for the rest of the month.
+- Bandwidth watch: the homepage references 59 `/_next/image` URLs; `/_next/image` answers `cache-control: max-age=0, must-revalidate`, so browsers revalidate each visit (cheap 304s, but they count as requests). Not urgent at current traffic.
+
 ## DNS to Netlify, Vercel cleaned up (2026-10-23, later)
 
 - Pushed `9e9022b` to `main` (polling fix, Netlify config, migration kit), so Git-triggered Netlify builds now match the CLI deploy.
