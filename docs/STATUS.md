@@ -2,6 +2,15 @@
 
 Updated: 2026-10-23
 
+## DNS to Netlify, Vercel cleaned up (2026-10-23, later)
+
+- Pushed `9e9022b` to `main` (polling fix, Netlify config, migration kit), so Git-triggered Netlify builds now match the CLI deploy.
+- The owner added `weddingmall.co.in` on Netlify with **Netlify DNS** (zone `6adaf2eac5828806db722eaa`, nameservers `dns1`–`dns4.p04.nsone.net`). Hostinger still serves the zone (`atlas`/`hyperion.dns-parking.com`) with apex A → Vercel `216.198.79.1` and **no `www` record**, which is why the domain still failed.
+- Hostinger's mail records were recreated in the Netlify zone so mail survives the switch: MX `mx1` (5) / `mx2.hostinger.com` (10), SPF, `_dmarc`, DKIM CNAMEs `hostingermail-a/b/c._domainkey`, `autoconfig`, `autodiscover`. The `_vercel` TXT was deliberately dropped.
+- Old Vercel account: project `weddingmallco` deleted (HTTP 204) and the `weddingmall.co.in` domain removed from the team (HTTP 200). The second Vercel account's project is still there (no token).
+- Claude in Chrome was not connected, so the Hostinger nameserver change is the owner's: hPanel → Domains → weddingmall.co.in → DNS / Nameservers → Change → the four `p04.nsone.net` servers. Propagation up to a few hours; Netlify then issues the certificate itself.
+- **Remaining:** nameserver change at Hostinger, then verify `https://www.weddingmall.co.in` and mail; email/Razorpay env; orphan media rows; revoke tokens.
+
 ## Deployed to Netlify `weddingmallcoin` (2026-10-23)
 
 - Netlify CLI logged in as `alokkumarsoft24@gmail.com` (team `alokkumarsoft24`, Free). Site `weddingmallcoin` (`0564f50d-1fb7-4ed4-b9a1-588d1ce39fc2`, Git-linked to `Bushra3010/WeddingMall.co.in`, nothing deployed before). `netlify.toml` restored; local `.netlify` link repaired.
