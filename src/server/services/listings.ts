@@ -1,6 +1,8 @@
 import 'server-only'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
+
+import { CACHE_TAGS } from '@/lib/cache/shared'
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -74,6 +76,7 @@ export async function moderateListingVersion(
 
   revalidatePath('/')
   revalidatePath('/vendors')
+  revalidateTag(CACHE_TAGS.vendors, 'max')
   const slug = version?.vendors?.slug
   if (slug) revalidatePath(`/vendor/${slug}`)
 

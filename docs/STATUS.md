@@ -2,6 +2,12 @@
 
 Updated: 2026-10-23
 
+## Supabase: request volume, not storage, was the load (2026-10-23, night)
+
+- Supabase edge logs (Management API `analytics/endpoints/logs`, ClickHouse SQL over `logs` with `source = 'edge_logs'`, needs both `iso_timestamp_start` and `iso_timestamp_end`): on the old project `search_vendors` ran 52,762 times on 2026-10-16 and 95,800 on 2026-10-17, each with `cities`, `categories` and `category_attributes` alongside — all from the hosting server (`user_agent: node`), i.e. `/vendors` search renders ~66/min, crawler-shaped. On the new project in its first 24 h: 9,615 REST calls, of which cities 2,702 + categories 2,185 + attributes 731 (≈60%) and search 919. Measured egress under 1 MB; DB 21 MB; storage 198 MB. Images go through Netlify's image CDN, so Supabase storage saw only ~280 requests. **Nothing is "filling up"; the cost is per-render queries and function seconds (Netlify logs showed 1–6 s per request).**
+- Fix: `src/lib/cache/shared.ts` wraps `unstable_cache` (raw function under vitest). `dal/taxonomy.ts` readers (categories, cities, slugs, attributes) cache 10 min under tag `taxonomy`; `dal/search.ts` caches each filter set 5 min under tag `vendors`. `revalidateTag(…, 'max')` added where listings publish/moderate (`services/listings.ts`, `services/moderation.ts`) and where admins edit categories/cities/attributes (`features/taxonomy/*actions.ts`). Lint, typecheck, 306 tests pass.
+- Live chat stays: its polling hits Supabase directly and only when the realtime socket is down.
+
 ## Netlify credits: deploys were the burn (2026-10-23, evening)
 
 - Credit-based Free plan: 300 credits/month, hard cap, site paused at zero. Prices: production deploy **15**, bandwidth 20/GB, web requests 2 per 10k, compute 10 per GB-hour; previews and failed builds are free.

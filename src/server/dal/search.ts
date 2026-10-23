@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { createPublicClient } from '@/lib/supabase/public'
+import { CACHE_TAGS, sharedCache } from '@/lib/cache/shared'
 import { logError } from '@/lib/observability/logger'
 import { searchFiltersSchema, type SearchFilters } from '@/features/search/filters'
 
@@ -71,7 +72,9 @@ async function enrichResults(
       .then((result) => result.data ?? []),
     supabase
       .from('vendor_attribute_values')
-      .select('vendor_id, value_json, category_attributes(code, label, unit, data_type, sort_order)')
+      .select(
+        'vendor_id, value_json, category_attributes(code, label, unit, data_type, sort_order)',
+      )
       .in('vendor_id', ids)
       .then((result) => result.data ?? []),
   ])
@@ -133,9 +136,23 @@ interface SearchRow {
   total_count: number | string
 }
 
+/**
+ * One result page per distinct filter set, shared across visitors for five
+ * minutes. Publishing or moderating a listing calls `revalidateTag('vendors')`
+ * so a new vendor does not wait out the TTL. Crawlers re-requesting the same
+ * search URLs were the bulk of `search_vendors` calls (95k on 2026-10-17).
+ */
 export async function searchVendors(input: Partial<SearchFilters>): Promise<SearchPage> {
   const filters = searchFiltersSchema.parse(input)
+  return runSearch(filters)
+}
 
+const runSearch = sharedCache(searchUncached, 'search.vendors', {
+  revalidate: 300,
+  tags: [CACHE_TAGS.vendors],
+})
+
+async function searchUncached(filters: SearchFilters): Promise<SearchPage> {
   try {
     const supabase = createPublicClient()
     const { data, error } = await supabase.rpc('search_vendors', {

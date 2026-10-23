@@ -1,6 +1,8 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
+
+import { CACHE_TAGS } from '@/lib/cache/shared'
 
 import { runAction, ServiceError, type ActionResult } from '@/lib/action-result'
 import { assertPermission, can, assertVendorCapability } from '@/lib/permissions'
@@ -100,6 +102,7 @@ export async function saveAttributeAction(
 
   if (result.ok) {
     revalidatePath('/admin/attributes')
+    revalidateTag(CACHE_TAGS.taxonomy, 'max')
     revalidatePath('/vendors')
   }
   return result
@@ -144,6 +147,7 @@ export async function deleteAttributeAction(
 
   if (result.ok) {
     revalidatePath('/admin/attributes')
+    revalidateTag(CACHE_TAGS.taxonomy, 'max')
     revalidatePath('/vendors')
   }
   return result

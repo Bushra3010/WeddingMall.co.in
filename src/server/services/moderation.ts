@@ -1,6 +1,8 @@
 import 'server-only'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
+
+import { CACHE_TAGS } from '@/lib/cache/shared'
 
 import { createClient } from '@/lib/supabase/server'
 import { ServiceError } from '@/lib/action-result'
@@ -51,6 +53,7 @@ export async function decideVendor(actor: Actor, input: AdminDecisionInput) {
 
   revalidatePath('/')
   revalidatePath('/vendors')
+  revalidateTag(CACHE_TAGS.vendors, 'max')
   if (vendor?.slug) revalidatePath(`/vendor/${vendor.slug}`)
 
   return { ok: true, decision: input.decision }

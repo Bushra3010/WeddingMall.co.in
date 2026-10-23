@@ -1,6 +1,8 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
+
+import { CACHE_TAGS } from '@/lib/cache/shared'
 
 import { runAction, ServiceError, type ActionResult } from '@/lib/action-result'
 import { assertPermission, can } from '@/lib/permissions'
@@ -85,6 +87,7 @@ export async function saveCategoryAction(
 
   if (result.ok) {
     revalidatePath('/admin/categories')
+    revalidateTag(CACHE_TAGS.taxonomy, 'max')
     revalidatePath('/categories')
     revalidatePath('/')
   }
@@ -139,6 +142,7 @@ export async function saveCityAction(
 
   if (result.ok) {
     revalidatePath('/admin/locations')
+    revalidateTag(CACHE_TAGS.taxonomy, 'max')
     revalidatePath('/cities')
     revalidatePath('/')
   }
@@ -180,6 +184,7 @@ export async function deleteCityAction(
 
   if (result.ok) {
     revalidatePath('/admin/locations')
+    revalidateTag(CACHE_TAGS.taxonomy, 'max')
     revalidatePath('/cities')
     revalidatePath('/')
   }
@@ -215,6 +220,7 @@ export async function deleteCategoryAction(
 
   if (result.ok) {
     revalidatePath('/admin/categories')
+    revalidateTag(CACHE_TAGS.taxonomy, 'max')
     revalidatePath('/categories')
     revalidatePath('/')
   }
@@ -268,6 +274,8 @@ export async function toggleStateAction(
     if (error) throw new ServiceError('internal_error', 'We could not update that state.')
 
     revalidatePath('/admin/locations')
+
+    revalidateTag(CACHE_TAGS.taxonomy, 'max')
     return { id, active }
   })
 }
