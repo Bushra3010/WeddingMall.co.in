@@ -8,8 +8,9 @@ Updated: 2026-10-23
 - The owner added `weddingmall.co.in` on Netlify with **Netlify DNS** (zone `6adaf2eac5828806db722eaa`, nameservers `dns1`–`dns4.p04.nsone.net`). Hostinger still serves the zone (`atlas`/`hyperion.dns-parking.com`) with apex A → Vercel `216.198.79.1` and **no `www` record**, which is why the domain still failed.
 - Hostinger's mail records were recreated in the Netlify zone so mail survives the switch: MX `mx1` (5) / `mx2.hostinger.com` (10), SPF, `_dmarc`, DKIM CNAMEs `hostingermail-a/b/c._domainkey`, `autoconfig`, `autodiscover`. The `_vercel` TXT was deliberately dropped.
 - Old Vercel account: project `weddingmallco` deleted (HTTP 204) and the `weddingmall.co.in` domain removed from the team (HTTP 200). The second Vercel account's project is still there (no token).
-- Claude in Chrome was not connected, so the Hostinger nameserver change is the owner's: hPanel → Domains → weddingmall.co.in → DNS / Nameservers → Change → the four `p04.nsone.net` servers. Propagation up to a few hours; Netlify then issues the certificate itself.
-- **Remaining:** nameserver change at Hostinger, then verify `https://www.weddingmall.co.in` and mail; email/Razorpay env; orphan media rows; revoke tokens.
+- The owner had already switched Hostinger's nameservers to `dns1`–`dns4.p04.nsone.net`; Google and Cloudflare resolvers see them, Netlify DNS answers A/MX correctly and the certificate is issued. The "still broken" symptom was a stale local resolver cache (old Hostinger NS → Vercel A record).
+- Netlify primary domain set to `www.weddingmall.co.in` with the apex as alias (via `updateSite` `body`), so apex 301 → www and www 200, matching `NEXT_PUBLIC_APP_URL`, the sitemap and the earlier Vercel setup.
+- **Remaining:** email/Razorpay env; orphan media rows; the second Vercel account's project (needs its token); revoke tokens.
 
 ## Deployed to Netlify `weddingmallcoin` (2026-10-23)
 
