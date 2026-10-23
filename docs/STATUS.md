@@ -1,6 +1,38 @@
 # Status
 
-Updated: 2026-10-15
+Updated: 2026-10-23
+
+## Deployed to Netlify `weddingmallcoin` (2026-10-23)
+
+- Netlify CLI logged in as `alokkumarsoft24@gmail.com` (team `alokkumarsoft24`, Free). Site `weddingmallcoin` (`0564f50d-1fb7-4ed4-b9a1-588d1ce39fc2`, Git-linked to `Bushra3010/WeddingMall.co.in`, nothing deployed before). `netlify.toml` restored; local `.netlify` link repaired.
+- Env set on the site: `NEXT_PUBLIC_APP_URL=https://www.weddingmall.co.in`, new Supabase URL / publishable key / secret key, new `CRON_SECRET`, `FEATURE_REALTIME_CHAT=true`, payments/phone/MFA flags `false`. Still missing: `EMAIL_PROVIDER_API_KEY`, `EMAIL_FROM`, Razorpay keys (and `PAYMENT_PROVIDER=razorpay` + `FEATURE_ONLINE_PAYMENTS=true` once they exist).
+- Deployed from the working tree with `netlify deploy --build --prod` (deploy `6adaf16b317349a9b0b8a249`, build 52 s): includes the polling fix, which is **not yet committed** — a Git-triggered build from `main` would ship the old code.
+- Site protection (team login) was turned off in the dashboard by the owner. "Powered by Netlify" badge turned off via `netlify api updateSite --data '{"site_id":…,"body":{"built_with_badge_enabled":false}}'` (top-level fields are ignored; it must be under `body`). Smoke test: `/`, `/categories`, `/cities`, `/vendors`, `/sitemap.xml`, `/auth/sign-in`, a vendor page all 200; `/account` 307 → sign-in; nonce CSP present on `/vendors`; badge script gone from the HTML.
+- Custom domain: `updateSite` with `custom_domain` was silently ignored; add `www.weddingmall.co.in` + apex in the dashboard (Domain management), then point Hostinger A `@` → `75.2.60.5`, CNAME `www` → `weddingmallcoin.netlify.app`. Supabase redirect list already includes the Netlify alias.
+- **Remaining:** commit + push this branch so Git builds match; add domain + DNS; email/Razorpay env; orphan media rows; revoke tokens.
+
+## Supabase moved to `qnrwoekuhxduanxygygj` (2026-10-23)
+
+- New project "wedding mall" in org `Bushra3010's Org`, ap-southeast-2, Postgres 17. The DB-password reset was refused by the session's policy, so everything went through the Management API SQL endpoint: `scripts/migrate-supabase-api.mjs schema` applied `0001`–`0044`; `data` copied every public table plus `auth.users`/`identities`/`mfa_factors` in replica mode (triggers silent), reset sequences, refreshed search text. `verify`: 37 users, 91 vendors, 4 enquiries, 12 messages, 10 categories — all equal on both sides.
+- Auth config set: Site URL `https://www.weddingmall.co.in`, redirects for www, apex and localhost. Add the Netlify alias once the site exists.
+- **Files: 846 of 932 storage objects were already lost before this move.** On the old project `storage.objects` has 839 `vendor-media` and 7 `vendor-documents` rows dated before 2026-10-12 (the day that project was created) whose files return `NoSuchKey`; only the rows were carried over from the Tokyo project, never the bytes. The 86 objects uploaded since then exist and were copied (101 on the new project, including the few pre-move files that did exist). Recovery needs the original Tokyo project's token, if it still exists. Otherwise those `vendor_media` rows should be deleted so vendor pages stop rendering broken images.
+- Old project `cbkggpptjylhkziostbv` untouched; keep it until the new site has run for a few days.
+- **Remaining:** Netlify token → create site, set env (new publishable + secret keys, `FEATURE_REALTIME_CHAT=true`), deploy; DNS at Hostinger; decide about the 846 orphan media rows; revoke all tokens pasted in chat.
+
+## The CPU bug: message threads re-rendered the page every 20 s (2026-10-23)
+
+- **Cause.** `useLiveMessages` (customer and vendor enquiry threads) fell back to `setInterval(router.refresh, 20_000)` whenever the realtime socket was not connected. `FEATURE_REALTIME_CHAT` defaults to `false` and was never set on the second Vercel account, so every open thread refreshed the `force-dynamic` page three times a minute, in background tabs too: proxy `getUser` + `getActor` + `getEnquiry` + `getThreadParties` per tick. One inbox tab left open ≈ 15 CPU-minutes/day; a handful of vendors ≈ the whole Hobby budget in days. The other free-tier project has no such loop, which is why it survives.
+- **Fix.** The fallback now asks Supabase directly for the newest message id (RLS-filtered `select id … limit 1`, no Vercel function) and calls `router.refresh()` only when that id changes; hidden tabs do not poll and check once on return. `src/components/customer/use-live-messages.ts`, new `tests/live-messages-poll.test.ts` (5 tests). Lint, typecheck and the full unit suite pass.
+- Also set `FEATURE_REALTIME_CHAT=true` on the next deployment so the socket carries updates and the poll is idle.
+- Secondary (unchanged): the proxy still runs on `/vendors/*` and `/vendor/*` for the nonce CSP; cheap per hit, but it is the next thing to trim if usage stays high.
+
+## Both Vercel accounts disabled; migration kit ready (2026-10-23)
+
+- **Why the site is down.** `www.weddingmall.co.in`, `weddingmallco-in.vercel.app` (second account) and `weddingmallco.vercel.app` (first account) all answer `x-vercel-error: DEPLOYMENT_DISABLED`. The first account (`alokkumarsoft24-9497`) has `softBlock.reason = FAIR_USE_LIMITS_EXCEEDED`, overage type `fluidCpuDuration`, since 2026-10-14 11:45 UTC. The second account shows the same symptom eight days after the move; its reason could not be read because the only Vercel token at hand belongs to the first account.
+- **Why both Vercel accounts were disabled.** Hobby allows ~4 CPU-hours of Fluid compute a month and is non-commercial. The proxy still runs on every `/vendors/*` and `/vendor/*` request (nonce CSP), `/vendors` and `/vendors/[category]` read `searchParams` so every filter combination is a function render, and crawlers hit those freely. A third Hobby account will be blocked the same way; the fix is Vercel Pro ($20/mo) or a host without a CPU cap, plus trimming the proxy matcher to the signed-in prefixes only.
+- **Supabase is not full.** Project `cbkggpptjylhkziostbv` is `ACTIVE_HEALTHY`; REST answers 200 with the anon key. Database 21 MB (limit 500 MB), storage 932 objects / 198 MB (limit 1 GB), 37 auth users, 91 vendors. What ran out on 2026-10-12 was the 5 GB/month **egress** quota, which resets monthly; the project is in Sydney (ap-southeast-2) while Vercel runs in Mumbai.
+- **Migration kit** (not yet run; needs the new project's credentials): `docs/MIGRATION.md` (runbook), `scripts/migrate-supabase-data.sh` (pg_dump → psql of `public` + `auth.users`/`identities`/`mfa_factors`, triggers silenced, search text refreshed), `scripts/copy-storage.mjs` (bucket-by-bucket object copy, idempotent). The storage script's dry run against the live project lists all 932 objects correctly.
+- **Remaining:** (1) get a token for the second Vercel account to read its block reason, or decide on Pro / another host; (2) create the new Supabase project (Mumbai) and Vercel project, then follow `docs/MIGRATION.md` steps 1–6; (3) revoke the Vercel and Supabase tokens pasted in chat on 2026-10-15 and 2026-10-23.
 
 ## Moved to a second Vercel account (2026-10-15)
 
@@ -165,17 +197,20 @@ Migrations `0018`–`0021`; app layer for reviews, vendor CRM fields, and analyt
 
 **Three live vulnerabilities found by probing before building** (ADR-031). A freshly signed-up account could review a vendor off a `draft` enquiry it had just created, PATCH its own review to `approved`, and rewrite an approved review in place. The second one took a real vendor's rating from 4.6 to 1.0 in two HTTP calls. All three are closed by triggers in `0018`, because RLS grants UPDATE per row and cannot restrict it per column.
 
-**Two more found by the probe's *permitted* assertions**, not its denials:
+**Two more found by the probe's _permitted_ assertions**, not its denials:
+
 - `0020` — the triggers used `has_admin_permission()`, which is `auth.uid()`-based and therefore false for the service role, so cron handlers and webhooks were refused as if they were the author.
-- `0021` — `reviews_refresh_rating` fired `after update of status`, which matches columns named in the UPDATE *statement*, not columns a BEFORE trigger changed. An edited review left public view while its stars stayed in the average.
+- `0021` — `reviews_refresh_rating` fired `after update of status`, which matches columns named in the UPDATE _statement_, not columns a BEFORE trigger changed. An edited review left public view while its stars stayed in the average.
 
 **Also shipped**
+
 - Reviews end to end: customer write/edit with revision history, vendor single public reply, admin moderation queue with tabs and required reasons. Replaces the `account/reviews` and `admin/reviews` stubs.
 - Vendor CRM on an enquiry: internal notes with follow-up dates, quote amount, lost reason. Notes gated on `note.manage`, not `lead.respond` — replying to a customer is not the same right as reading the team's private commentary about them.
 - `vendor_metrics_daily` is now populated. `rebuild_vendor_metrics()` recomputes rather than increments, so a missed run repairs itself; `/api/cron/vendor-metrics` drives it. Profile views come from a client beacon, not a write during render.
 - Analytics page and `enquiry_sla` view with overdue surfacing. Response rate renders as an em dash rather than 0% when nothing has been delivered.
 
 **Two schema bugs the new unit tests caught**, both the same shape — validation ordered before normalisation:
+
 - `z.coerce.number()` turns `''` into `0`, so a blank quote field would have recorded a ₹0 quote.
 - `.regex().optional()` validates before the transform can clear a blank, so submitting a review without an event date failed with "Use the date picker." on an optional field.
 
@@ -192,10 +227,12 @@ Migrations `0022`–`0023`; payment adapter, webhook, plan screens, CMS blog, CS
 **Featured placement is now checked against the plan, for admins too.** `vendor_may_be_featured()` reads the live subscription's entitlements. Comping placement means changing the plan, which leaves a record. "Sponsored" is a disclosure (PRD 6.2); it has to correspond to someone paying. Cancellation retracts the flag, because the guard can only block setting it.
 
 **Two webhook faults, both found by sending a signed request to the running route** (ADR-033):
+
 - The idempotency claim was permanent. A first delivery that failed was answered `200 {"status":"duplicate"}` on every retry — the provider considered it delivered and the event was lost. Only `processed`/`ignored` short-circuit now.
 - `subscriptions_provider_sub_idx` was a partial unique index, which Postgres will not infer for `ON CONFLICT` without a repeated predicate. Every `subscription.created` failed. `0023` makes it a plain unique index.
 
 **Also shipped**
+
 - Mock payment adapter behind a `PaymentAdapter` interface, signing with the same HMAC scheme a real provider uses — verifying signatures against an unsigned mock would verify nothing.
 - Webhook route: raw-body HMAC verification before parsing, unknown event types recorded and ignored rather than retried.
 - Vendor plan page: current entitlements, plan comparison, billing history. Replaces the `vendor-dashboard/plan` stub.
@@ -218,6 +255,7 @@ Scoped strictly to hardening per PRD 19.10 ("do not add new product scope"). The
 **The probe that found it first reported it blocked.** The insert used `Prefer: return=representation`; anon has no SELECT there, so a successful write returned 401. Verified properly by reading the table with the service role. That is now the standing rule: a write-refusal assertion must read the target table, never trust the write's status code.
 
 **Shipped**
+
 - `0024` — analytics sink closed; `record_vendor_profile_view()` de-duplicates by session over 30 minutes, so inflating a number costs a distinct session per event.
 - `0025` — Postgres-backed fixed-window rate limiting. Increment and check are one statement, so two concurrent requests cannot both pass at the ceiling. Applied to enquiry, message, review, checkout, and newsletter. Fails **open** on infrastructure error (losing real enquiries to a database blip is worse than briefly accepting extra) and **closed** on an unattributable caller.
 - CSP enforced on every response. `script-src` keeps `'unsafe-inline'` — see the blocker below.
@@ -233,6 +271,7 @@ Evidence: 12 static routes preserved, 168 RLS assertions across 7 probes, 119 un
 New states land **inactive**. A state with no cities would otherwise show up in public filters as an empty destination. `/admin/locations` now lists all 36 with city counts and a Show/Hide control, and the "add a city" dropdown offers only visible states. Hiding a state that still has active cities is refused with the count, and the check runs **before** the write — an earlier draft updated first and then threw, which would have applied the change while reporting failure.
 
 **Three admin stubs replaced**, chosen because live data was already accumulating behind them:
+
 - `/admin/plans` — plans, prices, entitlements, and live subscriber counts per plan.
 - `/admin/payments` — payments plus recent webhook deliveries, since when money looks wrong the first question is whether the provider's event arrived. Failed deliveries are surfaced at the top.
 - `/admin/audit-log` — filterable by action, with PII reveals, exports, and role changes tinted. Read gated on `admin.manage`, because the log records whose details were revealed and reading it is itself privileged.
@@ -253,7 +292,7 @@ Seven stubs replaced. These were leftovers from milestones 2-7 rather than new s
 
 **`/account/privacy`** records export and deletion requests against `data_requests`, which had existed unused. Deliberately a request rather than an instant action: deletion would otherwise remove enquiry history a vendor may need for a live booking. Status is visible to the person who asked, so "filed and forgotten" cannot look like success. One open request per type.
 
-**`/account/settings`** covers profile and email notification groups. Preferences store only opt-*outs*, so a notification group added later reaches existing users by default instead of being silently off for everyone who registered before it existed. The page states plainly that no email provider is configured yet rather than offering switches that quietly do nothing.
+**`/account/settings`** covers profile and email notification groups. Preferences store only opt-_outs_, so a notification group added later reaches existing users by default instead of being silently off for everyone who registered before it existed. The page states plainly that no email provider is configured yet rather than offering switches that quietly do nothing.
 
 Two bugs caught before they shipped: a `head: true` count read as `data.length` would have rendered zero holdings for everyone on the privacy page, and a duplicate-request message read "a export request".
 
@@ -270,6 +309,7 @@ Zero routes now render `MilestonePlaceholder`. The last eight: `/admin/leads`, `
 This is the drift CLAUDE.md invariant 3 exists to prevent. TypeScript caught it only because I happened to use the same wrong name in an action; nothing checks the SQL direction. **A parity test between `catalogue.ts` and `admin_permissions` is still missing** — ADR-004's original gap, now with evidence of what it costs.
 
 **Design decisions worth knowing**
+
 - `/admin/admin-users` cannot grant `super_admin`. A Server Action is a public endpoint, and Epic E requires that role not be creatable through public input, so the only path stays `npm run grant-admin`. The page says so rather than leaving an admin hunting for a missing control. Self-revocation is refused.
 - `/admin/customers` shows activity counts, not contact details. Reading a customer's phone number is a PII reveal that belongs on the enquiry where consent was given and where it is audited — a browsable directory would route around that.
 - `/admin/leads` shows no customer names for the same reason.
@@ -289,6 +329,7 @@ The last eight `MilestonePlaceholder` routes are gone. Every route in the app no
 TypeScript caught it: the same invented permission name was rejected in the Server Action, which prompted checking the SQL side. This is the drift CLAUDE.md invariant 3 warns about — the catalogue is mirrored in SQL, and the mirror had only been checked in one direction. Now `admin.manage`, verified both ways (a super-admin can write, anon cannot).
 
 **Built**
+
 - `/admin/leads` — every enquiry across vendors, filterable by overdue/unanswered/booked/spam. Overdue comes from the `enquiry_sla` view, so this and the vendor's own dashboard cannot disagree about what late means. No customer names or contact details.
 - `/admin/customers` — accounts and activity counts, gated on `user.support`. Deliberately no contact details: a browsable directory would route around the per-enquiry consent and audit trail.
 - `/admin/reports` — marketplace KPIs. Query lives in `dal/reports.ts`, partly because reads belong there and partly because `Date.now()` in a component body is what the React Compiler purity rule exists to catch.
@@ -345,7 +386,7 @@ Verified: a message inserted elsewhere appears in a watching browser with no rel
 
 That last one is the check that would have caught the `settings.manage` bug, and it took two attempts to get right.
 
-The first version scanned migration *files*. Wrong twice over: the pattern matched text inside SQL comments, so `0028` — the migration that fixes the bug — read as if it still had it; and it reported history rather than current state, which cannot be corrected because a superseded migration must never be edited. It now reads `pg_policies` and `pg_proc`.
+The first version scanned migration _files_. Wrong twice over: the pattern matched text inside SQL comments, so `0028` — the migration that fixes the bug — read as if it still had it; and it reported history rather than current state, which cannot be corrected because a superseded migration must never be edited. It now reads `pg_policies` and `pg_proc`.
 
 The second version passed a deliberately broken policy. Postgres normalises a stored policy expression, so `has_admin_permission('x')` comes back as `has_admin_permission('x'::text)` — the pattern matched no policy at all, and the codes it did find came only from function bodies. Proven by injecting a policy naming `totally.invented`, watching the check stay green, fixing the cast, and watching it fail with the offending permission and the exact policy named. Referenced-permission count went 8 → 12 once policies were actually being read.
 
@@ -353,15 +394,15 @@ A check that has never failed is indistinguishable from one that cannot fail, wh
 
 ## Thread integrity and sign-out (2026-08-02)
 
-**An administrator could speak as a customer.** `messages: participant send` gated inserts on `can_access_enquiry()`, which is true for the customer, for a vendor member, *and* for any admin holding `lead.read`. Right for reading — support needs to see a thread — wrong for writing. Observed in production: a `super_admin` posted two messages into a customer↔vendor thread and the vendor saw them attributed to the customer, because the UI labelled any sender who was not the viewer as the counterparty. Two independent faults compounding into a disclosure.
+**An administrator could speak as a customer.** `messages: participant send` gated inserts on `can_access_enquiry()`, which is true for the customer, for a vendor member, _and_ for any admin holding `lead.read`. Right for reading — support needs to see a thread — wrong for writing. Observed in production: a `super_admin` posted two messages into a customer↔vendor thread and the vendor saw them attributed to the customer, because the UI labelled any sender who was not the viewer as the counterparty. Two independent faults compounding into a disclosure.
 
 Migration `0030` adds `is_enquiry_party()` — customer or vendor member only, deliberately excluding admins — and repoints the insert policy at it. Reading is untouched: `can_access_enquiry` keeps its admin branch, so support can still open a thread and simply cannot add to it. Verified: customer and vendor post successfully, `super_admin` gets 403 and nothing lands, admin still reads both messages, an unrelated user can neither read nor write.
 
 **The labelling half is now a tested function.** `senderLabel()` in `features/messaging` replaces the inline `senderName ?? counterpartyName`. The rule is that identity is never inferred from absence: only the known customer may fall back to the counterparty name, and anyone else is shown by their own name or as "Another participant". Six unit tests, including the exact regression and the case where `customerId` is unknown.
 
-**Sign-out was not signing out.** The Server Action cleared the auth cookie and redirected, but the browser Supabase client kept its own session, so the header went on offering "Sign out" to somebody already signed out. The button now calls the client sign-out *and* the Server Action — the client call clears local state immediately, and the action is what actually ends the session, since a client-only sign-out would leave the cookie the server trusts intact. `SessionProvider` also re-reads on `visibilitychange` and `pageshow`, which catches a sign-out performed in another tab.
+**Sign-out was not signing out.** The Server Action cleared the auth cookie and redirected, but the browser Supabase client kept its own session, so the header went on offering "Sign out" to somebody already signed out. The button now calls the client sign-out _and_ the Server Action — the client call clears local state immediately, and the action is what actually ends the session, since a client-only sign-out would leave the cookie the server trusts intact. `SessionProvider` also re-reads on `visibilitychange` and `pageshow`, which catches a sign-out performed in another tab.
 
-**A probe was reporting a permission failure that was really a typo.** The scoping fix on `vendor_documents` filtered `vendor_id=eq...`, but that column does not exist — documents hang off `verification_id`. PostgREST returned 400, `body` was an object rather than an array, and the assertion read that as "no rows" and reported it as an admin who could not read documents. The detail line printed `rows undefined`, which is the tell. Fixed to filter through `verification_id`, and the assertion now prints the HTTP status and error body when the response is not an array — a probe that cannot say *why* it failed sends you looking in the wrong place.
+**A probe was reporting a permission failure that was really a typo.** The scoping fix on `vendor_documents` filtered `vendor_id=eq...`, but that column does not exist — documents hang off `verification_id`. PostgREST returned 400, `body` was an object rather than an array, and the assertion read that as "no rows" and reported it as an admin who could not read documents. The detail line printed `rows undefined`, which is the tell. Fixed to filter through `verification_id`, and the assertion now prints the HTTP status and error body when the response is not an array — a probe that cannot say _why_ it failed sends you looking in the wrong place.
 
 Tests: 125 unit (6 new), 169 RLS assertions, 22 E2E. Lint, typecheck, build clean; 12 static routes preserved.
 
@@ -385,7 +426,7 @@ Tests: 125 unit, 169 RLS assertions, 22 E2E.
 
 **The database was never leaking.** Probed first: two customers of one vendor, and one customer across two vendors, each read exactly their own rows — six assertions, clean. Cross-tenant isolation held throughout.
 
-**The page was.** `getCustomerEnquiries()` had no ownership filter and trusted RLS, but `enquiries: participant read` admits the customer **or a member of the vendor** or an admin. So `/account/enquiries` listed, for a vendor member, every enquiry sent *to* their business as though they had sent it. The reporter holds both a customer account and a Blinksai membership, so their own account page showed them their inbox. Reproduced: a vendor member's query returned 3 enquiries, 0 of them theirs; an admin's returned the same 3 (ADR-037).
+**The page was.** `getCustomerEnquiries()` had no ownership filter and trusted RLS, but `enquiries: participant read` admits the customer **or a member of the vendor** or an admin. So `/account/enquiries` listed, for a vendor member, every enquiry sent _to_ their business as though they had sent it. The reporter holds both a customer account and a Blinksai membership, so their own account page showed them their inbox. Reproduced: a vendor member's query returned 3 enquiries, 0 of them theirs; an admin's returned the same 3 (ADR-037).
 
 Fixed by making "mine" explicit — `getCustomerEnquiries`, `getOwnReviews`, `getReviewableEnquiries` filter on `customer_id`, and both enquiry detail pages 404 unless the viewer is the party that page is for. RLS still backs it; the policy answers "may this be read at all", not "is this yours".
 
@@ -420,6 +461,7 @@ At the owner's request the header was restored to its pre-Milestone-5 form, with
 **The measured cost, since it is not visible from the page.** The header taking `signedIn` as a prop means both layouts read the session again, which opts the public tree out of static rendering. Static routes fell from **12 to 5**, and `/`, `/about`, `/blog`, `/categories`, `/cities`, `/contact`, `/help`, `/privacy` and `/terms` are dynamic again — undoing ADR-030, which had taken TTFB from ~0.95s to ~0.15s for Indian traffic. This was raised before the change and chosen deliberately.
 
 **Two consequences worth knowing.**
+
 - Mobile now has **two navigation systems at once**: the restored hamburger and the bottom tab bar, both listing the same destinations. Say the word and I will drop one.
 - The icon-only sign-out is back, which is the control originally reported as "why is the sign in button still there".
 
@@ -441,7 +483,7 @@ The admin Locations table listed cities with no way to change or remove one, so 
 
 Edit needed no new server code — `saveCityAction` has always taken an `id` and updated; nothing ever sent one.
 
-**Delete was not safe to add as written.** Seven tables reference `cities` and two of them cascaded: `areas.city_id` and `vendor_service_areas.city_id`. A delete on a city in use would have removed vendors' coverage rows and nulled `vendors.primary_city_id` — dropping them out of search silently, with nothing recorded. Mumbai has three of each today. The only reason it had never fired is that no delete button existed. So `0032` makes those two FKs (and `cities.state_id`) RESTRICT, and `delete_city()` counts all seven references behind a `for update` on the city row, which an FK insert's `for key share` cannot cross. The constraint is the guarantee; the function supplies the message: *"Mumbai is still in use (3 vendors based there, 3 vendors covering it, 2 enquiries). Hide it instead."*
+**Delete was not safe to add as written.** Seven tables reference `cities` and two of them cascaded: `areas.city_id` and `vendor_service_areas.city_id`. A delete on a city in use would have removed vendors' coverage rows and nulled `vendors.primary_city_id` — dropping them out of search silently, with nothing recorded. Mumbai has three of each today. The only reason it had never fired is that no delete button existed. So `0032` makes those two FKs (and `cities.state_id`) RESTRICT, and `delete_city()` counts all seven references behind a `for update` on the city row, which an FK insert's `for key share` cannot cross. The constraint is the guarantee; the function supplies the message: _"Mumbai is still in use (3 vendors based there, 3 vendors covering it, 2 enquiries). Hide it instead."_
 
 **A unit test caught a leak before it shipped.** `0032` raised its refusal as `foreign_key_violation`, and the action decided whether a message was safe to show from the code alone — but Postgres raises 23503 itself, with text naming the constraint and child table. `0033` moves to `PT409`/`PT404`/`PT403`, which Postgres never raises, so the discrimination is exact rather than a guess at message text. Same class of bug as the raw RLS message that reached a customer's screen earlier; the fix is the same shape as `lib/db-errors`.
 
@@ -455,15 +497,15 @@ Note: `npm run db:apply` reapplies from `0001` and is not idempotent, so it cann
 
 Extends the Locations work to every admin screen whose rows the admin owns. Migration `0034`, `features/admin/delete-errors.ts`, `components/admin/{delete-row-button,category-rows,attribute-rows,plan-form}.tsx`, `features/billing/{plan-schema,plan-actions}.ts`, plus the CMS delete actions.
 
-| Screen | Edit | Delete |
-| --- | --- | --- |
-| Locations (cities) | done in the previous change | refuses while in use |
-| Categories | UI only — `saveCategoryAction` already took an `id` | refuses while in use |
-| Attributes | UI only — `saveAttributeAction` already took an `id` | deletes, reporting the vendor answers that go with it |
-| Blog posts | already existed | unguarded; nothing references `posts` |
-| Content pages | already existed | refuses the five that back public routes |
-| Plans | **new** — no save action existed at all | refuses while any subscription or vendor points at it |
-| Admin users | `grantAdminRoleAction` / `revokeAdminRoleAction` already wired | already wired |
+| Screen             | Edit                                                           | Delete                                                |
+| ------------------ | -------------------------------------------------------------- | ----------------------------------------------------- |
+| Locations (cities) | done in the previous change                                    | refuses while in use                                  |
+| Categories         | UI only — `saveCategoryAction` already took an `id`            | refuses while in use                                  |
+| Attributes         | UI only — `saveAttributeAction` already took an `id`           | deletes, reporting the vendor answers that go with it |
+| Blog posts         | already existed                                                | unguarded; nothing references `posts`                 |
+| Content pages      | already existed                                                | refuses the five that back public routes              |
+| Plans              | **new** — no save action existed at all                        | refuses while any subscription or vendor points at it |
+| Admin users        | `grantAdminRoleAction` / `revokeAdminRoleAction` already wired | already wired                                         |
 
 **Attributes are the one delete that proceeds rather than refusing.** `vendor_attribute_values` cascades from `category_attributes`, and there is no way to hide an attribute — refusing while any vendor had answered would make it permanently undeletable. So it deletes and returns the count, and the page renders that count next to the button. Consent, not a surprise.
 
@@ -586,7 +628,7 @@ Added to the same project with `npx cap add ios`. Bundle id `com.weddingmall.app
 
 **Honest limit: the iOS project has never been compiled.** Xcode cannot be installed without an Apple ID sign-in — the Mac App Store and developer.apple.com both gate it — and that is the owner's credential, not something to automate. `xcodebuild`, `actool` and `ibtool` are all Xcode-only stubs in the Command Line Tools.
 
-So the gap was closed as far as it can be: `npm run verify:ios` (`scripts/validate-ios.rb`) runs **14 structural checks** without Xcode — project opens, no dangling file references, the Swift file is in Compile Sources, bundle id and deployment target consistent across configurations, storyboard names a class that exists, asset catalogs reference images that exist, icon is 1024×1024 with no alpha (an App Store rejection that otherwise lands *after* the archive is built), Podfile and lock agree. `swiftc -parse` passes on the one hand-written Swift file.
+So the gap was closed as far as it can be: `npm run verify:ios` (`scripts/validate-ios.rb`) runs **14 structural checks** without Xcode — project opens, no dangling file references, the Swift file is in Compile Sources, bundle id and deployment target consistent across configurations, storyboard names a class that exists, asset catalogs reference images that exist, icon is 1024×1024 with no alpha (an App Store rejection that otherwise lands _after_ the archive is built), Podfile and lock agree. `swiftc -parse` passes on the one hand-written Swift file.
 
 That is still weaker than Android, which was built and driven on an emulator. The first `npx cap open ios` remains the real test.
 
@@ -630,7 +672,7 @@ The simulator-control tooling reports Xcode "not selected" even though `xcode-se
 
 ## Moved off Vercel to Railway (2026-08-12)
 
-Vercel suspended the account — `HTTP 402`, `x-vercel-error: DEPLOYMENT_DISABLED` — which took the website *and both mobile apps* down, since the apps load the deployed origin.
+Vercel suspended the account — `HTTP 402`, `x-vercel-error: DEPLOYMENT_DISABLED` — which took the website _and both mobile apps_ down, since the apps load the deployed origin.
 
 Redeployed to Railway (project `harmonious-simplicity`, service `WeddingMall.co.in`, building from the GitHub repo). All 17 environment variables ported, `NEXT_PUBLIC_APP_URL` repointed, Node pinned to 20 to match what the build and tests were verified on.
 
@@ -640,7 +682,7 @@ Verified live rather than assumed: every public route 200s, real Supabase data r
 
 Custom domains `weddingmall.co.in` and `www.weddingmall.co.in` are attached and waiting on DNS — until those CNAMEs are changed at the registrar the apps still point at the dead Vercel origin.
 
-**Worth recording about the architecture:** a 402 is a *successful* HTTP response, so the service worker's offline fallback never fired and both apps rendered Vercel's suspension page. The trade that makes updates instant also makes a hosting outage an app outage.
+**Worth recording about the architecture:** a 402 is a _successful_ HTTP response, so the service worker's offline fallback never fired and both apps rendered Vercel's suspension page. The trade that makes updates instant also makes a hosting outage an app outage.
 
 ## Blocked / outstanding
 
@@ -664,11 +706,11 @@ Custom domains `weddingmall.co.in` and `www.weddingmall.co.in` are attached and 
 
 Launch blockers, highest first:
 
-1. **Rotate the four credentials** shared in the build transcript — service-role key first, since it bypasses RLS entirely. Then the anon key, database password, and Vercel token. Update `.env.local` *and* the Vercel environment.
+1. **Rotate the four credentials** shared in the build transcript — service-role key first, since it bypasses RLS entirely. Then the anon key, database password, and Vercel token. Update `.env.local` _and_ the Vercel environment.
 2. **`script-src 'unsafe-inline'` on prerendered public pages only** (ADR-037). Dynamic routes now use a nonce with `strict-dynamic`. The remaining gap covers static marketing pages, whose content is ours; closing it would mean giving up prerendering, which is not a trade worth making.
-3. **No SMTP provider.** *Deferred by the owner, 2026-08-02 — will be done later.* Blocks sign-up confirmation, every email notification, and E2E journeys 1-3. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` on a real domain; the adapter is written and will pick it up with no code change.
+3. **No SMTP provider.** _Deferred by the owner, 2026-08-02 — will be done later._ Blocks sign-up confirmation, every email notification, and E2E journeys 1-3. Set `EMAIL_PROVIDER_API_KEY` + `EMAIL_FROM` on a real domain; the adapter is written and will pick it up with no code change.
 4. **Admin MFA is built but not enforced.** Shipped 2026-08-02 (ADR-036), then switched off at the owner's request the same day: enforcing it blocked access to the admin panel. `ADMIN_MFA_REQUIRED=false`. Enrolment stays available at `/admin/security` for anyone who wants it on their own account. Set the flag to `true` to require it again — the challenge, the 30-minute privileged session, and the enrol-first redirect are all still in place and still tested. PRD 10.3 asks for this, so it remains a launch consideration rather than a closed item.
-5. **Legal text still needs counsel** (PRD 14.3). *Deferred by the owner, 2026-08-02 — will be done later.* `/privacy` and `/terms` publish a truthful plain-English description of actual behaviour, clearly labelled as not lawyer-reviewed. That removed the 404s, not the legal requirement. Replace the bodies via `/admin/content` when the real documents exist — no deploy needed.
+5. **Legal text still needs counsel** (PRD 14.3). _Deferred by the owner, 2026-08-02 — will be done later._ `/privacy` and `/terms` publish a truthful plain-English description of actual behaviour, clearly labelled as not lawyer-reviewed. That removed the 404s, not the legal requirement. Replace the bodies via `/admin/content` when the real documents exist — no deploy needed.
 
 Then product scope: message attachments, Realtime, and Google OAuth. No placeholder routes remain.
 
@@ -715,7 +757,7 @@ Five defects found while verifying, four of them mine:
    Chrome sizes the mobile layout viewport from a descendant's scrollable
    content, so `innerWidth` became 461 at a 390px device width and every page
    rendered zoomed out. `overflow-x-auto` does not prevent this — `contain:
-   paint` does. Now covered by `dashboard-mobile.spec.ts`, which reports 481 vs
+paint` does. Now covered by `dashboard-mobile.spec.ts`, which reports 481 vs
    390 with the fix removed.
 2. **The rail never scrolled to the current step**, so arriving at step 5 put the
    step you came for half off the right edge.
@@ -761,7 +803,6 @@ Two things this pass did **not** settle:
   not a pass.
 - No regression test covers the `getMyVendors` fix — it needs an RLS probe with
   two users rather than a unit test. Add it to `npm run db:rls`.
-
 
 ## Admin vendor management (2026-08-28)
 
@@ -881,12 +922,11 @@ a reload.
 5. The 9 existing `draft` vendors stay where they are. Decide whether to move
    the complete ones (Pearl Banquet hall, Krishna Vatika) into the queue by
    hand.
-6. Pre-existing drift, found in passing and **not** fixed: *Krishna Vatika* has
+6. Pre-existing drift, found in passing and **not** fixed: _Krishna Vatika_ has
    `vendor_listings.status = 'pending'` with `vendors.status = 'draft'`. There
    are two submit paths — `submit_vendor_for_review()` (vendor + listing) and
    `submit_listing_for_review()` (listing only) — so a business can sit in
    `/admin/listings` while absent from `/admin/vendors`.
-
 
 ## Photo uploads, payout details, admin-created listings (2026-09-10)
 
@@ -982,13 +1022,13 @@ report nobody enjoys.
 
 1. **`bankAccount !== null` ticked the Bank step for every new vendor.** The
    field is absent rather than null on a fresh workspace, and `undefined !==
-   null` is true — so Bank showed unlocked with all six steps before it still
+null` is true — so Bank showed unlocked with all six steps before it still
    padlocked. The strict comparison looks like the careful one and is the wrong
    tool for an optional field. Caught by the existing prefix assertion in
    `wizard-steps.test.ts`, which failed exactly as it was written to.
 2. **`isStepUnlocked` could break its own prefix invariant.** It returned true
    for any complete step, which contradicts "unlock up to the frontier" whenever
-   a *later* step is complete and an earlier one is not. Latent before Bank
+   a _later_ step is complete and an earlier one is not. Latent before Bank
    existed; reachable the moment an optional step sat second-to-last. Now the
    limit is the furthest of the two, which satisfies both intents by
    construction.
@@ -1057,6 +1097,7 @@ created." Neither surfaces a Postgres message (invariant 7).
 
    Repeat for `0036`, `0037`, `0038`, `0039` — checking first which are already
    applied, since this session could not.
+
 2. `PGPASSWORD='...' npm run db:types`, then delete the three temporary casts
    that exist only because the schema is behind: `BankWriteClient` in
    `services/vendor-bank.ts`, `BankReadClient` in `dal/vendor-bank.ts`, and the
@@ -1077,7 +1118,7 @@ created." Neither surfaces a Postgres message (invariant 7).
    enter bank details, upload a cheque, reveal the number as an admin and check
    the `pii.reveal` row lands; create a business from `/admin/vendors/new` both
    as a draft and published.
-6. Still outstanding from 2026-08-28 and untouched here: *Krishna Vatika* has
+6. Still outstanding from 2026-08-28 and untouched here: _Krishna Vatika_ has
    `vendor_listings.status = 'pending'` with `vendors.status = 'draft'`, and the
    9 existing `draft` vendors have not been triaged.
 
@@ -1085,13 +1126,13 @@ created." Neither surfaces a Postgres message (invariant 7).
 
 Reported from `/admin/vendors/<id>`: both sections could be read and neither
 could be written. "Verification documents" listed files and offered no way to add
-one; "Payout details" said *Only the business owner can add them*. That was true
+one; "Payout details" said _Only the business owner can add them_. That was true
 of the schema and useless in practice — businesses here are signed up over the
 phone and at wedding fairs (which is why 0039 exists), so the person holding the
 GST certificate and the cancelled cheque is an admin sitting beside the owner.
 The fallback was WhatsApp, which is exactly what 0038 was written to stop.
 
-**Migration `0040`.** Nothing here widens who may *read* anything; every policy
+**Migration `0040`.** Nothing here widens who may _read_ anything; every policy
 touched already admitted an admin on the read side and the gap was entirely on
 insert and delete.
 
@@ -1167,6 +1208,7 @@ message.
    ```
 
    Repeat for `0035`–`0039` if they are not there yet.
+
 2. `PGPASSWORD='...' npm run db:types`, then delete the three temporary casts
    listed in the 2026-08-28 entry.
 3. **The RLS probes for `vendor_bank_accounts` are still missing**, and `0040`
@@ -1184,14 +1226,14 @@ message.
    payout account, enter and then replace payout details, and confirm the
    `vendor.document` and `vendor.payout` rows land in the audit trail on the same
    page with the number masked.
-5. Still outstanding from 2026-08-28: *Krishna Vatika* has
+5. Still outstanding from 2026-08-28: _Krishna Vatika_ has
    `vendor_listings.status = 'pending'` with `vendors.status = 'draft'`, and the
    9 existing `draft` vendors have not been triaged.
 
 ## An admin can edit the listing, photographs and all (2026-09-10)
 
-Reported straight after the last change: *"admin me vendor jo add kar raha hai
-usme photo daalne ka option hi nahi hai"* — and the same is true of service
+Reported straight after the last change: _"admin me vendor jo add kar raha hai
+usme photo daalne ka option hi nahi hai"_ — and the same is true of service
 areas, packages, availability and the street address. `/admin/vendors/new`
 (0039) takes a name, a category, a city and a description; after that the panel
 had nothing. A business signed up over the phone could be created and never
@@ -1284,9 +1326,10 @@ itself will show a draft business with empty categories and service areas.
    `/admin/vendors/new`, follow **Add photos and finish the listing**, upload
    three photographs, set categories and service areas, then approve from the
    Decision panel and confirm the photographs are public.
-5. Still outstanding from 2026-08-28: *Krishna Vatika* has
+5. Still outstanding from 2026-08-28: _Krishna Vatika_ has
    `vendor_listings.status = 'pending'` with `vendors.status = 'draft'`, and the
    9 existing `draft` vendors have not been triaged.
+
 ## Vendor photo gallery (2026-09-14)
 
 The vendor profile showed a static cover image and, below it, a four-across
@@ -1333,7 +1376,6 @@ Escape close with focus returned to the trigger and body scroll restored, and
 no horizontal page overflow on the phone.
 
 Not run: `npm run test:e2e` — no Playwright coverage was added for the gallery.
-
 
 ## Vendor amenities grid (2026-09-14)
 
@@ -1401,7 +1443,6 @@ returns `42703` — so migration `0036`'s fields still do not persist.
 Not extended to other categories: photographers, caterers, makeup artists and
 mehendi artists render whatever attributes they already have. No amenity set
 was invented for them.
-
 
 ## Admin can answer a vendor's amenities (2026-09-14)
 
@@ -1472,7 +1513,6 @@ Verified: `npm run verify` — lint 0 warnings, typecheck clean, build clean. Th
 admin route was checked to still guard (`307` to sign-in); the panel itself has
 **not** been seen rendered, because that needs an admin session.
 
-
 ## Venue amenity answers (2026-09-14)
 
 `npm run seed:amenities` (`scripts/seed-venue-amenities.mjs`, new; `package.json`)
@@ -1499,7 +1539,6 @@ whoever knows the venue can correct what a scraped description implies — a
 description that says "AC & Non-AC facilities available" does not say how many
 rooms are air-conditioned, and the script cannot answer what the copy does not
 state.
-
 
 ## Vendor card details (2026-09-14)
 
@@ -1535,7 +1574,6 @@ still empty. `npm run seed:amenities` fills them; see the section above.
 Verified: `npm run verify` — lint 0 warnings, typecheck clean, **214 unit tests
 passed** (4 new), build clean.
 
-
 ## The phone hero goes back to a compact card (2026-09-15)
 
 Reverting the mobile half of the section-sized-from-artwork change below. The
@@ -1557,7 +1595,6 @@ Contrast re-measured, since the crop is back: 375px headline 7.88:1, paragraph
 
 Still in place on the phone, and not part of this revert: `hero-mobile.png`
 itself, and the top-down scrim that holds text off it.
-
 
 ## The hero section is sized from its artwork (2026-09-15)
 
@@ -1588,7 +1625,6 @@ The desktop headline is the tight one and got tighter — 4.38:1 before, 3.93:1
 now, since more open sky is behind the end of it. Still above the 3:1 this
 display size needs.
 
-
 ## Hero resampled so the browser stops stretching it (2026-09-15)
 
 Nothing was zooming the desktop hero — `slow-zoom` went two commits ago and
@@ -1607,7 +1643,6 @@ the PNG returned 512 x 288 for the same request.
 A genuinely high-resolution original would still be better and is still worth
 supplying. `hero-mobile.png` has not had the same treatment — the request was
 about desktop — and is still 512 x 909.
-
 
 ## The phone hero gets its own artwork (2026-09-15)
 
@@ -1632,7 +1667,6 @@ needs. Desktop is unchanged at 4.38:1 and 5.96:1.
 This reverses the desktop-only decision below, which was made when the only
 artwork was a landscape crop.
 
-
 ## Hero artwork: static, desktop-only, and under-resolved (2026-09-15)
 
 Three asked-for changes and one defect found while making them.
@@ -1643,7 +1677,7 @@ Three asked-for changes and one defect found while making them.
   photograph for it to hold text off, and the gradient is already dark.
 - **`quality={90}` returned HTTP 400.** Next 16 refuses any quality not listed
   in `images.qualities`, and the default allows 75 alone — so the prop did not
-  produce a softer image, it produced *no* image. Caught by asking the optimiser
+  produce a softer image, it produced _no_ image. Caught by asking the optimiser
   directly rather than trusting the page to look right. `next.config.ts` now
   lists `[75, 90]`.
 
@@ -1660,7 +1694,6 @@ was verified by fetching it rather than inferred.
 The nine category images are also 512px on the long edge, and those are fine —
 the cards are 224 CSS px wide, so 512 covers a 2x display with room to spare.
 Only the full-bleed hero is starved.
-
 
 ## Category page rebuilt around a filter row (2026-09-15)
 
@@ -1711,7 +1744,6 @@ those answers exist.
 Verified: `npm run verify` — lint 0 warnings, typecheck clean, 286 unit tests,
 build clean.
 
-
 ## The app header sat under the status bar (2026-09-15)
 
 Reported from the installed app: the wordmark overlapping the clock and
@@ -1746,7 +1778,6 @@ inset: header 120px, background starting at y=0, logo at y=67 (clear of the
 notch), hero still flush to the top with no band, headline clear of the header.
 At 0 the page is byte-identical to before — header 73px, hero at y=1.
 
-
 ## Notes
 
 - All seed and demo data is fictional (PRD 2.3, Epic G). `npm run seed:demo -- --clean` removes the demo vendors.
@@ -1766,6 +1797,7 @@ Remaining: attach `weddingmall.co.in` + `www` in Netlify, repoint Hostinger DNS 
 `weddingmall.co.in` returns 503: the Free-plan site exceeded its 125k/month function-invocation limit on 2026-10-08 (enforced until the 2026-11-01 reset or a plan upgrade). Cause: the reverted navbar read the session in the `(public)` and `(customer)` layouts, so nearly every public page rendered per request. Owner chose to fix the root cause rather than upgrade. The orphaned Railway service `WeddingMall.co.in` (project `harmonious-simplicity`) was deleted.
 
 Changes — same header UI, session resolved in the browser (ADR-030):
+
 - `site-header.tsx` reads `useSession()`; sign-out clears the browser session, then calls the Server Action. Both layouts no longer call `getActor()`.
 - `shortlist-button.tsx` reads saved state from `useSession()` and renders the sign-in link itself; the vendor page no longer reads the session. `isShortlisted()` removed from `dal/enquiries.ts` (unused).
 - `vendor/[vendorSlug]` and `blog/[postSlug]` get `generateStaticParams() { return [] }` → ISR (●) instead of per-request (ƒ).

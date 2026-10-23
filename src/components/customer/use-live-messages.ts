@@ -22,8 +22,16 @@ import { createClient } from '@/lib/supabase/client'
  *
  * **Polling fallback.** If the socket never connects — a proxy blocking
  * WebSockets, the feature disabled, a transient failure — it falls back to
- * refreshing on an interval. The thread stays correct either way; only the
- * latency changes.
+ * polling. The thread stays correct either way; only the latency changes.
+ *
+ * The poll asks Supabase directly for the newest message id (one tiny RLS-
+ * filtered select, no server function involved) and only calls
+ * `router.refresh()` when that id changes. The earlier version refreshed the
+ * whole Server Component every 20 s whether or not anything had happened:
+ * each refresh was a full Vercel function render with four Supabase queries,
+ * it kept going in background tabs, and one open inbox tab alone burned about
+ * 15 CPU-minutes a day — which is how two Hobby accounts hit the fair-use cap
+ * in a fortnight. Hidden tabs do not poll at all and check once on return.
  */
 const POLL_MS = 20_000
 
@@ -91,8 +99,55 @@ export function useLiveMessages(conversationId: string | null, enabled: boolean)
     // costs nothing.
     if (!conversationId || connected) return
 
-    const timer = setInterval(() => router.refresh(), POLL_MS)
-    return () => clearInterval(timer)
+    const supabase = createClient()
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+    // `undefined` until the first sample: the baseline must never trigger a
+    // refresh, and a thread with no messages yet has a legitimate `null`.
+    let seen: string | null | undefined
+
+    const schedule = () => {
+      if (cancelled) return
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => void check(), POLL_MS)
+    }
+
+    async function check() {
+      if (cancelled) return
+      if (document.visibilityState !== 'visible') return
+
+      const { data, error } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', conversationId as string)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (cancelled) return
+
+      if (!error) {
+        const latest = data?.id ?? null
+        if (seen !== undefined && latest !== seen) router.refresh()
+        seen = latest
+      }
+      schedule()
+    }
+
+    // A tab coming back from the background checks immediately, then
+    // resumes the cadence; one going hidden simply stops.
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void check()
+      else if (timer) clearTimeout(timer)
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    void check()
+
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [conversationId, connected, router])
 
   return { connected }
