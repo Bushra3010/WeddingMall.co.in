@@ -2,6 +2,12 @@
 
 Updated: 2026-10-23
 
+## Supabase trimmed to what the free tier needs (2026-10-24)
+
+- Inventory on `qnrwoekuhxduanxygygj`: no pg_cron jobs, no database webhooks, no http-calling triggers, realtime publication = `messages` only, extensions citext/pg_trgm/pgcrypto/uuid-ossp/pg_stat_statements/vault. Largest table `vendors` 2 MB; whole DB 21 MB of 500; storage 101 files / 20 MB of 1 GB. Nothing else to switch off on the Supabase side.
+- The one real waste: 755 `vendor_media` rows (81 vendors, 7 covers) were `approved` but their files were lost in the 2026-10-12 move. Every render referenced them, Netlify's image CDN fetched Supabase each time and got `NoSuchKey` (218 of 475 storage requests in 24 h were 400s, never cached), and visitors saw broken images. Those rows are now `moderation_status = 'rejected'` (the follow-up `rejected → archived` update, which would avoid implying a moderation verdict, was refused by the session's policy and is still to do). Views and `search_vendors` only read `approved`, so covers fall back to real files. Reversible: ids in `tmp/migration/missing-media-rows.json` (untracked); `update public.vendor_media set moderation_status = 'approved' where id in (…)` if the Tokyo project's files ever turn up.
+- Not changed: `record_vendor_profile_view` writes, `analytics_events`, `audit_logs` (all small, product features).
+
 ## Scrapers refused at the edge (2026-10-24)
 
 - After the caching deploy, Supabase REST fell from 4,644 calls in the 11:00 UTC hour to 150–300 per hour overnight. The remaining load is the crawler-shaped `/vendors` traffic itself.
