@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { isBlockedBot } from '@/lib/bots'
 import { isNativeApp, isWebOnlyPath, WEB_ONLY_NOTICE_PATH } from '@/lib/native'
 import { buildCsp, newNonce } from '@/lib/security/csp'
 import { updateSession } from '@/lib/supabase/middleware'
@@ -22,6 +23,26 @@ const SESSION_PREFIXES = ['/account', '/vendor-dashboard', '/admin', '/auth']
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl
+  const userAgent = request.headers.get('user-agent')
+
+  /*
+   * SEO and AI scrapers are refused before anything renders. They were
+   * re-requesting `/vendors` filter combinations around 66 times a minute,
+   * which is what exhausted the Vercel Hobby CPU budget and what Netlify bills
+   * as compute. A 403 from the edge costs nothing. See `lib/bots.ts`.
+   */
+  if (isBlockedBot(userAgent)) {
+    return new NextResponse(null, { status: 403, headers: { 'X-Robots-Tag': 'noindex, nofollow' } })
+  }
+
+  const isSearch = pathname === '/vendors' || pathname.startsWith('/vendors/')
+  if (isSearch) {
+    // Diagnostic: who is driving search renders. One short line per request
+    // in the edge-function log; remove once the crawler is identified.
+    console.info(
+      `[search] ${request.headers.get('x-nf-client-connection-ip') ?? '-'} ${pathname}${search.slice(0, 80)} ua=${(userAgent ?? '-').slice(0, 90)}`,
+    )
+  }
   const needsSession = SESSION_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   )
@@ -89,8 +110,10 @@ export async function proxy(request: NextRequest) {
     return redirectResponse
   }
 
-  // Dashboards must never be indexed (PRD 11.1).
-  if (needsAuth) {
+  // Dashboards must never be indexed (PRD 11.1), nor open-ended search
+  // combinations: robots.txt already disallows `/vendors?…`, the header makes
+  // it stick for crawlers that reached a filtered URL through a link.
+  if (needsAuth || (isSearch && search)) {
     response.headers.set('X-Robots-Tag', 'noindex, nofollow')
   }
 

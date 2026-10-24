@@ -2,6 +2,14 @@
 
 Updated: 2026-10-23
 
+## Scrapers refused at the edge (2026-10-24)
+
+- After the caching deploy, Supabase REST fell from 4,644 calls in the 11:00 UTC hour to 150–300 per hour overnight. The remaining load is the crawler-shaped `/vendors` traffic itself.
+- `src/lib/bots.ts`: substring blocklist of SEO/AI scrapers (Ahrefs, Semrush, MJ12, DotBot, PetalBot, Bytespider, GPTBot, CCBot, ClaudeBot, Amazonbot, DataForSeo, BLEX, Seekport, Barkrowler, serpstat, Zoominfo, meta-externalagent, Imagesift, Timpi, Omgili). Google, Bing and social preview bots are deliberately not listed. `tests/bots.test.ts`.
+- `src/proxy.ts`: listed bots get a 403 before anything renders; `/vendors…` responses with a query string carry `X-Robots-Tag: noindex, nofollow`; every search request logs one line `[search] ip path ua` to the edge-function log so the crawler can be named (`netlify logs --source edge-functions --since 1h`). Remove the log line once identified.
+- `src/app/robots.ts`: the same list gets `Disallow: /`.
+- Netlify's `netlify logs --source functions` returned nothing for the last 12 h even though traffic exists; rely on Supabase `usage.api-counts` for the hourly picture.
+
 ## Supabase: request volume, not storage, was the load (2026-10-23, night)
 
 - Supabase edge logs (Management API `analytics/endpoints/logs`, ClickHouse SQL over `logs` with `source = 'edge_logs'`, needs both `iso_timestamp_start` and `iso_timestamp_end`): on the old project `search_vendors` ran 52,762 times on 2026-10-16 and 95,800 on 2026-10-17, each with `cities`, `categories` and `category_attributes` alongside — all from the hosting server (`user_agent: node`), i.e. `/vendors` search renders ~66/min, crawler-shaped. On the new project in its first 24 h: 9,615 REST calls, of which cities 2,702 + categories 2,185 + attributes 731 (≈60%) and search 919. Measured egress under 1 MB; DB 21 MB; storage 198 MB. Images go through Netlify's image CDN, so Supabase storage saw only ~280 requests. **Nothing is "filling up"; the cost is per-render queries and function seconds (Netlify logs showed 1–6 s per request).**
