@@ -60,8 +60,37 @@ export type EnquiryInput = z.infer<typeof enquirySchema>
  * still an explicit tick the customer makes — it is required to book, never
  * pre-ticked (PRD 2.3).
  */
+/**
+ * Indian mobile numbers only, in whatever form people type them:
+ * `98765 43210`, `098765…`, `+91 98765…`, `91…`. Stored as `+91XXXXXXXXXX`.
+ */
+export function normaliseIndianMobile(raw: string): string | null {
+  let digits = raw.replace(/\D/g, '')
+  if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2)
+  if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1)
+  if (!/^[6-9]\d{9}$/.test(digits)) return null
+  return `+91${digits}`
+}
+
+const indianMobile = z
+  .string()
+  .trim()
+  .min(1, 'Enter your mobile number')
+  .transform((value, ctx) => {
+    const normalised = normaliseIndianMobile(value)
+    if (!normalised) {
+      ctx.addIssue({ code: 'custom', message: 'Enter a 10-digit Indian mobile number' })
+      return z.NEVER
+    }
+    return normalised
+  })
+
 export const bookingSchema = z.object({
   vendorId: z.uuid(),
+  // Who is booking. Asked of everyone — a signed-in customer without a phone
+  // on file types it here, a guest gets an account created from it.
+  fullName: trimmed(120).min(2, 'Enter your name'),
+  phone: indianMobile,
   categoryId: z.uuid().optional().or(z.literal('')),
   cityId: z.uuid().optional().or(z.literal('')),
   eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Choose the date you want to book'),
@@ -86,12 +115,17 @@ export function bookingMessage(input: {
   eventTime?: string
   guestCount?: number
   note?: string
+  fullName?: string
+  phone?: string
 }): string {
   const lines = [
     `Booking request for ${input.eventDate}${input.eventTime ? ` at ${input.eventTime}` : ''}.`,
   ]
   if (input.guestCount) lines.push(`Guests: ${input.guestCount}.`)
   if (input.note?.trim()) lines.push(input.note.trim())
+  // The number rides in the message as well as on the profile, so the vendor
+  // has it even if the profile write failed or the customer edits it later.
+  if (input.fullName && input.phone) lines.push(`Contact: ${input.fullName}, ${input.phone}.`)
   lines.push('Please call me to confirm.')
   return lines.join('\n')
 }

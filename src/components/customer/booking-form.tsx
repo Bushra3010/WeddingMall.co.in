@@ -20,11 +20,18 @@ export function BookingForm({
   vendorName,
   categoryId,
   cityId,
+  defaultName,
+  defaultPhone,
+  signedIn,
 }: {
   vendorId: string
   vendorName: string
   categoryId?: string | null
   cityId?: string | null
+  /** Prefilled from the profile when signed in; empty for a guest. */
+  defaultName?: string | null
+  defaultPhone?: string | null
+  signedIn: boolean
 }) {
   const [state, action] = useAction(submitBookingAction)
   const [idempotencyKey] = useState(() => crypto.randomUUID())
@@ -38,6 +45,45 @@ export function BookingForm({
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       {categoryId ? <input type="hidden" name="categoryId" value={categoryId} /> : null}
       {cityId ? <input type="hidden" name="cityId" value={cityId} /> : null}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Your name" error={fieldError(state, 'fullName')} required>
+          {({ id, describedBy, invalid }) => (
+            <Input
+              id={id}
+              name="fullName"
+              autoComplete="name"
+              defaultValue={defaultName ?? ''}
+              maxLength={120}
+              required
+              aria-describedby={describedBy}
+              invalid={invalid}
+            />
+          )}
+        </Field>
+
+        <Field
+          label="Mobile number"
+          hint="The vendor calls this number to confirm"
+          error={fieldError(state, 'phone')}
+          required
+        >
+          {({ id, describedBy, invalid }) => (
+            <Input
+              id={id}
+              name="phone"
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              defaultValue={defaultPhone ?? ''}
+              placeholder="98765 43210"
+              required
+              aria-describedby={describedBy}
+              invalid={invalid}
+            />
+          )}
+        </Field>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Booking date" error={fieldError(state, 'eventDate')} required>
@@ -122,7 +168,12 @@ export function BookingForm({
         Book now
       </SubmitButton>
 
-      <p className="text-sand-500 text-xs">No payment needed to book.</p>
+      <p className="text-sand-500 text-xs">
+        No payment needed to book.
+        {signedIn
+          ? ''
+          : ' No account needed either — your booking and the vendor\u2019s replies open right after, in this browser.'}
+      </p>
     </form>
   )
 }

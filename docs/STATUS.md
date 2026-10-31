@@ -2,6 +2,14 @@
 
 Updated: 2026-10-23
 
+## "Book now" without an account (2026-10-31)
+
+- `/vendor/[slug]/book` no longer redirects to sign-in. The form asks name and mobile (Indian mobile, normalised to `+91…`, `normaliseIndianMobile` in `features/enquiries/schema.ts`), then date, time, guests, note, consent. Signed-in customers get name/phone prefilled from the profile (`getProfile` now selects `phone`).
+- `services/guest.ts` → `ensureCustomerSession`: a guest is signed in **anonymously** (Supabase anonymous sign-ins) after the form validates, the auth trigger creates the profile from `full_name`, and the phone is written to it; the booking then goes through the unchanged `submit_enquiry` RPC, RLS, thread and vendor inbox. Signed-in customers only get missing profile fields filled, never overwritten. The contact line is also appended to the booking message so the vendor has it regardless.
+- Tests: `tests/booking.test.ts` (8), full suite 312 pass; lint and typecheck clean. Not yet deployed.
+- **Needs the owner:** (1) Supabase dashboard → Authentication → Sign In / Providers → **Anonymous sign-ins: on** (the Management API call was refused by the session policy); without it the action returns "Booking without an account is not available right now". (2) Netlify CLI keeps landing on other accounts (`alokp0023`, then `aqosshotelai`); deploy needs `alokkumarsoft24@gmail.com` or a personal access token from that account.
+- Known limits: an anonymous customer who clears cookies cannot get back to the thread; a later "add phone/email to keep access" step is the natural follow-up. `/vendor/[slug]/enquire` still requires sign-in.
+
 ## Supabase trimmed to what the free tier needs (2026-10-24)
 
 - Inventory on `qnrwoekuhxduanxygygj`: no pg_cron jobs, no database webhooks, no http-calling triggers, realtime publication = `messages` only, extensions citext/pg_trgm/pgcrypto/uuid-ossp/pg_stat_statements/vault. Largest table `vendors` 2 MB; whole DB 21 MB of 500; storage 101 files / 20 MB of 1 GB. Nothing else to switch off on the Supabase side.

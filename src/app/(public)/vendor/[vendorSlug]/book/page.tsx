@@ -1,11 +1,11 @@
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 
 import { BookingForm } from '@/components/customer/booking-form'
 import { buttonVariants } from '@/components/ui/button'
 import { NOINDEX } from '@/lib/seo'
 import { cn } from '@/lib/utils'
-import { getActor } from '@/server/dal/actor'
+import { getActor, getProfile } from '@/server/dal/actor'
 import { getPublicVendor } from '@/server/dal/vendors'
 
 export const metadata = { title: 'Book now', ...NOINDEX }
@@ -16,10 +16,10 @@ export default async function BookPage({ params }: { params: Promise<{ vendorSlu
   const vendor = await getPublicVendor(vendorSlug)
   if (!vendor) notFound()
 
+  // No sign-in wall: a guest books with name and phone, and gets an
+  // anonymous account behind the scenes (see `services/guest.ts`).
   const actor = await getActor()
-  if (!actor.userId) {
-    redirect(`/auth/sign-in?next=${encodeURIComponent(`/vendor/${vendorSlug}/book`)}`)
-  }
+  const profile = actor.userId ? await getProfile() : null
 
   const primaryCategory = vendor.categories.find((row) => row.is_primary)?.categories
 
@@ -35,7 +35,7 @@ export default async function BookPage({ params }: { params: Promise<{ vendorSlu
 
       <h1 className="font-display text-sand-900 mt-3 text-3xl">Book {vendor.display_name}</h1>
       <p className="text-sand-600 mt-2 text-sm">
-        Pick your date and book directly. No quote, no payment.
+        Pick your date and book directly. No quote, no payment, no account needed.
       </p>
 
       <div className="border-sand-200 mt-8 rounded-[var(--radius-card)] border bg-white p-6">
@@ -44,6 +44,9 @@ export default async function BookPage({ params }: { params: Promise<{ vendorSlu
           vendorName={vendor.display_name}
           categoryId={primaryCategory?.id ?? null}
           cityId={vendor.primary_city_id}
+          defaultName={profile?.full_name}
+          defaultPhone={profile?.phone}
+          signedIn={Boolean(actor.userId)}
         />
       </div>
 

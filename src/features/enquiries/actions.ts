@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 
 import { runAction, ServiceError, type ActionResult } from '@/lib/action-result'
 import { getActor } from '@/server/dal/actor'
+import { ensureCustomerSession } from '@/server/services/guest'
 import {
   addEnquiryNote,
   markNotificationsRead,
@@ -92,9 +93,11 @@ export async function submitBookingAction(
   let enquiryId: string | null = null
 
   const result = await runAction('enquiry.book', async () => {
-    const actor = await getActor()
+    const guest = await getActor()
     const booking = bookingSchema.parse({
       vendorId: str(form, 'vendorId'),
+      fullName: str(form, 'fullName'),
+      phone: str(form, 'phone'),
       categoryId: str(form, 'categoryId'),
       cityId: str(form, 'cityId'),
       eventDate: str(form, 'eventDate'),
@@ -124,10 +127,18 @@ export async function submitBookingAction(
         eventTime: booking.eventTime || undefined,
         guestCount: booking.guestCount,
         note: booking.note,
+        fullName: booking.fullName,
+        phone: booking.phone,
       }),
       preferredContactMode: 'phone',
       contactConsent: true,
       idempotencyKey: booking.idempotencyKey,
+    })
+    // No account needed: a guest is signed in anonymously here, after the
+    // form has validated, so a bad form never creates a user.
+    const actor = await ensureCustomerSession(guest, {
+      fullName: booking.fullName,
+      phone: booking.phone,
     })
     const out = await submitEnquiry(actor, input)
     enquiryId = out.enquiryId
