@@ -2,6 +2,16 @@
 
 Updated: 2026-10-23
 
+## Live on Cloudflare Workers; Netlify retired (2026-11-17)
+
+- Cloudflare account `workblinksai@gmail.com` (id `1ce387178d2354daf9cf12767b3ea748`, Free). Wrangler logged in by OAuth in the Claude browser pane. Worker `weddingmall` serves `https://weddingmall.wedding-mall.workers.dev` and has custom domains `www.weddingmall.co.in` + `weddingmall.co.in`; dashboard Redirect Rule sends the apex to `https://www.weddingmall.co.in/${1}` (301, query kept).
+- Incremental cache: Workers KV `weddingmall-next-cache` (`c6078afb88aa43d1862d72992990d280`), because R2 is not enabled on the account (needs a card). Swap to R2 when it is.
+- Secrets: `CRON_SECRET` freshly generated; **`SUPABASE_SECRET_KEY` is a placeholder** (`pending-owner-must-set-real-key`) so `serverEnv()` validates; admin-client paths (cron, Razorpay webhook, admin deletes) fail until the owner runs `npx wrangler secret put SUPABASE_SECRET_KEY` with the real key from Supabase → Settings → API keys. Email/Razorpay secrets were never set.
+- Verified on workers.dev: all public pages 200, `/account` 307, AhrefsBot 403, 10 different `/vendors?…` renders with no CPU-limit (1102) errors on the Free plan, `/_next/image` returns WebP (hero 92 KB, pandit 52 KB, vendor photo 40 KB).
+- Zone `weddingmall.co.in` added on Free. Scanned records kept: MX `mx1`/`mx2.hostinger.com`, SPF, `_dmarc`, DKIM `hostingermail-a/b/c._domainkey`, `autoconfig`, `autodiscover` — all set to **DNS only** (proxying them breaks DKIM/autodiscover). The four A records pointing at Netlify were deleted. **Nameservers at Hostinger must change** from `dns1`–`dns4.p04.nsone.net` to `dalary.ns.cloudflare.com` + `santino.ns.cloudflare.com`; until then the domain still resolves to Netlify's 503.
+- `netlify.toml` removed. Still to clean up: the Netlify site `weddingmallcoin` and its DNS zone (team `alokkumarsoft24`, needs that login and a delete confirmation); a stray Worker `weddingmall` + KV namespace `f905627695c849d293ce43ebb80e2f80` created by mistake on the `aqosshotelai` Cloudflare account before the switch (delete from that dashboard; `aqoss.com` and the `aqoss` Worker were not touched).
+- Deploy: `set -a; . ./.dev.vars; set +a; NEXT_PUBLIC_APP_URL=https://www.weddingmall.co.in npm run cf:deploy` (public URL/anon key must be in the build env). No per-deploy credit cost.
+
 ## Cloudflare Workers build ready (2026-11-17, branch `cloudflare`)
 
 - Owner asked to leave Netlify for Cloudflare. `@opennextjs/cloudflare@1.20.17` needs Next `>=16.4.5`, so `next` and `eslint-config-next` moved 16.2.12 → **16.4.6**; typecheck, lint and 312 tests pass on it. Added `wrangler@4.163.0`, `wrangler.jsonc` (worker `weddingmall`, `nodejs_compat`, static assets, `IMAGES` binding, R2 incremental cache `weddingmall-next-cache`, self-reference service, non-secret vars), `open-next.config.ts`, scripts `cf:build` / `cf:preview` / `cf:deploy`. ESLint now ignores `.netlify/`, `.open-next/`, `.wrangler/` (the 1,004 lint errors were Netlify's bundle). Local env for preview is the gitignored `.dev.vars` (public URL/anon key from the build, placeholder secrets).

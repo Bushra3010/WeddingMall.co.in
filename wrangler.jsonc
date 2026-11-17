@@ -14,12 +14,15 @@
   // transformations a month; this site needs well under 1,000). Without the
   // binding the adapter serves the original file — a 2 MB PNG to a phone.
   "images": { "binding": "IMAGES" },
-  // ISR pages and unstable_cache entries live in R2 (free tier: 10 GB,
-  // 1M writes and 10M reads a month); without it every cache miss re-renders.
-  "r2_buckets": [
+  // ISR pages and unstable_cache entries live in Workers KV (free: 100k reads
+  // and 1k writes a day, no card needed). R2 is the better long-term store
+  // (1M writes a month) once it is enabled on the account: swap this for an
+  // `r2_buckets` entry bound to NEXT_INC_CACHE_R2_BUCKET and switch
+  // open-next.config.ts to the r2 override.
+  "kv_namespaces": [
     {
-      "binding": "NEXT_INC_CACHE_R2_BUCKET",
-      "bucket_name": "weddingmall-next-cache",
+      "binding": "NEXT_INC_CACHE_KV",
+      "id": "c6078afb88aa43d1862d72992990d280",
     },
   ],
   "services": [
@@ -38,5 +41,11 @@
     "FEATURE_PHONE_AUTH": "false",
     "ADMIN_MFA_REQUIRED": "false",
   },
+  // Custom domains: Cloudflare creates the DNS records and certificates.
+  // The apex should 301 to www (Rules → Redirect Rules in the dashboard).
+  "routes": [
+    { "pattern": "www.weddingmall.co.in", "custom_domain": true },
+    { "pattern": "weddingmall.co.in", "custom_domain": true },
+  ],
   "observability": { "enabled": true },
 }
