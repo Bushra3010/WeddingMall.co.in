@@ -2,6 +2,12 @@
 
 Updated: 2026-10-23
 
+## Site down again: Netlify Free credits exhausted (2026-11-17)
+
+- `www.weddingmall.co.in`, the apex and `weddingmallcoin.netlify.app` all answer 503 `{"error":"usage_exceeded"}`. DNS is fine (Netlify NS, Netlify IPs). The site's team is `alokkumarsoft24` (Free, 300 credits/month, hard cap); its usage period last observed as the 29th → 29th, so it reopens around **2026-11-29** unless upgraded. The per-category usage split was not readable: the CLI is now logged into `opticscareer396@gmail.com` (team `career-optics`, which is itself over its credits since 2026-11-02), the browser pane is logged out, and every Supabase token has been revoked.
+- Page weight measured against the deployed build (`next start` on the last `.next`): home 2.5 MB first visit (209 KB HTML, 1.39 MB JS/CSS in 19 files, 994 KB images — hero 331 KB at `w=2048&q=90`), `/vendors` 1.5 MB, vendor page 1.4 MB, `/categories` 1.4 MB; 20–41 requests each. At 20 credits/GB the 300-credit month is ≈15 GB ≈ 6,000–10,000 first visits including crawlers (Googlebot/Bingbot are deliberately allowed), so the Free plan cannot carry a marketplace with this weight. Only one deploy (15 credits) fell in this period; the rest is traffic.
+- **Options:** Netlify Personal ($9, 1,000 credits) or Pro ($20, 3,000); or move to a host whose free tier does not bill bandwidth per GB for static assets. Trimming weight (hero to `q=75`/smaller `deviceSizes`, `public/Images` PNGs to WebP — `pandit-jee-01.png` alone is 2.1 MB source, `prefetch={false}` on card links) stretches the budget but does not change the order of magnitude.
+
 ## "Book now" without an account (2026-10-31)
 
 - `/vendor/[slug]/book` no longer redirects to sign-in. The form asks name and mobile (Indian mobile, normalised to `+91…`, `normaliseIndianMobile` in `features/enquiries/schema.ts`), then date, time, guests, note, consent. Signed-in customers get name/phone prefilled from the profile (`getProfile` now selects `phone`).
