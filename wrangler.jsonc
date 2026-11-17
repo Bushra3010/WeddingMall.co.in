@@ -1,0 +1,42 @@
+{
+  // Cloudflare Workers deployment via @opennextjs/cloudflare.
+  // `npm run cf:build` produces .open-next/, `npm run cf:deploy` ships it.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "weddingmall",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  // `/_next/image` resizes through Cloudflare Images (free: 5,000 unique
+  // transformations a month; this site needs well under 1,000). Without the
+  // binding the adapter serves the original file — a 2 MB PNG to a phone.
+  "images": { "binding": "IMAGES" },
+  // ISR pages and unstable_cache entries live in R2 (free tier: 10 GB,
+  // 1M writes and 10M reads a month); without it every cache miss re-renders.
+  "r2_buckets": [
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "weddingmall-next-cache",
+    },
+  ],
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "weddingmall",
+    },
+  ],
+  // Plain, non-secret settings. Secrets (SUPABASE_SECRET_KEY, CRON_SECRET,
+  // Razorpay, email) go in with `wrangler secret put`.
+  "vars": {
+    "NEXT_PUBLIC_APP_URL": "https://www.weddingmall.co.in",
+    "NEXT_TELEMETRY_DISABLED": "1",
+    "FEATURE_REALTIME_CHAT": "true",
+    "FEATURE_ONLINE_PAYMENTS": "false",
+    "FEATURE_PHONE_AUTH": "false",
+    "ADMIN_MFA_REQUIRED": "false",
+  },
+  "observability": { "enabled": true },
+}

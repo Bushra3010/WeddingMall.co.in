@@ -23,6 +23,10 @@ const eslintConfig = defineConfig([
     // Same reason: the iOS project vendors Capacitor's `native-bridge.js` under
     // App/public, and CocoaPods output is not ours to lint.
     'ios/**',
+    // Deploy-tool output (Netlify bundles, OpenNext/Cloudflare worker build).
+    '.netlify/**',
+    '.open-next/**',
+    '.wrangler/**',
   ]),
 ])
 

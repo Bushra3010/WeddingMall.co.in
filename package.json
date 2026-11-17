@@ -24,7 +24,10 @@
     "db:rls": "node --env-file=.env.local scripts/rls-probe.mjs && node --env-file=.env.local scripts/rls-tenant-probe.mjs && node --env-file=.env.local scripts/rls-onboarding-probe.mjs && node --env-file=.env.local scripts/rls-listing-probe.mjs && node --env-file=.env.local scripts/rls-enquiry-probe.mjs && node --env-file=.env.local scripts/rls-review-probe.mjs && node --env-file=.env.local scripts/rls-billing-probe.mjs && node --env-file=.env.local scripts/rls-realtime-probe.mjs && node --env-file=.env.local scripts/rls-taxonomy-probe.mjs",
     "grant-admin": "node --env-file=.env.local scripts/grant-admin.mjs",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo-vendors.mjs",
-    "seed:amenities": "node --env-file=.env.local scripts/seed-venue-amenities.mjs"
+    "seed:amenities": "node --env-file=.env.local scripts/seed-venue-amenities.mjs",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
@@ -39,7 +42,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.28.0",
-    "next": "16.2.12",
+    "next": "16.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.83.0",
@@ -50,6 +53,7 @@
     "@capacitor/android": "^8.5.0",
     "@capacitor/cli": "^7.6.8",
     "@capacitor/ios": "^8.5.0",
+    "@opennextjs/cloudflare": "^1.20.17",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.0",
@@ -61,13 +65,14 @@
     "@vitejs/plugin-react": "^4.7.0",
     "dotenv": "^17.4.2",
     "eslint": "^9",
-    "eslint-config-next": "16.2.12",
+    "eslint-config-next": "16.4.6",
     "jsdom": "^26.1.0",
     "pg": "^8.22.0",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.7",
+    "wrangler": "^4.163.0"
   }
 }
